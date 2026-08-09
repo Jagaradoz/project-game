@@ -1,16 +1,23 @@
-# Webcam Pose Detection MVP
+# Webcam Lane Runner
 
-Client-side testbed for an exercise-game concept. Answers one question: **is browser
-webcam pose detection fast and reliable enough to drive a game?**
+Endless 3-lane runner steered with your body. Lean left/right to switch lane, jog in
+place to shoot. Built on a webcam pose-detection testbed that answers one question:
+**is browser webcam pose detection fast and reliable enough to drive a game?**
 
-- Live webcam feed with the detected skeleton drawn on top
-- **Lean / step LEFT–CENTER–RIGHT** from shoulder + hip midline
-- **Jogging in place** detection with a steps-per-minute readout
-- **FPS** and **inference milliseconds** shown separately
+- 3D road, 3 lanes, geometry primitives only — blue sphere is you, red spheres are enemies
+- **Lean LEFT–CENTER–RIGHT** maps straight onto the 3 lanes. Lane changes **snap**;
+  the mapping is absolute, so lean position and lane can never drift apart
+- **The march never stops.** Jogging in place opens fire; stop jogging and the bullets
+  stop while you keep walking into whatever is ahead
+- Enemies die to one bullet and only score when killed. One that walks past you is a miss
+- 3 HP, one hit each, brief grace period, then a score + distance screen
+- Arrow keys / `A`,`D` work too, so the game is playable with no camera at all
+- Detector debug (skeleton, offsets, cadence, FPS, inference ms) still there, collapsed
 - 100% client side. No server processing, no login, no database, no build step.
 
-Stack: plain HTML/CSS/ES modules + [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe)
-`PoseLandmarker`, loaded from jsDelivr.
+Stack: plain HTML/CSS/ES modules, [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe)
+`PoseLandmarker` and [Three.js](https://threejs.org), both loaded from jsDelivr at pinned
+versions. Zero npm dependencies.
 
 ## Run locally
 
@@ -19,7 +26,8 @@ cd "d:\Browser Works\test-game"
 npx -y serve . -l 5173
 ```
 
-Open <http://localhost:5173> and click **Start Camera**.
+Open <http://localhost:5173>. The runner starts immediately on the keyboard; open
+**Camera & detector debug** and click **Start Camera** to steer with your body.
 
 `localhost` counts as a secure context, so the camera works over plain HTTP here.
 First load pulls ~6 MB of WASM + model from the CDN, so give it a few seconds.
@@ -50,7 +58,7 @@ ngrok config add-authtoken <YOUR_TOKEN>
 
 ## Tests
 
-Both detectors are pure reducers over landmark arrays, so they run headless:
+Both detectors and the whole game are pure reducers, so they run headless:
 
 ```powershell
 npm test
@@ -72,6 +80,11 @@ The values you are most likely to touch:
 | `jog.crossThreshold` / `peakThreshold` | How high a knee must swing to count. Units are torso-lengths. |
 | `jog.minStepsInWindow` / `windowMs` | How much evidence before it says JOGGING. |
 | `pose.model` | `'lite'` (default, fastest) or `'full'` (more accurate, slower). |
+| `game.walkSpeed` / `maxSpeed` / `rampDistance` | How fast the march is and how quickly it speeds up. |
+| `game.fireIntervalMs` / `bulletSpeed` | Rate of fire and how fast a shot travels. |
+| `game.spawnIntervalMs` / `minSpawnIntervalMs` | How thick the enemy stream gets. |
+| `game.maxHp` / `invulnMs` | How many hits a run survives, and the grace period after one. |
+| `game.camera` | Where the camera sits. Move it back if the outer lanes clip on a narrow screen. |
 
 ## How the two detections work
 
@@ -95,9 +108,9 @@ camera shake) cancels out of a difference; alternating motion does not. A two-st
 machine counts each knee swap as a step, but only if that swing actually reached a
 real amplitude, which is what rejects small sways. It reports JOGGING when at least
 2 steps land in a 2.5-second window at a plausible human cadence (40–300 spm). The
-amplitude gate is deliberately low (a knee swing of ~0.1 torso-lengths), so a light
-shuffle in place counts — raise `jog.crossThreshold` / `peakThreshold` if idle
-fidgeting starts registering.
+amplitude gate is deliberately low (a knee swing of 0.06 torso-lengths), so a light
+shuffle in place is enough to keep the road moving — raise `jog.crossThreshold` /
+`peakThreshold` if idle fidgeting starts registering.
 
 ## Mirroring
 
@@ -110,19 +123,31 @@ emitted from *your* perspective — step to your own left and it reads `LEFT`. F
 ## Layout
 
 ```
-index.html                  video + overlay canvas + HUD
+index.html                  game canvas + HUD, webcam thumbnail, debug panel
 styles.css                  layout only, including the mirror transform
-src/config.js               every tunable value
+src/config.js               every tunable value, game included
 src/camera.js               getUserMedia, iOS quirks, readable errors
 src/pose.js                 PoseLandmarker load/detect, GPU -> CPU fallback
 src/draw.js                 skeleton overlay
 src/detectors/lateral.js    pure reducer: landmarks -> LEFT/CENTER/RIGHT
 src/detectors/jog.js        pure reducer: landmarks over time -> jogging + cadence
+src/game/state.js           pure reducer: input over time -> lanes, enemies, bullets, HP, score
+src/game/input.js           lean + keyboard -> { lane, isFiring }
+src/game/scene.js           Three.js scene: boxes for road, spheres for bodies
+src/game/render.js          one-way sync: game state -> meshes
 src/util/landmarks.js       visibility gating + scale-invariant body measurements
 src/util/smooth.js          EMA, sliding window, cadence
-src/main.js                 wiring + render loop + FPS meter
-test/                       headless detector tests
+src/main.js                 wiring: pose loop, game loop, HUD
+test/                       headless detector + game tests
 ```
+
+## The two loops
+
+The camera tops out near 30 FPS and inference is the expensive part, so the game does
+not run inside the pose loop. Pose keeps its `requestVideoFrameCallback` loop and
+writes `{ lane, isFiring }` into a shared snapshot; the game reads that snapshot from
+its own `requestAnimationFrame` loop and renders at display rate. That also means the
+runner boots and plays on the keyboard before the camera is ever granted.
 
 ## What to record while testing
 

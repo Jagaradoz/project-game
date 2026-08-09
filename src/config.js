@@ -14,6 +14,10 @@ const CDN_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPI
 export const MEDIAPIPE_MODULE_URL = `${CDN_BASE}/vision_bundle.mjs`;
 export const MEDIAPIPE_WASM_URL = `${CDN_BASE}/wasm`;
 
+/** Pinned for the same reason as MediaPipe: a CDN release must not move under us. */
+export const THREE_VERSION = '0.180.0';
+export const THREE_MODULE_URL = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/build/three.module.js`;
+
 const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker';
 
 /** Swap CONFIG.pose.model to compare accuracy vs. speed. */
@@ -75,10 +79,13 @@ export const CONFIG = {
   },
 
   jog: {
-    /** |kneeDelta| (in torso-lengths) needed to flip the up-knee state machine. */
-    crossThreshold: 0.06,
+    /**
+     * |kneeDelta| (in torso-lengths) needed to flip the up-knee state machine.
+     * Deliberately low: the game asks for a light shuffle, not real knee lifts.
+     */
+    crossThreshold: 0.035,
     /** A state must also peak above this before its transition counts as a step. */
-    peakThreshold: 0.1,
+    peakThreshold: 0.06,
     /** EMA weight for kneeDelta. */
     smoothing: 0.5,
     /** Steps are counted within this trailing window. */
@@ -104,5 +111,87 @@ export const CONFIG = {
     jointColor: '#ffffff',
     /** Joints below CONFIG.pose.minVisibility are drawn in this colour instead. */
     lowConfidenceColor: '#ff4d4d',
+  },
+
+  /**
+   * Endless 3-lane runner. World units are arbitrary but consistent: one lane is
+   * `laneWidth` wide, the player sits at z = playerZ, and enemies travel in +z
+   * (towards the camera). Lane index 0 = left, 1 = centre, 2 = right.
+   */
+  game: {
+    laneCount: 3,
+    laneWidth: 2.4,
+    /** Paved margin outside the outer lanes, purely cosmetic. */
+    shoulderWidth: 1.2,
+    roadLength: 220,
+
+    playerRadius: 0.75,
+    playerZ: 0,
+    enemyRadius: 0.65,
+
+    /** Enemies appear here and are retired once past despawnZ, behind the player. */
+    spawnZ: -85,
+    despawnZ: 8,
+
+    /**
+     * The march is constant -- the player is always walking forward. Jogging
+     * decides whether they SHOOT, not whether they move.
+     */
+    walkSpeed: 11,
+    maxSpeed: 18,
+    /** The ramp eases in over this long rather than snapping to a new speed. */
+    speedLerpMs: 400,
+
+    /** Bullets only leave the barrel while the body is jogging. */
+    bulletSpeed: 46,
+    bulletRadius: 0.18,
+    fireIntervalMs: 190,
+    bulletPoolSize: 40,
+
+    spawnIntervalMs: 1600,
+    minSpawnIntervalMs: 850,
+    /** Odds a spawn row gets a second enemy, once the ramp is under way. */
+    doubleSpawnChance: 0.2,
+    /** Never fill a row: one lane must always be survivable. */
+    maxLanesPerRow: 2,
+    /** Distance travelled before speed and spawn rate reach their hardest values. */
+    rampDistance: 1400,
+
+    maxHp: 3,
+    /** Grace period after a hit, so one pile-up cannot drain the bar. */
+    invulnMs: 1200,
+    /** Frames longer than this (tab switch, GC pause) are clamped to it. */
+    maxFrameMs: 50,
+
+    /** Enough meshes for the worst case; the pool is never grown at runtime. */
+    enemyPoolSize: 24,
+
+    dashCount: 26,
+    dashLength: 3,
+    dashGap: 6,
+    dashWidth: 0.18,
+
+    /**
+     * Framed for a portrait screen: far enough back that the outer lanes stay
+     * inside a narrow viewport, aimed far enough ahead to show oncoming traffic.
+     */
+    camera: {
+      fov: 62,
+      x: 0,
+      y: 8,
+      z: 14,
+      lookAtY: 1,
+      lookAtZ: -28,
+    },
+
+    colors: {
+      sky: '#101418',
+      road: '#3a4048',
+      shoulder: '#2a3038',
+      dash: '#e8edf2',
+      player: '#2f7bff',
+      enemy: '#ff3b3b',
+      bullet: '#8be9ff',
+    },
   },
 };

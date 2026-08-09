@@ -238,10 +238,19 @@ test('jog: symmetric bobbing is rejected', () => {
   assert.equal(state.stepCount, 0);
 });
 
-test('jog: alternation too shallow to clear the peak gate is rejected', () => {
-  // 0.08 crosses crossThreshold (0.06) so the state machine flips, but never
-  // reaches peakThreshold (0.10), so no step is committed.
+test('jog: a shuffle barely lifting the knees is detected', () => {
+  // 8% of a torso length -- the height the game asks for. This was below the
+  // original peak gate; it locks in the retune that made jogging less strict.
   const { state } = run(createJogState(), updateJog, 96, alternatingKnees(0.08, 400));
+
+  assert.equal(state.isJogging, true);
+  assert.ok(state.stepCount >= CONFIG.jog.minStepsInWindow, `stepCount was ${state.stepCount}`);
+});
+
+test('jog: alternation too shallow to clear the peak gate is rejected', () => {
+  // 0.045 crosses crossThreshold (0.035) so the state machine flips, but never
+  // reaches peakThreshold (0.06), so no step is committed.
+  const { state } = run(createJogState(), updateJog, 96, alternatingKnees(0.045, 400));
 
   assert.equal(state.stepCount, 0);
   assert.equal(state.isJogging, false);

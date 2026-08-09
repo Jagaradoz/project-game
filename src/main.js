@@ -1,4 +1,4 @@
-/** Wiring: camera -> pose -> detectors -> overlay + HUD. */
+/** Wiring: camera -> pose -> detectors -> input, and input -> game -> scene. */
 
 import { CONFIG } from './config.js';
 import { startCamera, describeCameraError } from './camera.js';
@@ -7,6 +7,10 @@ import { resizeOverlay, clearOverlay, drawSkeleton } from './draw.js';
 import { createLateralState, updateLateral, recalibrateLateral, LATERAL } from './detectors/lateral.js';
 import { createJogState, updateJog } from './detectors/jog.js';
 import { ema } from './util/smooth.js';
+import { createGameState, updateGame, restartGame } from './game/state.js';
+import { createInput } from './game/input.js';
+import { createScene } from './game/scene.js';
+import { syncScene } from './game/render.js';
 
 const el = {
   video: document.getElementById('video'),
@@ -24,6 +28,14 @@ const el = {
   fpsDetail: document.getElementById('fpsDetail'),
   backendValue: document.getElementById('backendValue'),
   backendDetail: document.getElementById('backendDetail'),
+  game: document.getElementById('game'),
+  gameCanvas: document.getElementById('gameCanvas'),
+  hpBar: document.getElementById('hpBar'),
+  scoreValue: document.getElementById('scoreValue'),
+  distanceValue: document.getElementById('distanceValue'),
+  gameOver: document.getElementById('gameOver'),
+  finalScore: document.getElementById('finalScore'),
+  restartBtn: document.getElementById('restartBtn'),
 };
 
 const ctx = el.overlay.getContext('2d');
@@ -37,11 +49,19 @@ let smoothedFps = null;
 let smoothedInferenceMs = null;
 let isRunning = false;
 
+const input = createInput();
+let game = createGameState(randomSeed());
+let sceneRefs = null;
+let lastGameMs = 0;
+
 el.startBtn.addEventListener('click', start);
 el.calibrateBtn.addEventListener('click', () => {
   lateral = recalibrateLateral(lateral);
   setStatus('Recalibrating center -- stand still for a second.');
 });
+el.restartBtn.addEventListener('click', restart);
+
+bootGame();
 
 async function start() {
   el.startBtn.disabled = true;
@@ -107,9 +127,101 @@ function processFrame(nowMs) {
   lateral = updateLateral(lateral, landmarks, nowMs);
   jog = updateJog(jog, landmarks, nowMs);
 
+  // The game reads this snapshot from its own loop; it never runs inference.
+  if (!landmarks || !lateral.isCalibrated) {
+    input.clearPose();
+  } else {
+    input.setPose(lateral.label, jog.isJogging);
+  }
+
   clearOverlay(ctx);
   drawSkeleton(ctx, landmarks, connections);
   renderHud(landmarks);
+}
+
+/**
+ * The game runs on its own rAF loop rather than inside the pose loop: the camera
+ * caps out around 30 FPS, and the road would stutter at that rate on a 60/120 Hz
+ * display. It also means the game is playable on the keyboard before -- or
+ * without -- the camera ever being granted.
+ */
+async function bootGame() {
+  input.attachKeyboard();
+  window.addEventListener('keydown', onGameKey);
+  buildHpPips();
+  renderGameHud();
+
+  try {
+    sceneRefs = await createScene(el.gameCanvas);
+  } catch (error) {
+    showError('Could not load the 3D renderer. Check the network, then reload.');
+    console.error(error);
+    return;
+  }
+
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => sceneRefs.resize()).observe(el.game);
+  } else {
+    window.addEventListener('resize', () => sceneRefs.resize());
+  }
+
+  lastGameMs = performance.now();
+  requestAnimationFrame(gameFrame);
+}
+
+function gameFrame(nowMs) {
+  const dtMs = nowMs - lastGameMs;
+  lastGameMs = nowMs;
+
+  const wasOver = game.isOver;
+  game = updateGame(game, input.read(), dtMs);
+
+  syncScene(sceneRefs, game);
+  sceneRefs.render();
+
+  renderGameHud();
+  if (game.isOver !== wasOver) toggleGameOver(game.isOver);
+
+  requestAnimationFrame(gameFrame);
+}
+
+function onGameKey(event) {
+  if (!game.isOver) return;
+  if (event.key === 'r' || event.key === 'R' || event.key === ' ') {
+    event.preventDefault();
+    restart();
+  }
+}
+
+function restart() {
+  game = restartGame(game);
+  input.reset();
+  toggleGameOver(false);
+  renderGameHud();
+}
+
+function toggleGameOver(isOver) {
+  el.gameOver.hidden = !isOver;
+  if (isOver) {
+    el.finalScore.textContent = `Score ${game.score} · ${Math.round(game.distance)} m`;
+  }
+}
+
+function buildHpPips() {
+  el.hpBar.replaceChildren();
+  for (let index = 0; index < CONFIG.game.maxHp; index += 1) {
+    const pip = document.createElement('span');
+    pip.className = 'pip';
+    el.hpBar.append(pip);
+  }
+}
+
+function renderGameHud() {
+  el.hpBar.childNodes.forEach((pip, index) => {
+    pip.classList.toggle('empty', index >= game.hp);
+  });
+  el.scoreValue.textContent = String(game.score);
+  el.distanceValue.textContent = `${Math.round(game.distance)} m`;
 }
 
 function renderHud(landmarks) {
@@ -141,6 +253,10 @@ function updateFps(nowMs) {
   el.fpsValue.textContent = smoothedFps === null ? '--' : smoothedFps.toFixed(0);
   el.fpsDetail.textContent =
     smoothedInferenceMs === null ? 'inference -- ms' : `inference ${smoothedInferenceMs.toFixed(1)} ms`;
+}
+
+function randomSeed() {
+  return Math.floor(Math.random() * 2 ** 32) >>> 0;
 }
 
 function setStatus(text) {
