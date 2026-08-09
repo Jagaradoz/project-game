@@ -61,6 +61,13 @@ export const CONFIG = {
     /** EMA weight for the new sample. Lower = smoother but laggier. */
     smoothing: 0.35,
     /**
+     * Blend of shoulder midline vs hip midline used as the body's lateral centre.
+     * The pelvis swings sideways on every step, so the shoulders carry most of the
+     * weight -- that is what keeps LEFT/RIGHT readable while jogging in place.
+     * 1 = shoulders only, 0 = hips only.
+     */
+    shoulderWeight: 0.7,
+    /**
      * MediaPipe x is in raw (un-mirrored) camera space, so the subject moving to
      * their OWN left increases x. Flip this if the on-screen label reads backwards.
      */
@@ -69,20 +76,20 @@ export const CONFIG = {
 
   jog: {
     /** |kneeDelta| (in torso-lengths) needed to flip the up-knee state machine. */
-    crossThreshold: 0.15,
+    crossThreshold: 0.06,
     /** A state must also peak above this before its transition counts as a step. */
-    peakThreshold: 0.2,
+    peakThreshold: 0.1,
     /** EMA weight for kneeDelta. */
-    smoothing: 0.45,
+    smoothing: 0.5,
     /** Steps are counted within this trailing window. */
-    windowMs: 2000,
+    windowMs: 2500,
     /** Minimum steps inside the window to call it jogging. */
-    minStepsInWindow: 3,
+    minStepsInWindow: 2,
     /** Drop back to not-jogging after this long with no step. */
-    timeoutMs: 1200,
+    timeoutMs: 1500,
     /** Plausible human cadence band, in steps per minute. */
-    minCadenceSpm: 60,
-    maxCadenceSpm: 240,
+    minCadenceSpm: 40,
+    maxCadenceSpm: 300,
   },
 
   fps: {

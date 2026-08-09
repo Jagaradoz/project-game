@@ -56,7 +56,6 @@ export function measureBody(landmarks, minVisibility = CONFIG.pose.minVisibility
     hipMid,
     shoulderWidth,
     torsoLength,
-    centerX: (shoulderMid.x + hipMid.x) / 2,
     kneesVisible,
     leftKnee: kneesVisible ? leftKnee : null,
     rightKnee: kneesVisible ? rightKnee : null,

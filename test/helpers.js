@@ -18,6 +18,9 @@ const FRAME_MS = 1000 / 30;
  *                                    standing twice as far from the camera.
  * @param {number} [opts.leftKneeLift]  Fraction of a torso length the left knee is raised.
  * @param {number} [opts.rightKneeLift] Same for the right knee.
+ * @param {number} [opts.hipShift]    Sideways offset of the pelvis (hips + knees)
+ *                                    only, in normalised x. Models the pelvis
+ *                                    swinging over the support leg while jogging.
  * @param {number} [opts.visibility]
  */
 export function makePose({
@@ -25,6 +28,7 @@ export function makePose({
   scale = 1,
   leftKneeLift = 0,
   rightKneeLift = 0,
+  hipShift = 0,
   visibility = 1,
 } = {}) {
   const shoulderWidth = 0.24 * scale;
@@ -49,10 +53,11 @@ export function makePose({
 
   set(LANDMARK.LEFT_SHOULDER, centerX + shoulderWidth / 2, shoulderY);
   set(LANDMARK.RIGHT_SHOULDER, centerX - shoulderWidth / 2, shoulderY);
-  set(LANDMARK.LEFT_HIP, centerX + hipWidth / 2, hipY);
-  set(LANDMARK.RIGHT_HIP, centerX - hipWidth / 2, hipY);
-  set(LANDMARK.LEFT_KNEE, centerX + hipWidth / 2, restKneeY - leftKneeLift * torso);
-  set(LANDMARK.RIGHT_KNEE, centerX - hipWidth / 2, restKneeY - rightKneeLift * torso);
+  const pelvisX = centerX + hipShift;
+  set(LANDMARK.LEFT_HIP, pelvisX + hipWidth / 2, hipY);
+  set(LANDMARK.RIGHT_HIP, pelvisX - hipWidth / 2, hipY);
+  set(LANDMARK.LEFT_KNEE, pelvisX + hipWidth / 2, restKneeY - leftKneeLift * torso);
+  set(LANDMARK.RIGHT_KNEE, pelvisX - hipWidth / 2, restKneeY - rightKneeLift * torso);
 
   return landmarks;
 }

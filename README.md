@@ -68,6 +68,7 @@ The values you are most likely to touch:
 | --- | --- |
 | `lateral.enterOffset` / `exitOffset` | How far to lean before LEFT/RIGHT commits, and how far back before it releases. Units are shoulder-widths. |
 | `lateral.invertSides` | Flip if the on-screen label reads backwards. |
+| `lateral.shoulderWeight` | How much the midline trusts shoulders over hips. Raise it if jogging in place nudges the lean label; lower it if leaning from the waist feels too sensitive. |
 | `jog.crossThreshold` / `peakThreshold` | How high a knee must swing to count. Units are torso-lengths. |
 | `jog.minStepsInWindow` / `windowMs` | How much evidence before it says JOGGING. |
 | `pose.model` | `'lite'` (default, fastest) or `'full'` (more accurate, slower). |
@@ -78,10 +79,14 @@ Both signals are **normalised by body size**, so the thresholds do not change wh
 you stand closer to or further from the camera — a phone propped on a desk frames
 you very differently from a laptop.
 
-**Lean / step.** Takes the midline of shoulders and hips, learns a baseline over
-the first second of standing still, then reports the sideways offset in
-shoulder-widths. Hysteresis (enter at 0.35, release at 0.20) stops the label
-chattering when you hover on the boundary. Hit **Recalibrate Center** any time you
+**Lean / step.** Takes the body midline — shoulders weighted 0.7 against hips,
+because the pelvis swings sideways on every step and the shoulders do not — learns
+a baseline over the first second of standing still, then reports the sideways
+offset in shoulder-widths. Hysteresis is **signed**: you commit to a side at
+±0.35 and hold it until the offset falls back inside ±0.20 *on that same side*, so
+crossing the baseline releases immediately and stepping straight across flips the
+label in one move. That weighting plus the signed release is what lets you steer
+left/right while jogging in place. Hit **Recalibrate Center** any time you
 reposition.
 
 **Jog in place.** Uses the *difference* between the two knee heights, divided by
@@ -89,7 +94,10 @@ torso length — not absolute knee height. Symmetric motion (squatting, bobbing,
 camera shake) cancels out of a difference; alternating motion does not. A two-state
 machine counts each knee swap as a step, but only if that swing actually reached a
 real amplitude, which is what rejects small sways. It reports JOGGING when at least
-3 steps land in a 2-second window at a plausible human cadence (60–240 spm).
+2 steps land in a 2.5-second window at a plausible human cadence (40–300 spm). The
+amplitude gate is deliberately low (a knee swing of ~0.1 torso-lengths), so a light
+shuffle in place counts — raise `jog.crossThreshold` / `peakThreshold` if idle
+fidgeting starts registering.
 
 ## Mirroring
 

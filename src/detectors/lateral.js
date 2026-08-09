@@ -45,7 +45,7 @@ export function updateLateral(state, landmarks, nowMs, config = CONFIG.lateral) 
   // would otherwise flicker every time a limb drops below the visibility bar.
   if (!body) return { ...state, hasBody: false };
 
-  const smoothedX = ema(state.smoothedX, body.centerX, config.smoothing);
+  const smoothedX = ema(state.smoothedX, lateralCenter(body, config), config.smoothing);
 
   if (!state.isCalibrated) {
     return calibrate({ ...state, smoothedX, hasBody: true }, smoothedX, nowMs, config);
@@ -57,7 +57,19 @@ export function updateLateral(state, landmarks, nowMs, config = CONFIG.lateral) 
   return { ...state, smoothedX, hasBody: true, offset, label: nextLabel(state.label, offset, config) };
 }
 
-/** Averages centerX over `calibrationMs` to learn where "standing in the middle" is. */
+/**
+ * Lateral centre of the body, weighted toward the shoulders.
+ *
+ * The pelvis swings sideways with every step, so a hip-heavy midline reads a jog
+ * in place as lateral movement. The shoulders stay much closer to the true body
+ * axis while the legs work, which is what lets leaning and jogging coexist.
+ */
+function lateralCenter(body, config) {
+  const shoulderWeight = config.shoulderWeight;
+  return shoulderWeight * body.shoulderMid.x + (1 - shoulderWeight) * body.hipMid.x;
+}
+
+/** Averages the lateral centre over `calibrationMs` to learn where "standing in the middle" is. */
 function calibrate(state, smoothedX, nowMs, config) {
   const startMs = state.calibrationStartMs ?? nowMs;
   const samples = [...state.calibrationSamples, smoothedX];
@@ -79,15 +91,19 @@ function calibrate(state, smoothedX, nowMs, config) {
 }
 
 /**
- * Hysteresis: crossing `enterOffset` commits to a side, and only falling back
- * inside `exitOffset` releases it. A single threshold would chatter whenever the
- * subject hovers on the boundary.
+ * Signed hysteresis: crossing `enterOffset` commits to a side, and the label is
+ * held until the offset falls back inside `exitOffset` ON THAT SAME SIDE. A
+ * single threshold would chatter whenever the subject hovers on the boundary.
+ *
+ * The comparisons are signed on purpose. An unsigned `Math.abs(offset) <
+ * exitOffset` release latches the first side forever: stepping across to the
+ * other side keeps |offset| large, so the old label never releases and the new
+ * one never gets a chance to commit.
  */
 function nextLabel(currentLabel, offset, config) {
-  if (currentLabel === LATERAL.CENTER) {
-    if (offset > config.enterOffset) return LATERAL.LEFT;
-    if (offset < -config.enterOffset) return LATERAL.RIGHT;
-    return LATERAL.CENTER;
-  }
-  return Math.abs(offset) < config.exitOffset ? LATERAL.CENTER : currentLabel;
+  if (offset > config.enterOffset) return LATERAL.LEFT;
+  if (offset < -config.enterOffset) return LATERAL.RIGHT;
+  if (currentLabel === LATERAL.LEFT) return offset > config.exitOffset ? LATERAL.LEFT : LATERAL.CENTER;
+  if (currentLabel === LATERAL.RIGHT) return offset < -config.exitOffset ? LATERAL.RIGHT : LATERAL.CENTER;
+  return LATERAL.CENTER;
 }

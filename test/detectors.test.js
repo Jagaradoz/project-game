@@ -14,6 +14,13 @@ const SETTLE_FRAMES = 30;
 /** Shoulder width of the synthetic pose, so tests can express offsets in shoulder-widths. */
 const shoulderWidthAt = (scale) => 0.24 * scale;
 
+/** Square-wave knee alternation: `lift` torso-lengths, flipping every `phaseMs`. */
+const alternatingKnees = (lift, phaseMs) => (frameIndex) => {
+  const framesPerPhase = Math.round(phaseMs / FRAME_MS);
+  const isLeftUp = Math.floor(frameIndex / framesPerPhase) % 2 === 0;
+  return makePose({ leftKneeLift: isLeftUp ? lift : 0, rightKneeLift: isLeftUp ? 0 : lift });
+};
+
 /** Runs calibration at `centerX`, then holds a pose offset by `offsetSw` shoulder-widths. */
 function calibrateThenOffset(offsetSw, { scale = 1, centerX = 0.5, state = createLateralState() } = {}) {
   const calibrated = run(state, updateLateral, CALIBRATION_FRAMES, () => makePose({ centerX, scale }));
@@ -103,6 +110,85 @@ test('lateral: falling under exitOffset releases back to CENTER', () => {
   assert.equal(state.label, LATERAL.CENTER);
 });
 
+test('lateral: stepping straight across from one side to the other flips the label', () => {
+  // The regression that made the HUD read LEFT forever: unsigned hysteresis never
+  // released the committed side, because |offset| stays large on the far side too.
+  const left = calibrateThenOffset(0.5);
+  assert.equal(left.state.label, LATERAL.LEFT);
+
+  const acrossX = 0.5 - 0.5 * shoulderWidthAt(1);
+  const { state } = run(left.state, updateLateral, SETTLE_FRAMES, () => makePose({ centerX: acrossX }), left.endMs);
+
+  assert.equal(state.label, LATERAL.RIGHT);
+});
+
+test('lateral: a committed side releases once the offset crosses the baseline', () => {
+  const left = calibrateThenOffset(0.5);
+
+  // Just past centre toward the other side: too small to commit RIGHT, but well
+  // past the point where LEFT should still be held.
+  const pastCentreX = 0.5 - 0.28 * shoulderWidthAt(1);
+  const { state } = run(left.state, updateLateral, SETTLE_FRAMES, () => makePose({ centerX: pastCentreX }), left.endMs);
+
+  assert.equal(state.label, LATERAL.CENTER);
+});
+
+test('lateral: pelvis swing from jogging in place does not leave CENTER', () => {
+  const calibrated = run(createLateralState(), updateLateral, CALIBRATION_FRAMES, () => makePose({ centerX: 0.5 }));
+
+  // Hips swing a third of a shoulder-width each way -- past enterOffset if the
+  // midline were hip-weighted -- while the shoulders stay put.
+  const swingX = 0.35 * shoulderWidthAt(1);
+  const { state } = run(
+    calibrated.state,
+    updateLateral,
+    96,
+    (frameIndex) =>
+      makePose({
+        centerX: 0.5,
+        hipShift: Math.floor(frameIndex / 12) % 2 === 0 ? swingX : -swingX,
+        leftKneeLift: Math.floor(frameIndex / 12) % 2 === 0 ? 0.35 : 0,
+        rightKneeLift: Math.floor(frameIndex / 12) % 2 === 0 ? 0 : 0.35,
+      }),
+    calibrated.endMs,
+  );
+
+  assert.equal(state.label, LATERAL.CENTER, `offset reached ${state.offset}`);
+});
+
+test('lateral: leaning while jogging still reports the side', () => {
+  const calibrated = run(createLateralState(), updateLateral, CALIBRATION_FRAMES, () => makePose({ centerX: 0.5 }));
+
+  const leanX = 0.5 - 0.6 * shoulderWidthAt(1);
+  const swingX = 0.35 * shoulderWidthAt(1);
+  const { state } = run(
+    calibrated.state,
+    updateLateral,
+    96,
+    (frameIndex) => {
+      const isLeftUp = Math.floor(frameIndex / 12) % 2 === 0;
+      return makePose({
+        centerX: leanX,
+        hipShift: isLeftUp ? swingX : -swingX,
+        leftKneeLift: isLeftUp ? 0.35 : 0,
+        rightKneeLift: isLeftUp ? 0 : 0.35,
+      });
+    },
+    calibrated.endMs,
+  );
+
+  assert.equal(state.label, LATERAL.RIGHT, `offset reached ${state.offset}`);
+});
+
+test('lateral: jogging in place does not drag the label off CENTER over time', () => {
+  // Same alternation as the jog detector test, checked against the lateral state
+  // so the two detections are confirmed to coexist.
+  const calibrated = run(createLateralState(), updateLateral, CALIBRATION_FRAMES, () => makePose({ centerX: 0.5 }));
+  const jogged = run(calibrated.state, updateLateral, 96, alternatingKnees(0.35, 400), calibrated.endMs);
+
+  assert.equal(jogged.state.label, LATERAL.CENTER);
+});
+
 test('lateral: an unusable frame holds the previous label instead of snapping to CENTER', () => {
   const committed = calibrateThenOffset(0.5);
   const held = updateLateral(committed.state, null, committed.endMs);
@@ -120,13 +206,6 @@ test('lateral: recalibrate clears the learned baseline', () => {
   assert.equal(reset.label, LATERAL.CENTER);
 });
 
-/** Square-wave knee alternation: `lift` torso-lengths, flipping every `phaseMs`. */
-const alternatingKnees = (lift, phaseMs) => (frameIndex) => {
-  const framesPerPhase = Math.round(phaseMs / FRAME_MS);
-  const isLeftUp = Math.floor(frameIndex / framesPerPhase) % 2 === 0;
-  return makePose({ leftKneeLift: isLeftUp ? lift : 0, rightKneeLift: isLeftUp ? 0 : lift });
-};
-
 test('jog: alternating knees at a human cadence is detected', () => {
   const { state } = run(createJogState(), updateJog, 96, alternatingKnees(0.35, 400));
 
@@ -136,6 +215,15 @@ test('jog: alternating knees at a human cadence is detected', () => {
     state.cadenceSpm >= CONFIG.jog.minCadenceSpm && state.cadenceSpm <= CONFIG.jog.maxCadenceSpm,
     `cadence was ${state.cadenceSpm}`,
   );
+});
+
+test('jog: a small, low-lift jog is still detected', () => {
+  // Knees barely leave the rest position -- 15% of a torso length, roughly a
+  // shuffle in place rather than a high-knee jog.
+  const { state } = run(createJogState(), updateJog, 96, alternatingKnees(0.15, 400));
+
+  assert.equal(state.isJogging, true);
+  assert.ok(state.stepCount >= CONFIG.jog.minStepsInWindow, `stepCount was ${state.stepCount}`);
 });
 
 test('jog: symmetric bobbing is rejected', () => {
@@ -151,9 +239,9 @@ test('jog: symmetric bobbing is rejected', () => {
 });
 
 test('jog: alternation too shallow to clear the peak gate is rejected', () => {
-  // 0.18 crosses crossThreshold (0.15) so the state machine flips, but never
-  // reaches peakThreshold (0.20), so no step is committed.
-  const { state } = run(createJogState(), updateJog, 96, alternatingKnees(0.18, 400));
+  // 0.08 crosses crossThreshold (0.06) so the state machine flips, but never
+  // reaches peakThreshold (0.10), so no step is committed.
+  const { state } = run(createJogState(), updateJog, 96, alternatingKnees(0.08, 400));
 
   assert.equal(state.stepCount, 0);
   assert.equal(state.isJogging, false);
