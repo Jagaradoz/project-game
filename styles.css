@@ -1,0 +1,151 @@
+:root {
+  --bg: #101418;
+  --panel: #1b2128;
+  --text: #e8edf2;
+  --muted: #8b98a5;
+  --accent: #00e5ff;
+  --ok: #35d07f;
+  --off: #55606b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* The mirror lives here. Video and canvas get the SAME transform so the
+   skeleton stays glued to the body without any flipping in the drawing code. */
+#video,
+#overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+}
+
+#video {
+  object-fit: cover;
+}
+
+#placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  text-align: center;
+  padding: 16px;
+}
+
+#controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button {
+  flex: 1 1 160px;
+  min-height: 48px; /* comfortable touch target on a phone */
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #04121a;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: var(--off);
+  color: #aab4bd;
+  cursor: not-allowed;
+}
+
+#status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+#error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #3a1c1c;
+  color: #ffb4b4;
+  font-size: 14px;
+}
+
+#error[hidden] {
+  display: none;
+}
+
+#hud {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.label {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.value {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.value.small {
+  font-size: 18px;
+}
+
+.value.active {
+  color: var(--ok);
+}
+
+.detail {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

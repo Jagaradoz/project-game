@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Pose Detection Test</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <div id="stage">
+        <video id="video" playsinline muted autoplay></video>
+        <canvas id="overlay"></canvas>
+        <div id="placeholder">Tap <strong>Start Camera</strong> to begin.</div>
+      </div>
+
+      <div id="controls">
+        <button id="startBtn" type="button">Start Camera</button>
+        <button id="calibrateBtn" type="button" disabled>Recalibrate Center</button>
+      </div>
+
+      <p id="status" role="status">Idle.</p>
+      <p id="error" role="alert" hidden></p>
+
+      <section id="hud">
+        <div class="tile">
+          <span class="label">Lean / Step</span>
+          <span class="value" id="lateralValue">--</span>
+          <span class="detail" id="lateralDetail">offset 0.00 sw</span>
+        </div>
+        <div class="tile">
+          <span class="label">Jog In Place</span>
+          <span class="value" id="jogValue">--</span>
+          <span class="detail" id="jogDetail">0 spm &middot; 0 steps</span>
+        </div>
+        <div class="tile">
+          <span class="label">FPS</span>
+          <span class="value" id="fpsValue">--</span>
+          <span class="detail" id="fpsDetail">inference -- ms</span>
+        </div>
+        <div class="tile">
+          <span class="label">Backend</span>
+          <span class="value small" id="backendValue">--</span>
+          <span class="detail" id="backendDetail">--</span>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
