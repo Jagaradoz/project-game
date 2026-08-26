@@ -1,16 +1,16 @@
 /** Wiring: camera -> pose -> detectors -> input, and input -> game -> scene. */
 
-import { CONFIG } from './config.js';
-import { startCamera, describeCameraError } from './camera.js';
-import { initPose, detect } from './pose.js';
-import { resizeOverlay, clearOverlay, drawSkeleton } from './draw.js';
-import { createLateralState, updateLateral, recalibrateLateral, LATERAL } from './detectors/lateral.js';
-import { createJogState, updateJog } from './detectors/jog.js';
-import { ema } from './util/smooth.js';
-import { createGameState, updateGame, restartGame } from './game/state.js';
-import { createInput } from './game/input.js';
-import { createScene } from './game/scene.js';
-import { syncScene } from './game/render.js';
+import { CONFIG } from './config.js?v=1.3.2';
+import { startCamera, describeCameraError } from './camera.js?v=1.3.2';
+import { initPose, detect } from './pose.js?v=1.3.2';
+import { resizeOverlay, clearOverlay, drawSkeleton } from './draw.js?v=1.3.2';
+import { createLateralState, updateLateral, recalibrateLateral, LATERAL } from './detectors/lateral.js?v=1.3.2';
+import { createJogState, updateJog } from './detectors/jog.js?v=1.3.2';
+import { ema } from './util/smooth.js?v=1.3.2';
+import { createGameState, updateGame, restartGame } from './game/state.js?v=1.3.2';
+import { createInput } from './game/input.js?v=1.3.2';
+import { createScene } from './game/scene.js?v=1.3.2';
+import { syncScene } from './game/render.js?v=1.3.2';
 
 const el = {
   video: document.getElementById('video'),
