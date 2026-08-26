@@ -6,8 +6,8 @@
  * sci-fi light pylons, and parallax background mountain ranges.
  */
 
-import { CONFIG, THREE_MODULE_URL } from '../config.js?v=1.3.2';
-import { laneToX } from './state.js?v=1.3.2';
+import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.4.0';
+import { laneToX } from './state.js?v=1.4.0';
 
 const ROAD_THICKNESS = 0.25;
 const ROAD_TOP_Y = ROAD_THICKNESS / 2;
@@ -44,7 +44,7 @@ export async function createScene(canvas, config = CONFIG.game) {
   const dashes = addDashes(THREE, scene, config);
   const scenery = addRoadsideScenery(THREE, scene, config);
   const mountains = addBackgroundMountains(THREE, scene, config);
-  const player = addPlayer(THREE, scene, config);
+  const player = await addPlayer(THREE, scene, config);
   const enemyPool = addEnemyPool(THREE, scene, config);
   const bulletPool = addBulletPool(THREE, scene, config);
 
@@ -348,12 +348,13 @@ function addBackgroundMountains(THREE, scene, config) {
 }
 
 /**
- * Stylized low-poly player character with faceted geometry and glowing energy accents.
+ * Rigged 3D player character with skeletal animations and low-poly fallback.
  */
-function addPlayer(THREE, scene, config) {
+async function addPlayer(THREE, scene, config) {
   const group = new THREE.Group();
 
-  // Low-poly faceted core body
+  // Procedural geometric fallback group
+  const fallbackGroup = new THREE.Group();
   const bodyGeo = new THREE.IcosahedronGeometry(config.playerRadius, 1);
   const bodyMat = new THREE.MeshStandardMaterial({
     color: config.colors.player,
@@ -363,19 +364,220 @@ function addPlayer(THREE, scene, config) {
     transparent: true,
   });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
-  group.add(body);
+  fallbackGroup.add(body);
 
-  // Glowing energy ring
   const ringGeo = new THREE.TorusGeometry(config.playerRadius * 0.95, 0.08, 6, 12);
-  const ringMat = new THREE.MeshBasicMaterial({ color: config.colors.dash });
+  const ringMat = new THREE.MeshBasicMaterial({ color: config.colors.dash, transparent: true });
   const ring = new THREE.Mesh(ringGeo, ringMat);
   ring.rotation.x = Math.PI / 2;
-  group.add(ring);
+  fallbackGroup.add(ring);
 
-  group.position.set(laneToX(1, config), ROAD_TOP_Y + config.playerRadius, config.playerZ);
+  fallbackGroup.position.y = config.playerRadius;
+  group.add(fallbackGroup);
+
+  // Model container for loaded rigged GLTF characters
+  const modelContainer = new THREE.Group();
+  group.add(modelContainer);
+
+  group.position.set(laneToX(1, config), ROAD_TOP_Y, config.playerZ);
   scene.add(group);
 
-  return { group, body, ring, material: bodyMat };
+  const playerObj = {
+    group,
+    body,
+    ring,
+    material: bodyMat,
+    materials: [bodyMat, ringMat],
+    mixer: null,
+    actions: {},
+    currentAction: null,
+    currentActionName: null,
+    characterId: config.defaultCharacter || 'robot',
+    fallbackVisible: true,
+    modelContainer,
+    fallbackGroup,
+  };
+
+  // Helper to load GLTFLoader
+  let loader = null;
+  try {
+    let GLTFLoaderClass = null;
+    try {
+      const mod = await import(/* @vite-ignore */ GLTF_LOADER_URL);
+      GLTFLoaderClass = mod.GLTFLoader;
+    } catch (e) {
+      try {
+        const mod2 = await import(/* @vite-ignore */ 'three/addons/loaders/GLTFLoader.js');
+        GLTFLoaderClass = mod2.GLTFLoader;
+      } catch (err) {
+        console.warn('GLTFLoader dynamic import fallback failed:', err);
+      }
+    }
+    if (GLTFLoaderClass) {
+      loader = new GLTFLoaderClass();
+    }
+  } catch (err) {
+    console.error('Failed to initialize GLTFLoader:', err);
+  }
+
+  const gltfCache = new Map();
+
+  playerObj.playAnimation = function playAnimation(name, duration = 0.2, loop = true) {
+    if (!playerObj.mixer || playerObj.fallbackVisible) return;
+    if (playerObj.currentActionName === name && playerObj.currentAction?.isRunning()) return;
+
+    const targetAction =
+      playerObj.actions[name] ||
+      playerObj.actions.run ||
+      playerObj.actions.idle ||
+      Object.values(playerObj.actions)[0];
+
+    if (!targetAction) return;
+
+    if (loop) {
+      targetAction.setLoop(THREE.LoopRepeat, Infinity);
+      targetAction.clampWhenFinished = false;
+    } else {
+      targetAction.setLoop(THREE.LoopOnce, 1);
+      targetAction.clampWhenFinished = true;
+    }
+
+    if (playerObj.currentAction && playerObj.currentAction !== targetAction) {
+      targetAction.reset();
+      targetAction.fadeIn(duration);
+      targetAction.play();
+      playerObj.currentAction.fadeOut(duration);
+    } else {
+      targetAction.reset();
+      targetAction.play();
+    }
+
+    playerObj.currentAction = targetAction;
+    playerObj.currentActionName = name;
+  };
+
+  playerObj.loadCharacter = async function loadCharacter(charId) {
+    playerObj.characterId = charId;
+
+    if (charId === 'orb' || !loader) {
+      // Switch to procedural energy orb
+      modelContainer.visible = false;
+      fallbackGroup.visible = true;
+      playerObj.fallbackVisible = true;
+      if (playerObj.mixer) {
+        playerObj.mixer.stopAllAction();
+        playerObj.mixer = null;
+      }
+      playerObj.materials = [bodyMat, ringMat];
+      playerObj.actions = {};
+      playerObj.currentAction = null;
+      playerObj.currentActionName = null;
+      return true;
+    }
+
+    const charDef = config.characters?.[charId] || config.characters?.robot;
+    if (!charDef || !charDef.path) return false;
+
+    try {
+      let gltf = gltfCache.get(charDef.path);
+      if (!gltf) {
+        gltf = await loader.loadAsync(charDef.path);
+        gltfCache.set(charDef.path, gltf);
+      }
+
+      // Clean up previous model and mixer
+      if (playerObj.mixer) {
+        playerObj.mixer.stopAllAction();
+      }
+      while (modelContainer.children.length > 0) {
+        modelContainer.remove(modelContainer.children[0]);
+      }
+
+      const model = gltf.scene;
+      const materials = [];
+
+      model.traverse((child) => {
+        if (child.isMesh || child.isSkinnedMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          if (child.material) {
+            // Clone materials so opacity blinking doesn't affect other models
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map((m) => {
+                const cm = m.clone();
+                cm.transparent = true;
+                materials.push(cm);
+                return cm;
+              });
+            } else {
+              child.material = child.material.clone();
+              child.material.transparent = true;
+              materials.push(child.material);
+            }
+          }
+        }
+      });
+
+      // Align model bounding box to place feet on ground level (Y = 0)
+      const box = new THREE.Box3().setFromObject(model);
+      const scale = charDef.scale || 1.0;
+      model.scale.set(scale, scale, scale);
+
+      // Recompute ground offset after scale
+      const scaledBox = new THREE.Box3().setFromObject(model);
+      model.position.set(0, -scaledBox.min.y + (charDef.offsetY || 0), 0);
+      model.rotation.y = charDef.rotationY ?? Math.PI;
+
+      modelContainer.add(model);
+      modelContainer.visible = true;
+      fallbackGroup.visible = false;
+
+      // Set up AnimationMixer with animations from original GLTF
+      const mixer = new THREE.AnimationMixer(model);
+      const actions = {};
+      const clipMap = new Map(gltf.animations.map((c) => [c.name.toLowerCase(), c]));
+
+      for (const [logicalName, clipName] of Object.entries(charDef.animations || {})) {
+        let clip = gltf.animations.find((c) => c.name === clipName);
+        if (!clip) {
+          clip = clipMap.get(clipName.toLowerCase());
+        }
+        if (clip) {
+          actions[logicalName] = mixer.clipAction(clip);
+        }
+      }
+
+      // If no configured clips matched, make all available clips accessible
+      if (Object.keys(actions).length === 0 && gltf.animations.length > 0) {
+        gltf.animations.forEach((clip, idx) => {
+          const name = idx === 0 ? 'run' : clip.name.toLowerCase();
+          actions[name] = mixer.clipAction(clip);
+        });
+      }
+
+      playerObj.mixer = mixer;
+      playerObj.actions = actions;
+      playerObj.materials = materials.length > 0 ? materials : [bodyMat];
+      playerObj.fallbackVisible = false;
+      playerObj.currentAction = null;
+      playerObj.currentActionName = null;
+
+      playerObj.playAnimation('run', 0.1, true);
+      return true;
+    } catch (err) {
+      console.error(`Failed to load character model ${charId}:`, err);
+      modelContainer.visible = false;
+      fallbackGroup.visible = true;
+      playerObj.fallbackVisible = true;
+      playerObj.materials = [bodyMat, ringMat];
+      return false;
+    }
+  };
+
+  // Pre-load default character
+  await playerObj.loadCharacter(config.defaultCharacter || 'robot');
+
+  return playerObj;
 }
 
 /**

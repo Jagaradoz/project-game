@@ -6,15 +6,16 @@
  * scenery props, lane dashes, and background mountain parallax.
  */
 
-import { CONFIG } from '../config.js?v=1.3.2';
-import { laneToX, isInvulnerable } from './state.js?v=1.3.2';
+import { CONFIG } from '../config.js?v=1.4.0';
+import { laneToX, isInvulnerable } from './state.js?v=1.4.0';
 
 /** Blink cycle while the grace window is open. */
 const BLINK_PERIOD_MS = 160;
 const BLINK_OPACITY = 0.25;
 
-export function syncScene(sceneRefs, state, config = CONFIG.game) {
-  syncPlayer(sceneRefs.player, state, config);
+export function syncScene(sceneRefs, state, dtMs = 16.67, config = CONFIG.game) {
+  const dtSec = Math.min(dtMs / 1000, 0.1);
+  syncPlayer(sceneRefs.player, state, dtSec, config);
   syncEnemies(sceneRefs.enemyPool, state.enemies, state.elapsedMs, config);
   syncBullets(sceneRefs.bulletPool, state.bullets, config);
   syncDashes(sceneRefs.dashes, state.distance);
@@ -23,24 +24,61 @@ export function syncScene(sceneRefs, state, config = CONFIG.game) {
   syncMountains(sceneRefs.mountains, state.distance);
 }
 
-function syncPlayer(player, state, config) {
+function syncPlayer(player, state, dtSec, config) {
   if (!player) return;
 
   const targetX = laneToX(state.lane, config);
-  player.group.position.x = targetX;
+  const currentX = player.group.position.x;
+
+  // Smooth position interpolation
+  player.group.position.x += (targetX - currentX) * 0.35;
   player.group.position.z = config.playerZ;
 
-  // Invulnerability blink
-  const isBlinkOn = Math.floor(state.elapsedMs / BLINK_PERIOD_MS) % 2 === 1;
-  player.material.opacity = isInvulnerable(state) && isBlinkOn ? BLINK_OPACITY : 1;
+  // Dynamic banking tilt when switching lanes
+  const deltaX = targetX - currentX;
+  const targetRoll = -deltaX * 0.25;
+  player.group.rotation.z += (targetRoll - player.group.rotation.z) * 0.2;
+  const targetYaw = deltaX * 0.15;
+  player.group.rotation.y += (targetYaw - player.group.rotation.y) * 0.2;
 
-  // Subtle dynamic rotation on the energy ring & body bobbing
-  if (player.ring) {
-    player.ring.rotation.z = state.elapsedMs * 0.003;
+  // Invulnerability blink across all active character materials
+  const isBlinkOn = Math.floor(state.elapsedMs / BLINK_PERIOD_MS) % 2 === 1;
+  const opacity = isInvulnerable(state) && isBlinkOn ? BLINK_OPACITY : 1;
+  if (player.materials) {
+    for (const mat of player.materials) {
+      mat.opacity = opacity;
+    }
   }
-  if (player.body) {
-    player.body.rotation.y = state.elapsedMs * 0.0015;
-    player.body.rotation.x = Math.sin(state.elapsedMs * 0.008) * 0.08;
+
+  // Skeletal animation mixer update
+  if (player.mixer) {
+    player.mixer.update(dtSec);
+  }
+
+  // Animation state transitions
+  if (state.isOver) {
+    player.playAnimation?.('death', 0.2, false);
+  } else if (state.isJogging) {
+    player.playAnimation?.('run', 0.15, true);
+    if (player.currentAction) {
+      player.currentAction.timeScale = 1.35;
+    }
+  } else {
+    player.playAnimation?.('run', 0.2, true);
+    if (player.currentAction) {
+      player.currentAction.timeScale = 1.0;
+    }
+  }
+
+  // Procedural geometric animation if fallback / orb is active
+  if (player.fallbackVisible) {
+    if (player.ring) {
+      player.ring.rotation.z = state.elapsedMs * 0.003;
+    }
+    if (player.body) {
+      player.body.rotation.y = state.elapsedMs * 0.0015;
+      player.body.rotation.x = Math.sin(state.elapsedMs * 0.008) * 0.08;
+    }
   }
 }
 

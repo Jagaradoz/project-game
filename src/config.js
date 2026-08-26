@@ -17,6 +17,7 @@ export const MEDIAPIPE_WASM_URL = `${CDN_BASE}/wasm`;
 /** Pinned for the same reason as MediaPipe: a CDN release must not move under us. */
 export const THREE_VERSION = '0.180.0';
 export const THREE_MODULE_URL = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/build/three.module.js`;
+export const GLTF_LOADER_URL = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/examples/jsm/loaders/GLTFLoader.js`;
 
 const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker';
 
@@ -191,6 +192,63 @@ export const CONFIG = {
       segmentCount: 20,
       segmentLength: 12,
     },
+
+    characters: {
+      robot: {
+        id: 'robot',
+        name: 'Expressive Robot',
+        path: './assets/models/RobotExpressive.glb',
+        scale: 0.8,
+        rotationY: Math.PI,
+        offsetY: 0,
+        animations: {
+          run: 'Running',
+          walk: 'Walking',
+          idle: 'Idle',
+          shoot: 'Punch',
+          death: 'Death',
+          jump: 'Jump',
+          wave: 'Wave',
+        },
+      },
+      xbot: {
+        id: 'xbot',
+        name: 'Cyber X-Bot',
+        path: './assets/models/Xbot.glb',
+        scale: 1.15,
+        rotationY: Math.PI,
+        offsetY: 0,
+        animations: {
+          run: 'run',
+          walk: 'walk',
+          idle: 'idle',
+          shoot: 'agree',
+          death: 'sad_pose',
+        },
+      },
+      soldier: {
+        id: 'soldier',
+        name: 'Tactical Soldier',
+        path: './assets/models/Soldier.glb',
+        scale: 1.2,
+        rotationY: Math.PI,
+        offsetY: 0,
+        animations: {
+          run: 'Run',
+          walk: 'Walk',
+          idle: 'Idle',
+          shoot: 'TPose',
+          death: 'Idle',
+        },
+      },
+      orb: {
+        id: 'orb',
+        name: 'Energy Orb',
+        path: null,
+        scale: 1.0,
+      },
+    },
+    defaultCharacter: 'robot',
 
     colors: {
       sky: '#0b1017',
