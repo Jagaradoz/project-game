@@ -1,19 +1,46 @@
 /**
- * Three.js scene for the Low-Poly Runner.
+ * Three.js scene for the Low-Poly Runner - Authentic Kenney Nature Kit 3D Assets.
  *
- * Implements a rich, stylized low-poly aesthetic with flat-shaded geometries,
- * faceted road segments, animated hazard curbs, roadside pine trees, geometric boulders,
- * sci-fi light pylons, and parallax background mountain ranges.
+ * Implements a rich, stylized low-poly woodland aesthetic using official CC0 low-poly
+ * 3D nature models (pines, oaks, detailed trees, rocks, boulders, logs, stumps,
+ * mushroom clusters, bushes, and campfires), combined with earthen forest trails,
+ * timber/moss curbs, floating fireflies, and rolling misty mountain ridges.
  */
 
-import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.4.0';
-import { laneToX } from './state.js?v=1.4.0';
+import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.8.0';
+import { laneToX } from './state.js?v=1.8.0';
 
 const ROAD_THICKNESS = 0.25;
 const ROAD_TOP_Y = ROAD_THICKNESS / 2;
 const ROAD_BEHIND_PLAYER = 18;
-const FOG_NEAR = 65;
+const FOG_NEAR = 55;
 const FOG_FAR = 240;
+
+const NATURE_GLB_ASSETS = {
+  foreground: [
+    { id: 'plantBush', path: './assets/models/nature/plant_bushDetailed.glb', scale: 2.2 },
+    { id: 'plantBushLarge', path: './assets/models/nature/plant_bushLarge.glb', scale: 2.2 },
+    { id: 'mushroomGroup', path: './assets/models/nature/mushroom_redGroup.glb', scale: 2.4 },
+    { id: 'rockSmall', path: './assets/models/nature/rock_smallA.glb', scale: 2.5 },
+    { id: 'logLarge', path: './assets/models/nature/log_large.glb', scale: 1.9 },
+    { id: 'stumpRound', path: './assets/models/nature/stump_roundDetailed.glb', scale: 1.8 },
+    { id: 'campfireStones', path: './assets/models/nature/campfire_stones.glb', scale: 1.8 },
+  ],
+  midground: [
+    { id: 'pineDefaultA', path: './assets/models/nature/tree_pineDefaultA.glb', scale: 2.5 },
+    { id: 'pineTallA', path: './assets/models/nature/tree_pineTallA_detailed.glb', scale: 2.5 },
+    { id: 'treeOak', path: './assets/models/nature/tree_oak.glb', scale: 2.4 },
+    { id: 'treeDetailed', path: './assets/models/nature/tree_detailed.glb', scale: 2.4 },
+    { id: 'rockLargeA', path: './assets/models/nature/rock_largeA.glb', scale: 2.0 },
+    { id: 'rockTallA', path: './assets/models/nature/rock_tallA.glb', scale: 2.2 },
+  ],
+  background: [
+    { id: 'pineRoundA', path: './assets/models/nature/tree_pineRoundA.glb', scale: 2.8 },
+    { id: 'treePlateau', path: './assets/models/nature/tree_plateau.glb', scale: 2.8 },
+    { id: 'treeFat', path: './assets/models/nature/tree_fat.glb', scale: 2.6 },
+    { id: 'treeDetailedBg', path: './assets/models/nature/tree_detailed.glb', scale: 2.7 },
+  ],
+};
 
 export async function createScene(canvas, config = CONFIG.game) {
   const THREE = await import(/* @vite-ignore */ THREE_MODULE_URL);
@@ -29,22 +56,45 @@ export async function createScene(canvas, config = CONFIG.game) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-  // Lighting tuned for crisp low-poly facet highlights & rich atmosphere
-  const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x0f172a, 1.4);
+  // Lighting tuned for lush forest canopy atmosphere and crisp low-poly facet highlights
+  const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x14532d, 1.6);
   scene.add(hemiLight);
 
-  const sun = new THREE.DirectionalLight(0xfffbeb, 1.8);
-  sun.position.set(14, 22, 10);
+  const sun = new THREE.DirectionalLight(0xfffae0, 2.0);
+  sun.position.set(16, 24, 12);
   scene.add(sun);
 
-  const ambientFill = new THREE.AmbientLight(0x1e293b, 0.7);
+  const ambientFill = new THREE.AmbientLight(0x132e27, 0.8);
   scene.add(ambientFill);
+
+  // Initialize GLTF Loader
+  let loader = null;
+  try {
+    let GLTFLoaderClass = null;
+    try {
+      const mod = await import(/* @vite-ignore */ GLTF_LOADER_URL);
+      GLTFLoaderClass = mod.GLTFLoader;
+    } catch (e) {
+      try {
+        const mod2 = await import(/* @vite-ignore */ 'three/addons/loaders/GLTFLoader.js');
+        GLTFLoaderClass = mod2.GLTFLoader;
+      } catch (err) {
+        console.warn('GLTFLoader dynamic import fallback failed:', err);
+      }
+    }
+    if (GLTFLoaderClass) {
+      loader = new GLTFLoaderClass();
+    }
+  } catch (err) {
+    console.error('Failed to initialize GLTFLoader:', err);
+  }
 
   const roadSegments = addLowPolyRoad(THREE, scene, config);
   const dashes = addDashes(THREE, scene, config);
-  const scenery = addRoadsideScenery(THREE, scene, config);
+  const scenery = await addRoadsideScenery(THREE, scene, config, loader);
+  const fireflies = addFireflies(THREE, scene, config);
   const mountains = addBackgroundMountains(THREE, scene, config);
-  const player = await addPlayer(THREE, scene, config);
+  const player = await addPlayer(THREE, scene, config, loader);
   const enemyPool = addEnemyPool(THREE, scene, config);
   const bulletPool = addBulletPool(THREE, scene, config);
 
@@ -73,6 +123,7 @@ export async function createScene(canvas, config = CONFIG.game) {
     dashes,
     roadSegments,
     scenery,
+    fireflies,
     mountains,
     resize,
     render,
@@ -84,8 +135,8 @@ function roadWidth(config) {
 }
 
 /**
- * Modular low-poly road track with faceted road decks, alternating hazard curbs,
- * and roadside terrain embankments that scroll continuously with distance.
+ * Modular low-poly forest trail with earthen track decks, alternating timber logs &
+ * mossy stone curbs, and dual-layer grassy knoll embankments.
  */
 function addLowPolyRoad(THREE, scene, config) {
   const width = roadWidth(config);
@@ -96,21 +147,22 @@ function addLowPolyRoad(THREE, scene, config) {
 
   const roadMat = new THREE.MeshStandardMaterial({
     color: config.colors.road,
-    roughness: 0.7,
-    metalness: 0.15,
+    roughness: 0.85,
+    metalness: 0.05,
     flatShading: true,
   });
 
-  const curbLightMat = new THREE.MeshStandardMaterial({
+  const curbMossMat = new THREE.MeshStandardMaterial({
     color: config.colors.curbLight,
-    roughness: 0.5,
-    metalness: 0.3,
+    roughness: 0.8,
+    metalness: 0.1,
     flatShading: true,
   });
 
-  const curbDarkMat = new THREE.MeshStandardMaterial({
+  const curbTimberMat = new THREE.MeshStandardMaterial({
     color: config.colors.curbDark,
-    roughness: 0.75,
+    roughness: 0.9,
+    metalness: 0.05,
     flatShading: true,
   });
 
@@ -120,9 +172,16 @@ function addLowPolyRoad(THREE, scene, config) {
     flatShading: true,
   });
 
+  const terrainFacetedMat = new THREE.MeshStandardMaterial({
+    color: config.colors.terrainFaceted,
+    roughness: 0.85,
+    flatShading: true,
+  });
+
   const roadGeo = new THREE.BoxGeometry(width, ROAD_THICKNESS, segmentLength);
-  const curbGeo = new THREE.BoxGeometry(0.38, ROAD_THICKNESS + 0.1, segmentLength / 4);
-  const terrainGeo = new THREE.BoxGeometry(18, ROAD_THICKNESS * 0.7, segmentLength);
+  const curbGeo = new THREE.BoxGeometry(0.42, ROAD_THICKNESS + 0.14, segmentLength / 4);
+  const innerTerrainGeo = new THREE.BoxGeometry(10, ROAD_THICKNESS * 0.85, segmentLength);
+  const outerTerrainGeo = new THREE.BoxGeometry(18, ROAD_THICKNESS * 1.6, segmentLength);
 
   const segments = [];
 
@@ -130,36 +189,47 @@ function addLowPolyRoad(THREE, scene, config) {
     const group = new THREE.Group();
     const baseZ = startZ + i * segmentLength + segmentLength / 2;
 
-    // Main road deck
+    // Main earthen forest trail deck
     const roadMesh = new THREE.Mesh(roadGeo, roadMat);
     group.add(roadMesh);
 
-    // Left and right hazard curbs with alternating high-contrast low-poly blocks
+    // Left and right curbs: alternating carved timber logs and mossy stone blocks
     const halfWidth = width / 2;
     for (let c = 0; c < 4; c += 1) {
       const cz = -segmentLength / 2 + (c + 0.5) * (segmentLength / 4);
       const isAlt = (i * 4 + c) % 2 === 0;
-      const cMat = isAlt ? curbLightMat : curbDarkMat;
+      const cMat = isAlt ? curbMossMat : curbTimberMat;
 
       const curbL = new THREE.Mesh(curbGeo, cMat);
-      curbL.position.set(-halfWidth - 0.19, 0.05, cz);
+      curbL.position.set(-halfWidth - 0.21, 0.07, cz);
       group.add(curbL);
 
       const curbR = new THREE.Mesh(curbGeo, cMat);
-      curbR.position.set(halfWidth + 0.19, 0.05, cz);
+      curbR.position.set(halfWidth + 0.21, 0.07, cz);
       group.add(curbR);
     }
 
-    // Side terrain embankments (faceted terrain slopes)
-    const terrainL = new THREE.Mesh(terrainGeo, terrainMat);
-    terrainL.position.set(-halfWidth - 9.3, -0.04, 0);
-    terrainL.rotation.z = 0.04;
-    group.add(terrainL);
+    // Tier 1 inner grassy embankment
+    const terrainL1 = new THREE.Mesh(innerTerrainGeo, terrainMat);
+    terrainL1.position.set(-halfWidth - 5.3, -0.02, 0);
+    terrainL1.rotation.z = 0.05;
+    group.add(terrainL1);
 
-    const terrainR = new THREE.Mesh(terrainGeo, terrainMat);
-    terrainR.position.set(halfWidth + 9.3, -0.04, 0);
-    terrainR.rotation.z = -0.04;
-    group.add(terrainR);
+    const terrainR1 = new THREE.Mesh(innerTerrainGeo, terrainMat);
+    terrainR1.position.set(halfWidth + 5.3, -0.02, 0);
+    terrainR1.rotation.z = -0.05;
+    group.add(terrainR1);
+
+    // Tier 2 outer elevated forest knoll
+    const terrainL2 = new THREE.Mesh(outerTerrainGeo, terrainFacetedMat);
+    terrainL2.position.set(-halfWidth - 15.5, 0.22, 0);
+    terrainL2.rotation.z = 0.08;
+    group.add(terrainL2);
+
+    const terrainR2 = new THREE.Mesh(outerTerrainGeo, terrainFacetedMat);
+    terrainR2.position.set(halfWidth + 15.5, 0.22, 0);
+    terrainR2.rotation.z = -0.08;
+    group.add(terrainR2);
 
     group.position.set(0, 0, baseZ);
     scene.add(group);
@@ -170,7 +240,7 @@ function addLowPolyRoad(THREE, scene, config) {
 }
 
 /**
- * Recycled lane dashes with neon cyan glow.
+ * Recycled lane trail markers with subtle glowing forest spirit green.
  */
 function addDashes(THREE, scene, config) {
   const geometry = new THREE.BoxGeometry(config.dashWidth, 0.035, config.dashLength);
@@ -192,140 +262,146 @@ function addDashes(THREE, scene, config) {
 }
 
 /**
- * Rich collection of roadside low-poly props (pine trees, rocks, sci-fi light pylons)
- * placed close to the road edges and recycled continuously.
+ * Multi-layer authentic Kenney low-poly 3D nature scenery:
+ * - Layer 1 (Foreground Trailside): Bushes, red toadstools, rocks, logs, stumps, campfires.
+ * - Layer 2 (Midground Trees): Multi-tier pines, broadleaf oaks, detailed trees, granite boulders.
+ * - Layer 3 (Background Canopy): Deep pine stands, plateau trees, and rocky monoliths.
  */
-function addRoadsideScenery(THREE, scene, config) {
+async function addRoadsideScenery(THREE, scene, config, loader) {
   const span = config.scenery.span;
   const count = config.scenery.itemCount;
   const startZ = ROAD_BEHIND_PLAYER - span;
   const items = [];
 
-  const trunkMat = new THREE.MeshStandardMaterial({
-    color: config.colors.treeTrunk,
-    roughness: 0.9,
-    flatShading: true,
-  });
+  // Pre-load all nature GLB models categorized by layer
+  const loadedLayers = { foreground: [], midground: [], background: [] };
 
-  const foliageMats = [
-    new THREE.MeshStandardMaterial({ color: config.colors.treeFoliage, roughness: 0.75, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: config.colors.treeFoliageAlt, roughness: 0.8, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: config.colors.treeFoliageWarm, roughness: 0.7, flatShading: true }),
-  ];
-
-  const rockMats = [
-    new THREE.MeshStandardMaterial({ color: config.colors.rock, roughness: 0.85, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: config.colors.rockAlt, roughness: 0.9, flatShading: true }),
-  ];
-
-  const pylonPillarMat = new THREE.MeshStandardMaterial({
-    color: config.colors.curbDark,
-    roughness: 0.4,
-    metalness: 0.5,
-    flatShading: true,
-  });
-
-  const pylonGlowMat = new THREE.MeshBasicMaterial({ color: config.colors.lightPylon });
-
-  function createPineTree(scale = 1, matIndex = 0) {
-    const group = new THREE.Group();
-    const trunkGeo = new THREE.CylinderGeometry(0.2 * scale, 0.3 * scale, 1.4 * scale, 5);
-    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-    trunk.position.y = (1.4 * scale) / 2;
-    group.add(trunk);
-
-    const fMat = foliageMats[matIndex % foliageMats.length];
-    const tiers = 3;
-    for (let t = 0; t < tiers; t += 1) {
-      const radius = (1.6 - t * 0.38) * scale;
-      const height = (1.8 - t * 0.3) * scale;
-      const coneGeo = new THREE.ConeGeometry(radius, height, 5);
-      const cone = new THREE.Mesh(coneGeo, fMat);
-      cone.position.y = 0.9 * scale + t * 1.0 * scale;
-      cone.rotation.y = (t * Math.PI) / 3;
-      group.add(cone);
+  if (loader) {
+    for (const [layerKey, assetList] of Object.entries(NATURE_GLB_ASSETS)) {
+      for (const asset of assetList) {
+        try {
+          const gltf = await loader.loadAsync(asset.path);
+          gltf.scene.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+          loadedLayers[layerKey].push({ asset, model: gltf.scene });
+        } catch (e) {
+          console.warn(`Failed to load nature model ${asset.path}:`, e);
+        }
+      }
     }
-    return group;
-  }
-
-  function createRock(scale = 1, matIndex = 0) {
-    const geo = new THREE.DodecahedronGeometry(scale, 0);
-    const mesh = new THREE.Mesh(geo, rockMats[matIndex % rockMats.length]);
-    mesh.position.y = scale * 0.7;
-    mesh.rotation.set(scale * 1.8, scale * 1.3, scale * 0.7);
-    return mesh;
-  }
-
-  function createPylon(scale = 1) {
-    const group = new THREE.Group();
-    const pillarGeo = new THREE.CylinderGeometry(0.14 * scale, 0.22 * scale, 3.4 * scale, 6);
-    const pillar = new THREE.Mesh(pillarGeo, pylonPillarMat);
-    pillar.position.y = (3.4 * scale) / 2;
-    group.add(pillar);
-
-    const beaconGeo = new THREE.OctahedronGeometry(0.35 * scale, 0);
-    const beacon = new THREE.Mesh(beaconGeo, pylonGlowMat);
-    beacon.position.y = 3.4 * scale + 0.3;
-    group.add(beacon);
-
-    return group;
   }
 
   const stepZ = span / count;
   for (let i = 0; i < count; i += 1) {
     const baseZ = startZ + i * stepZ;
     const side = i % 2 === 0 ? -1 : 1;
-    // Keep scenery positioned cleanly right next to the curbs for high visibility
-    const distOffset = 4.4 + ((i * 17) % 10) * 0.45;
-    const posX = side * distOffset;
-    const propType = (i * 7) % 6;
+    const propGroup = new THREE.Group();
 
-    let prop;
-    const scale = 0.85 + ((i * 13) % 10) * 0.09;
-
-    if (propType <= 2) {
-      prop = createPineTree(scale, i);
-    } else if (propType <= 4) {
-      prop = createRock(scale * 1.15, i);
-    } else {
-      prop = createPylon(scale * 0.95);
+    // 1. Foreground Accent (Trailside shrubs, rocks, logs, campfire)
+    if (loadedLayers.foreground.length > 0) {
+      const fgIdx = (i * 5) % loadedLayers.foreground.length;
+      const fgEntry = loadedLayers.foreground[fgIdx];
+      const fgClone = fgEntry.model.clone(true);
+      const fgScale = fgEntry.asset.scale * (0.9 + ((i * 11) % 7) * 0.04);
+      fgClone.scale.set(fgScale, fgScale, fgScale);
+      fgClone.rotation.y = ((i * 2.1) % 1) * Math.PI * 2;
+      const fgDist = 3.6 + ((i * 13) % 7) * 0.3;
+      fgClone.position.set(side * fgDist, 0, (Math.random() - 0.5) * 1.5);
+      propGroup.add(fgClone);
     }
 
-    prop.position.set(posX, 0, baseZ);
-    scene.add(prop);
-    items.push({ group: prop, baseZ });
+    // 2. Midground Forest Trees & Boulders
+    if (loadedLayers.midground.length > 0) {
+      const mgIdx = (i * 3 + 1) % loadedLayers.midground.length;
+      const mgEntry = loadedLayers.midground[mgIdx];
+      const mgClone = mgEntry.model.clone(true);
+      const mgScale = mgEntry.asset.scale * (0.88 + ((i * 17) % 9) * 0.05);
+      mgClone.scale.set(mgScale, mgScale, mgScale);
+      mgClone.rotation.y = ((i * 1.7) % 1) * Math.PI * 2;
+      const mgDist = 6.2 + ((i * 19) % 9) * 0.5;
+      mgClone.position.set(side * mgDist, 0, (Math.random() - 0.5) * 2.0);
+      propGroup.add(mgClone);
+    }
+
+    // 3. Background Canopy (Every other cluster for deep forest density)
+    if (i % 2 === 0 && loadedLayers.background.length > 0) {
+      const bgIdx = (i * 2) % loadedLayers.background.length;
+      const bgEntry = loadedLayers.background[bgIdx];
+      const bgClone = bgEntry.model.clone(true);
+      const bgScale = bgEntry.asset.scale * (0.92 + ((i * 7) % 8) * 0.05);
+      bgClone.scale.set(bgScale, bgScale, bgScale);
+      bgClone.rotation.y = ((i * 3.3) % 1) * Math.PI * 2;
+      const bgDist = 11.5 + ((i * 23) % 11) * 0.7;
+      bgClone.position.set(side * bgDist, 0, (Math.random() - 0.5) * 3.0);
+      propGroup.add(bgClone);
+    }
+
+    propGroup.position.set(0, 0, baseZ);
+    scene.add(propGroup);
+    items.push({ group: propGroup, baseZ });
   }
 
   return { items, span, startZ };
 }
 
 /**
- * Low-poly mountain silhouettes in the horizon with subtle parallax scrolling.
+ * Atmospheric floating glowing firefly particles drifting through the forest air.
+ */
+function addFireflies(THREE, scene, config) {
+  const count = config.scenery.fireflyCount || 24;
+  const span = config.scenery.span;
+  const startZ = ROAD_BEHIND_PLAYER - span;
+  const fireflyGeo = new THREE.OctahedronGeometry(0.1, 0);
+  const fireflyMat = new THREE.MeshBasicMaterial({ color: config.colors.firefly });
+  const items = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const mesh = new THREE.Mesh(fireflyGeo, fireflyMat);
+    const side = i % 2 === 0 ? -1 : 1;
+    const initialX = side * (1.2 + ((i * 13) % 7) * 0.7);
+    const initialY = 1.2 + ((i * 7) % 5) * 0.6;
+    const baseZ = startZ + (i * (span / count));
+    const phase = i * 0.7;
+
+    mesh.position.set(initialX, initialY, baseZ);
+    scene.add(mesh);
+    items.push({ mesh, baseZ, initialX, initialY, phase });
+  }
+
+  return { items, span, startZ };
+}
+
+/**
+ * Layered low-poly background mountain ridges and green forested foothills.
  */
 function addBackgroundMountains(THREE, scene, config) {
   const count = config.scenery.mountainCount;
-  const span = 280;
-  const startZ = -160;
+  const span = 300;
+  const startZ = -180;
   const items = [];
 
   const mountainMat = new THREE.MeshStandardMaterial({
     color: config.colors.mountain,
-    roughness: 0.9,
+    roughness: 0.92,
     flatShading: true,
   });
 
   const peakMat = new THREE.MeshStandardMaterial({
     color: config.colors.mountainPeak,
-    roughness: 0.85,
+    roughness: 0.88,
     flatShading: true,
   });
 
   for (let i = 0; i < count; i += 1) {
     const side = i % 2 === 0 ? -1 : 1;
-    const posX = side * (32 + ((i * 23) % 45));
+    const posX = side * (35 + ((i * 23) % 50));
     const posZ = startZ + ((i * 47) % span);
-    const height = 28 + ((i * 37) % 32);
-    const radius = 20 + ((i * 29) % 20);
+    const height = 30 + ((i * 37) % 35);
+    const radius = 22 + ((i * 29) % 22);
 
     const group = new THREE.Group();
     const coneGeo = new THREE.ConeGeometry(radius, height, 5);
@@ -333,10 +409,10 @@ function addBackgroundMountains(THREE, scene, config) {
     baseMesh.position.y = height / 2 - 3;
     group.add(baseMesh);
 
-    // Snow cap
-    const capGeo = new THREE.ConeGeometry(radius * 0.38, height * 0.38, 5);
+    // Forest mist mountain crest
+    const capGeo = new THREE.ConeGeometry(radius * 0.42, height * 0.42, 5);
     const capMesh = new THREE.Mesh(capGeo, peakMat);
-    capMesh.position.y = height - (height * 0.38) / 2 - 3;
+    capMesh.position.y = height - (height * 0.42) / 2 - 3;
     group.add(capMesh);
 
     group.position.set(posX, 0, posZ);
@@ -350,7 +426,7 @@ function addBackgroundMountains(THREE, scene, config) {
 /**
  * Rigged 3D player character with skeletal animations and low-poly fallback.
  */
-async function addPlayer(THREE, scene, config) {
+async function addPlayer(THREE, scene, config, loader) {
   const group = new THREE.Group();
 
   // Procedural geometric fallback group
@@ -397,28 +473,6 @@ async function addPlayer(THREE, scene, config) {
     modelContainer,
     fallbackGroup,
   };
-
-  // Helper to load GLTFLoader
-  let loader = null;
-  try {
-    let GLTFLoaderClass = null;
-    try {
-      const mod = await import(/* @vite-ignore */ GLTF_LOADER_URL);
-      GLTFLoaderClass = mod.GLTFLoader;
-    } catch (e) {
-      try {
-        const mod2 = await import(/* @vite-ignore */ 'three/addons/loaders/GLTFLoader.js');
-        GLTFLoaderClass = mod2.GLTFLoader;
-      } catch (err) {
-        console.warn('GLTFLoader dynamic import fallback failed:', err);
-      }
-    }
-    if (GLTFLoaderClass) {
-      loader = new GLTFLoaderClass();
-    }
-  } catch (err) {
-    console.error('Failed to initialize GLTFLoader:', err);
-  }
 
   const gltfCache = new Map();
 
@@ -581,23 +635,33 @@ async function addPlayer(THREE, scene, config) {
 }
 
 /**
- * Low-poly faceted enemy combat drones.
+ * Low-poly faceted enemy combat drones with glowing energy core and orbit ring.
  */
 function addEnemyPool(THREE, scene, config) {
-  const geometry = new THREE.OctahedronGeometry(config.enemyRadius, 0);
-  const material = new THREE.MeshStandardMaterial({
+  const coreGeo = new THREE.OctahedronGeometry(config.enemyRadius * 0.85, 0);
+  const coreMat = new THREE.MeshStandardMaterial({
     color: config.colors.enemy,
-    roughness: 0.3,
-    metalness: 0.3,
+    roughness: 0.25,
+    metalness: 0.7,
     flatShading: true,
   });
 
+  const ringGeo = new THREE.TorusGeometry(config.enemyRadius * 1.1, 0.05, 5, 8);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xff3b30 });
+
   return Array.from({ length: config.enemyPoolSize }, () => {
-    const enemy = new THREE.Mesh(geometry, material);
-    enemy.position.y = ROAD_TOP_Y + config.enemyRadius;
-    enemy.visible = false;
-    scene.add(enemy);
-    return enemy;
+    const group = new THREE.Group();
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    group.add(core);
+
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 3;
+    group.add(ring);
+
+    group.position.y = ROAD_TOP_Y + config.enemyRadius;
+    group.visible = false;
+    scene.add(group);
+    return group;
   });
 }
 

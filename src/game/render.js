@@ -6,8 +6,8 @@
  * scenery props, lane dashes, and background mountain parallax.
  */
 
-import { CONFIG } from '../config.js?v=1.4.0';
-import { laneToX, isInvulnerable } from './state.js?v=1.4.0';
+import { CONFIG } from '../config.js?v=1.8.0';
+import { laneToX, isInvulnerable } from './state.js?v=1.8.0';
 
 /** Blink cycle while the grace window is open. */
 const BLINK_PERIOD_MS = 160;
@@ -21,6 +21,7 @@ export function syncScene(sceneRefs, state, dtMs = 16.67, config = CONFIG.game) 
   syncDashes(sceneRefs.dashes, state.distance);
   syncRoadSegments(sceneRefs.roadSegments, state.distance);
   syncScenery(sceneRefs.scenery, state.distance);
+  syncFireflies(sceneRefs.fireflies, state.distance, state.elapsedMs);
   syncMountains(sceneRefs.mountains, state.distance);
 }
 
@@ -147,6 +148,19 @@ function syncScenery(scenery, distance) {
   for (const item of scenery.items) {
     const shifted = item.baseZ - scenery.startZ + offset;
     item.group.position.z = scenery.startZ + (shifted % scenery.span);
+  }
+}
+
+/** Floating woodland fireflies with undulating wave motion. */
+function syncFireflies(fireflies, distance, elapsedMs) {
+  if (!fireflies) return;
+  const offset = distance % fireflies.span;
+
+  for (const item of fireflies.items) {
+    const shifted = item.baseZ - fireflies.startZ + offset;
+    item.mesh.position.z = fireflies.startZ + (shifted % fireflies.span);
+    item.mesh.position.y = item.initialY + Math.sin(elapsedMs * 0.0025 + item.phase) * 0.35;
+    item.mesh.position.x = item.initialX + Math.cos(elapsedMs * 0.0018 + item.phase) * 0.3;
   }
 }
 

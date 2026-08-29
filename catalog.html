@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>3D Asset Catalog - Low-Poly Forest Biome</title>
+    <style>
+      :root {
+        --bg-main: #0b1518;
+        --bg-panel: rgba(15, 30, 35, 0.88);
+        --bg-card: rgba(22, 45, 52, 0.75);
+        --bg-card-active: rgba(34, 197, 94, 0.25);
+        --border-color: rgba(74, 222, 128, 0.25);
+        --border-active: #4ade80;
+        --text-main: #f1f5f9;
+        --text-muted: #94a3b8;
+        --accent: #22c55e;
+        --accent-glow: rgba(34, 197, 94, 0.4);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg-main);
+        color: var(--text-main);
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: var(--bg-panel);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border-color);
+        z-index: 10;
+      }
+
+      .header-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .header-title h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        background: linear-gradient(135deg, #4ade80, #38bdf8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(34, 197, 94, 0.15);
+        color: #4ade80;
+        border: 1px solid rgba(74, 222, 128, 0.3);
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border: 1px solid var(--border-color);
+        background: var(--bg-card);
+        color: var(--text-main);
+      }
+
+      .btn:hover {
+        border-color: var(--border-active);
+        box-shadow: 0 0 12px var(--accent-glow);
+        transform: translateY(-1px);
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #0b1518;
+        border-color: var(--accent);
+      }
+
+      .btn-primary:hover {
+        background: #4ade80;
+      }
+
+      .main-layout {
+        display: flex;
+        flex: 1;
+        height: calc(100vh - 61px);
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 330px;
+        background: var(--bg-panel);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        backdrop-filter: blur(8px);
+      }
+
+      .search-box {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .search-input {
+        width: 100%;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-main);
+        font-size: 0.85rem;
+        outline: none;
+      }
+
+      .search-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 8px var(--accent-glow);
+      }
+
+      .category-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .category-title {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 6px;
+        padding-left: 4px;
+      }
+
+      .asset-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: var(--bg-card);
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.18s ease;
+      }
+
+      .asset-card:hover {
+        background: rgba(22, 45, 52, 0.95);
+        border-color: rgba(74, 222, 128, 0.4);
+        transform: translateX(3px);
+      }
+
+      .asset-card.active {
+        background: var(--bg-card-active);
+        border-color: var(--border-active);
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+      }
+
+      .asset-icon {
+        font-size: 1.3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.25);
+      }
+
+      .asset-info {
+        flex: 1;
+        overflow: hidden;
+      }
+
+      .asset-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .asset-tag {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      .viewport-container {
+        flex: 1;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        background: radial-gradient(circle at center, #17333a 0%, #081114 100%);
+      }
+
+      #canvas3d {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .overlay-info {
+        position: absolute;
+        top: 16px;
+        left: 20px;
+        pointer-events: none;
+        background: rgba(11, 21, 24, 0.78);
+        backdrop-filter: blur(10px);
+        padding: 12px 18px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        max-width: 360px;
+      }
+
+      .overlay-info h2 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 4px;
+      }
+
+      .overlay-info p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+      }
+
+      .overlay-meta {
+        display: flex;
+        gap: 12px;
+        margin-top: 8px;
+        font-size: 0.75rem;
+        color: #86efac;
+      }
+
+      .viewport-controls {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        background: rgba(11, 21, 24, 0.85);
+        backdrop-filter: blur(10px);
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+      }
+
+      .tool-btn {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .tool-btn:hover,
+      .tool-btn.active {
+        color: #fff;
+        background: rgba(74, 222, 128, 0.25);
+      }
+
+      .help-pill {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(11, 21, 24, 0.7);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        pointer-events: none;
+      }
+
+      #loadingSpinner {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(11, 21, 24, 0.7);
+        backdrop-filter: blur(4px);
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--accent);
+        gap: 10px;
+        z-index: 5;
+        transition: opacity 0.3s;
+      }
+
+      #loadingSpinner.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header>
+      <div class="header-title">
+        <h1>🌲 Forest Biome &mdash; 3D Model Catalog</h1>
+        <span class="badge">Official CC0 Low-Poly Assets</span>
+      </div>
+      <div class="nav-links">
+        <a href="./index.html" class="btn btn-primary">🎮 Back to Game</a>
+      </div>
+    </header>
+
+    <div class="main-layout">
+      <aside class="sidebar">
+        <div class="search-box">
+          <input type="text" id="searchInput" class="search-input" placeholder="Search 3D assets..." />
+        </div>
+        <div class="category-list" id="assetList">
+          <!-- Populated by JavaScript -->
+        </div>
+      </aside>
+
+      <main class="viewport-container">
+        <div id="loadingSpinner">⏳ Loading 3D Model...</div>
+        <canvas id="canvas3d"></canvas>
+
+        <div class="overlay-info" id="overlayInfo">
+          <h2 id="assetTitle">Forest Diorama</h2>
+          <p id="assetDesc">Interactive 3D low-poly showcase featuring trees, rocks, fallen logs, and flora.</p>
+          <div class="overlay-meta" id="assetMeta">
+            <span id="polyCount">Type: 3D Scene</span>
+            <span id="sourceTag">Source: CC0 Model Pack</span>
+          </div>
+        </div>
+
+        <div class="viewport-controls">
+          <button class="tool-btn active" id="rotateToggle">🔄 Auto-Rotate</button>
+          <button class="tool-btn" id="wireframeToggle">🕸️ Wireframe</button>
+          <button class="tool-btn" id="lightToggle">☀️ Daylight</button>
+          <button class="tool-btn" id="resetCamBtn">🎯 Recenter View</button>
+        </div>
+
+        <div class="help-pill">Left-click: Rotate &bull; Right-click: Pan &bull; Scroll: Zoom</div>
+      </main>
+    </div>
+
+    <script type="module">
+      import * as THREE from 'three';
+      import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+      const ASSET_CATALOG = [
+        {
+          id: 'forest-diorama',
+          name: 'Forest Diorama Showcase',
+          category: 'Showcases',
+          icon: '🏞️',
+          type: 'diorama',
+          desc: 'Complete woodland diorama combining real Kenney low-poly trees, granite rocks, fallen logs, stumps, mushroom clusters, bushes, and campfires.',
+          meta: 'Full 3D Composition',
+        },
+        {
+          id: 'tree-pine-default',
+          name: 'Pine Tree (Default)',
+          category: 'Vegetation & Trees',
+          icon: '🌲',
+          type: 'glb',
+          path: './assets/models/nature/tree_pineDefaultA.glb',
+          scale: 3.0,
+          desc: 'Multi-tiered conifer evergreen pine with needle facet shading.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'tree-pine-tall',
+          name: 'Pine Tree (Tall Detailed)',
+          category: 'Vegetation & Trees',
+          icon: '🌲',
+          type: 'glb',
+          path: './assets/models/nature/tree_pineTallA_detailed.glb',
+          scale: 3.0,
+          desc: 'High canopy alpine pine tree with layered branch clusters.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'tree-pine-round',
+          name: 'Pine Tree (Round Canopy)',
+          category: 'Vegetation & Trees',
+          icon: '🌲',
+          type: 'glb',
+          path: './assets/models/nature/tree_pineRoundA.glb',
+          scale: 3.0,
+          desc: 'Compact rounded crown pine conifer.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'tree-oak',
+          name: 'Broadleaf Oak Tree',
+          category: 'Vegetation & Trees',
+          icon: '🌳',
+          type: 'glb',
+          path: './assets/models/nature/tree_oak.glb',
+          scale: 3.0,
+          desc: 'Full foliage deciduous oak tree with broad low-poly canopy.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'tree-detailed',
+          name: 'Detailed Forest Tree',
+          category: 'Vegetation & Trees',
+          icon: '🌳',
+          type: 'glb',
+          path: './assets/models/nature/tree_detailed.glb',
+          scale: 3.0,
+          desc: 'Flourishing woodland tree with organic sculpted canopy lobes.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'tree-plateau',
+          name: 'Plateau Tree',
+          category: 'Vegetation & Trees',
+          icon: '🌴',
+          type: 'glb',
+          path: './assets/models/nature/tree_plateau.glb',
+          scale: 3.0,
+          desc: 'Terraced foliage flat-top forest tree.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'tree-fat',
+          name: 'Stout Forest Tree',
+          category: 'Vegetation & Trees',
+          icon: '🌳',
+          type: 'glb',
+          path: './assets/models/nature/tree_fat.glb',
+          scale: 3.0,
+          desc: 'Dense wide-canopy woodland shelter tree.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'plant-bush-detailed',
+          name: 'Forest Bush (Detailed)',
+          category: 'Vegetation & Trees',
+          icon: '🌿',
+          type: 'glb',
+          path: './assets/models/nature/plant_bushDetailed.glb',
+          scale: 3.5,
+          desc: 'Stylized faceted understory bush clump.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'plant-bush-large',
+          name: 'Large Foliage Bush',
+          category: 'Vegetation & Trees',
+          icon: '🌿',
+          type: 'glb',
+          path: './assets/models/nature/plant_bushLarge.glb',
+          scale: 3.5,
+          desc: 'Expansive lush foliage shrubbery for roadside decoration.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'rock-large-a',
+          name: 'Granite Boulder Large',
+          category: 'Rocks & Terrain',
+          icon: '🪨',
+          type: 'glb',
+          path: './assets/models/nature/rock_largeA.glb',
+          scale: 2.8,
+          desc: 'Heavy low-poly faceted granite stone boulder.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'rock-tall-a',
+          name: 'Granite Rock Column',
+          category: 'Rocks & Terrain',
+          icon: '⛰️',
+          type: 'glb',
+          path: './assets/models/nature/rock_tallA.glb',
+          scale: 2.8,
+          desc: 'Tall vertical stone outcrop and rocky monolith.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'rock-small-a',
+          name: 'Small Ground Pebble',
+          category: 'Rocks & Terrain',
+          icon: '🪨',
+          type: 'glb',
+          path: './assets/models/nature/rock_smallA.glb',
+          scale: 3.5,
+          desc: 'Scattered pathside stone fragment.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'log-large',
+          name: 'Fallen Weathered Log',
+          category: 'Woodland Props',
+          icon: '🪵',
+          type: 'glb',
+          path: './assets/models/nature/log_large.glb',
+          scale: 2.8,
+          desc: 'Carved timber log resting on the forest floor.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'stump-round',
+          name: 'Old Tree Stump',
+          category: 'Woodland Props',
+          icon: '🪵',
+          type: 'glb',
+          path: './assets/models/nature/stump_roundDetailed.glb',
+          scale: 2.6,
+          desc: 'Aged tree stump with visible growth rings and root base.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'shroom-red-group',
+          name: 'Wild Red Toadstools',
+          category: 'Woodland Props',
+          icon: '🍄',
+          type: 'glb',
+          path: './assets/models/nature/mushroom_redGroup.glb',
+          scale: 3.0,
+          desc: 'Cluster of vibrant red forest mushrooms.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'campfire-stones',
+          name: 'Campfire with Stone Ring',
+          category: 'Woodland Props',
+          icon: '🔥',
+          type: 'glb',
+          path: './assets/models/nature/campfire_stones.glb',
+          scale: 2.8,
+          desc: 'Rustic woodland campfire with circular stone perimeter and charred logs.',
+          meta: 'Kenney Nature Kit .glb',
+        },
+        {
+          id: 'char-robot',
+          name: 'Robot Expressive (Rigged)',
+          category: 'Characters & Enemies',
+          icon: '🤖',
+          type: 'glb',
+          path: './assets/models/RobotExpressive.glb',
+          scale: 1.2,
+          desc: 'Hero runner character with rigged skeletal animation (Running).',
+          meta: 'Skinned Mesh GLB',
+          animName: 'Running',
+        },
+        {
+          id: 'char-xbot',
+          name: 'Cyber X-Bot (Rigged)',
+          category: 'Characters & Enemies',
+          icon: '🦾',
+          type: 'glb',
+          path: './assets/models/Xbot.glb',
+          scale: 1.2,
+          desc: 'Bipedal humanoid android character.',
+          meta: 'Skinned Mesh GLB',
+        },
+        {
+          id: 'char-soldier',
+          name: 'Tactical Soldier (Rigged)',
+          category: 'Characters & Enemies',
+          icon: '🪖',
+          type: 'glb',
+          path: './assets/models/Soldier.glb',
+          scale: 1.2,
+          desc: 'Tactical forest operative with military gear.',
+          meta: 'Skinned Mesh GLB',
+        },
+      ];
+
+      // Setup Viewport & Scene
+      const canvas = document.getElementById('canvas3d');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0e2422);
+
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+      camera.position.set(0, 5, 12);
+
+      const controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 + 0.05;
+
+      // Lights
+      const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x14532d, 1.6);
+      scene.add(hemiLight);
+
+      const dirLight = new THREE.DirectionalLight(0xfffae0, 2.0);
+      dirLight.position.set(12, 20, 10);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      const ambientLight = new THREE.AmbientLight(0x132e27, 0.8);
+      scene.add(ambientLight);
+
+      // Floor grid disk
+      const gridMat = new THREE.MeshStandardMaterial({
+        color: 0x183b32,
+        roughness: 0.9,
+        flatShading: true,
+      });
+      const gridMesh = new THREE.Mesh(new THREE.CylinderGeometry(8, 8.5, 0.4, 32), gridMat);
+      gridMesh.position.y = -0.2;
+      gridMesh.receiveShadow = true;
+      scene.add(gridMesh);
+
+      const gltfLoader = new GLTFLoader();
+      const currentAssetGroup = new THREE.Group();
+      scene.add(currentAssetGroup);
+
+      let currentMixer = null;
+      let isWireframe = false;
+      let isDaylight = false;
+      let activeAssetId = 'forest-diorama';
+      const clock = new THREE.Clock();
+
+      // UI elements
+      const loadingSpinner = document.getElementById('loadingSpinner');
+      const assetListEl = document.getElementById('assetList');
+      const searchInput = document.getElementById('searchInput');
+      const assetTitle = document.getElementById('assetTitle');
+      const assetDesc = document.getElementById('assetDesc');
+      const polyCount = document.getElementById('polyCount');
+      const sourceTag = document.getElementById('sourceTag');
+
+      // Populate sidebar
+      function renderSidebar(filter = '') {
+        assetListEl.innerHTML = '';
+        const categories = [...new Set(ASSET_CATALOG.map((a) => a.category))];
+
+        categories.forEach((cat) => {
+          const items = ASSET_CATALOG.filter(
+            (a) =>
+              a.category === cat &&
+              (a.name.toLowerCase().includes(filter) || a.desc.toLowerCase().includes(filter)),
+          );
+          if (items.length === 0) return;
+
+          const title = document.createElement('div');
+          title.className = 'category-title';
+          title.textContent = cat;
+          assetListEl.appendChild(title);
+
+          items.forEach((item) => {
+            const card = document.createElement('div');
+            card.className = `asset-card ${item.id === activeAssetId ? 'active' : ''}`;
+            card.innerHTML = `
+              <div class="asset-icon">${item.icon}</div>
+              <div class="asset-info">
+                <div class="asset-name">${item.name}</div>
+                <div class="asset-tag">${item.meta}</div>
+              </div>
+            `;
+            card.onclick = () => selectAsset(item.id);
+            assetListEl.appendChild(card);
+          });
+        });
+      }
+
+      // Load & Render Selected Asset
+      async function selectAsset(id) {
+        activeAssetId = id;
+        renderSidebar(searchInput.value.toLowerCase().trim());
+
+        const asset = ASSET_CATALOG.find((a) => a.id === id);
+        if (!asset) return;
+
+        assetTitle.textContent = asset.name;
+        assetDesc.textContent = asset.desc;
+        polyCount.textContent = `Type: ${asset.category}`;
+        sourceTag.textContent = asset.meta;
+
+        loadingSpinner.classList.remove('hidden');
+
+        // Clear current meshes
+        if (currentMixer) {
+          currentMixer.stopAllAction();
+          currentMixer = null;
+        }
+        while (currentAssetGroup.children.length > 0) {
+          currentAssetGroup.remove(currentAssetGroup.children[0]);
+        }
+
+        if (asset.type === 'diorama') {
+          await buildForestDiorama();
+        } else if (asset.type === 'glb') {
+          try {
+            const gltf = await gltfLoader.loadAsync(asset.path);
+            const model = gltf.scene;
+
+            model.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                if (child.material) {
+                  child.material.wireframe = isWireframe;
+                }
+              }
+            });
+
+            const scale = asset.scale || 2.0;
+            model.scale.set(scale, scale, scale);
+
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            model.position.x = -center.x;
+            model.position.y = -box.min.y;
+            model.position.z = -center.z;
+
+            currentAssetGroup.add(model);
+
+            // Handle animations if available
+            if (gltf.animations && gltf.animations.length > 0) {
+              currentMixer = new THREE.AnimationMixer(model);
+              const clip = gltf.animations[0];
+              const action = currentMixer.clipAction(clip);
+              action.play();
+            }
+          } catch (e) {
+            console.error('Error loading GLB:', e);
+          }
+        }
+
+        loadingSpinner.classList.add('hidden');
+        resetCameraForAsset(asset);
+      }
+
+      // Build Rich Forest Diorama using real Kenney GLB models
+      async function buildForestDiorama() {
+        const dioramaGroup = new THREE.Group();
+
+        // 1. Trail Road deck
+        const roadGeo = new THREE.BoxGeometry(3.6, 0.15, 12);
+        const roadMat = new THREE.MeshStandardMaterial({
+          color: 0x4d3725,
+          roughness: 0.85,
+          flatShading: true,
+        });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.position.y = 0.05;
+        road.receiveShadow = true;
+        dioramaGroup.add(road);
+
+        // 2. Load and place Nature models
+        const propsToLoad = [
+          { path: './assets/models/nature/tree_pineTallA_detailed.glb', x: -3.5, z: -3.0, scale: 2.4, rotY: 0.4 },
+          { path: './assets/models/nature/tree_pineDefaultA.glb', x: 3.6, z: -2.2, scale: 2.3, rotY: 1.2 },
+          { path: './assets/models/nature/tree_oak.glb', x: -3.8, z: 2.2, scale: 2.2, rotY: 2.5 },
+          { path: './assets/models/nature/tree_detailed.glb', x: 3.5, z: 2.8, scale: 2.2, rotY: 0.8 },
+          { path: './assets/models/nature/rock_largeA.glb', x: -2.4, z: 0.5, scale: 1.8, rotY: 1.1 },
+          { path: './assets/models/nature/rock_tallA.glb', x: 4.2, z: 0.2, scale: 1.9, rotY: 0.7 },
+          { path: './assets/models/nature/log_large.glb', x: 2.4, z: -0.8, scale: 1.7, rotY: 0.5 },
+          { path: './assets/models/nature/stump_roundDetailed.glb', x: -2.3, z: -1.6, scale: 1.6, rotY: 0.3 },
+          { path: './assets/models/nature/mushroom_redGroup.glb', x: -1.8, z: 1.8, scale: 2.2, rotY: 0.2 },
+          { path: './assets/models/nature/plant_bushDetailed.glb', x: -2.8, z: -0.2, scale: 2.0, rotY: 1.5 },
+          { path: './assets/models/nature/campfire_stones.glb', x: 2.6, z: 1.2, scale: 1.6, rotY: 0 },
+        ];
+
+        for (const p of propsToLoad) {
+          try {
+            const gltf = await gltfLoader.loadAsync(p.path);
+            const m = gltf.scene;
+            m.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                if (child.material) child.material.wireframe = isWireframe;
+              }
+            });
+            m.scale.set(p.scale, p.scale, p.scale);
+            m.position.set(p.x, 0.05, p.z);
+            m.rotation.y = p.rotY;
+            dioramaGroup.add(m);
+          } catch (err) {
+            console.warn('Diorama asset load error:', err);
+          }
+        }
+
+        // Add 12 Fireflies
+        const fireflyGeo = new THREE.OctahedronGeometry(0.08, 0);
+        const fireflyMat = new THREE.MeshBasicMaterial({ color: 0x86efac });
+        for (let i = 0; i < 12; i++) {
+          const ff = new THREE.Mesh(fireflyGeo, fireflyMat);
+          ff.position.set(
+            (Math.random() - 0.5) * 8,
+            0.8 + Math.random() * 2.5,
+            (Math.random() - 0.5) * 8,
+          );
+          dioramaGroup.add(ff);
+        }
+
+        currentAssetGroup.add(dioramaGroup);
+      }
+
+      function resetCameraForAsset(asset) {
+        if (asset.type === 'diorama') {
+          camera.position.set(7, 6, 11);
+          controls.target.set(0, 1.2, 0);
+        } else {
+          camera.position.set(0, 3.5, 7.5);
+          controls.target.set(0, 1.4, 0);
+        }
+        controls.update();
+      }
+
+      // Controls
+      const rotateBtn = document.getElementById('rotateToggle');
+      rotateBtn.onclick = () => {
+        controls.autoRotate = !controls.autoRotate;
+        rotateBtn.classList.toggle('active', controls.autoRotate);
+      };
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 2.0;
+
+      const wireframeBtn = document.getElementById('wireframeToggle');
+      wireframeBtn.onclick = () => {
+        isWireframe = !isWireframe;
+        wireframeBtn.classList.toggle('active', isWireframe);
+        currentAssetGroup.traverse((child) => {
+          if (child.isMesh && child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach((m) => (m.wireframe = isWireframe));
+            } else {
+              child.material.wireframe = isWireframe;
+            }
+          }
+        });
+      };
+
+      const lightBtn = document.getElementById('lightToggle');
+      lightBtn.onclick = () => {
+        isDaylight = !isDaylight;
+        lightBtn.classList.toggle('active', isDaylight);
+        if (isDaylight) {
+          scene.background.set(0x477884);
+          hemiLight.color.set(0xffffff);
+          hemiLight.groundColor.set(0x2d6a4f);
+          dirLight.color.set(0xfff5db);
+          dirLight.intensity = 2.6;
+          lightBtn.textContent = '🌙 Twilight';
+        } else {
+          scene.background.set(0x0e2422);
+          hemiLight.color.set(0xbae6fd);
+          hemiLight.groundColor.set(0x14532d);
+          dirLight.color.set(0xfffae0);
+          dirLight.intensity = 2.0;
+          lightBtn.textContent = '☀️ Daylight';
+        }
+      };
+
+      document.getElementById('resetCamBtn').onclick = () => {
+        const asset = ASSET_CATALOG.find((a) => a.id === activeAssetId);
+        if (asset) resetCameraForAsset(asset);
+      };
+
+      searchInput.oninput = (e) => {
+        renderSidebar(e.target.value.toLowerCase().trim());
+      };
+
+      function onResize() {
+        const w = canvas.parentElement.clientWidth;
+        const h = canvas.parentElement.clientHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h, false);
+      }
+      window.addEventListener('resize', onResize);
+      onResize();
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+        if (currentMixer) {
+          currentMixer.update(delta);
+        }
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // Initialize
+      renderSidebar();
+      selectAsset('forest-diorama');
+    </script>
+  </body>
+</html>
