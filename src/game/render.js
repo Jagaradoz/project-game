@@ -6,8 +6,8 @@
  * scenery props, lane dashes, and background mountain parallax.
  */
 
-import { CONFIG } from '../config.js?v=1.8.0';
-import { laneToX, isInvulnerable } from './state.js?v=1.8.0';
+import { CONFIG } from '../config.js?v=1.9.1';
+import { laneToX, isInvulnerable } from './state.js?v=1.9.1';
 
 /** Blink cycle while the grace window is open. */
 const BLINK_PERIOD_MS = 160;

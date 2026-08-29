@@ -1,6 +1,6 @@
 {
   "name": "pose-test-game",
-  "version": "1.8.0",
+  "version": "1.9.1",
   "private": true,
   "type": "module",
   "description": "Webcam pose detection MVP - lateral lean/step + jog-in-place detection in the browser",
