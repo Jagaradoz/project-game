@@ -8,8 +8,8 @@
  * - Atmospheric morning sunbeams, misty emerald fog, and floating golden forest motes.
  */
 
-import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.9.1';
-import { laneToX } from './state.js?v=1.9.1';
+import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.9.4';
+import { laneToX } from './state.js?v=1.9.4';
 
 const ROAD_THICKNESS = 0.25;
 const ROAD_TOP_Y = ROAD_THICKNESS / 2;
@@ -28,58 +28,47 @@ function createPRNG(seed = 4281) {
 }
 
 const NATURE_GLB_ASSETS = {
-  // Tall arching trees that create the overarching canopy tunnel
-  canopyArch: [
-    { id: 'treeTall', path: './assets/models/nature/tree_tall.glb', scale: 3.4 },
-    { id: 'treeTallDark', path: './assets/models/nature/tree_tall_dark.glb', scale: 3.4 },
-    { id: 'treeTallFall', path: './assets/models/nature/tree_tall_fall.glb', scale: 3.3 },
-    { id: 'treeThin', path: './assets/models/nature/tree_thin.glb', scale: 3.5 },
-    { id: 'treeThinDark', path: './assets/models/nature/tree_thin_dark.glb', scale: 3.5 },
-    { id: 'treeOak', path: './assets/models/nature/tree_oak.glb', scale: 3.1 },
-    { id: 'treeOakDark', path: './assets/models/nature/tree_oak_dark.glb', scale: 3.1 },
-    { id: 'treeDetailed', path: './assets/models/nature/tree_detailed.glb', scale: 3.1 },
-    { id: 'treeDetailedDark', path: './assets/models/nature/tree_detailed_dark.glb', scale: 3.1 },
-    { id: 'pineTallA', path: './assets/models/nature/tree_pineTallA_detailed.glb', scale: 3.3 },
-    { id: 'pineTallB', path: './assets/models/nature/tree_pineTallB_detailed.glb', scale: 3.3 },
+  // Roadside feature trees: slender, elegant low-poly pines, birches, and tall oaks with clean vertical lines
+  roadsideTrees: [
+    { id: 'treeTall', path: './assets/models/nature/tree_tall.glb', scale: 3.1 },
+    { id: 'treeTallDark', path: './assets/models/nature/tree_tall_dark.glb', scale: 3.1 },
+    { id: 'treeThin', path: './assets/models/nature/tree_thin.glb', scale: 3.2 },
+    { id: 'treeThinDark', path: './assets/models/nature/tree_thin_dark.glb', scale: 3.2 },
+    { id: 'treeOak', path: './assets/models/nature/tree_oak.glb', scale: 2.8 },
+    { id: 'treeOakDark', path: './assets/models/nature/tree_oak_dark.glb', scale: 2.8 },
+    { id: 'treeDetailed', path: './assets/models/nature/tree_detailed.glb', scale: 2.8 },
+    { id: 'treePineTallA', path: './assets/models/nature/tree_pineTallA_detailed.glb', scale: 3.0 },
+    { id: 'treePineTallB', path: './assets/models/nature/tree_pineTallB_detailed.glb', scale: 3.0 },
+    { id: 'treePineTallC', path: './assets/models/nature/tree_pineTallC_detailed.glb', scale: 3.0 },
   ],
-  // Flank trees: dense vertical woodland stands & deep forest canopy
-  flankTrees: [
-    { id: 'pineDefaultA', path: './assets/models/nature/tree_pineDefaultA.glb', scale: 2.7 },
-    { id: 'pineDefaultB', path: './assets/models/nature/tree_pineDefaultB.glb', scale: 2.7 },
-    { id: 'pineRoundA', path: './assets/models/nature/tree_pineRoundA.glb', scale: 2.8 },
-    { id: 'pineRoundC', path: './assets/models/nature/tree_pineRoundC.glb', scale: 2.6 },
-    { id: 'treeCone', path: './assets/models/nature/tree_cone.glb', scale: 2.6 },
-    { id: 'treeConeDark', path: './assets/models/nature/tree_cone_dark.glb', scale: 2.6 },
-    { id: 'treePlateau', path: './assets/models/nature/tree_plateau.glb', scale: 2.8 },
-    { id: 'treeFat', path: './assets/models/nature/tree_fat.glb', scale: 2.6 },
-    { id: 'treeSimple', path: './assets/models/nature/tree_simple.glb', scale: 2.6 },
+  // Meadow & rolling knoll trees: natural low-poly conifers and forest pines
+  meadowTrees: [
+    { id: 'pineDefaultA', path: './assets/models/nature/tree_pineDefaultA.glb', scale: 2.5 },
+    { id: 'pineDefaultB', path: './assets/models/nature/tree_pineDefaultB.glb', scale: 2.5 },
+    { id: 'pineRoundA', path: './assets/models/nature/tree_pineRoundA.glb', scale: 2.6 },
+    { id: 'pineRoundB', path: './assets/models/nature/tree_pineRoundB.glb', scale: 2.6 },
+    { id: 'treeCone', path: './assets/models/nature/tree_cone.glb', scale: 2.5 },
+    { id: 'treeConeDark', path: './assets/models/nature/tree_cone_dark.glb', scale: 2.5 },
+    { id: 'treeSimple', path: './assets/models/nature/tree_simple.glb', scale: 2.5 },
+    { id: 'treeSimpleDark', path: './assets/models/nature/tree_simple_dark.glb', scale: 2.5 },
   ],
-  // Dense trailside shrubs, ferns, wild grass & flowers
+  // Trailside wildflower patches, low shrubs, and ferns
   undergrowth: [
-    { id: 'plantBushDetailed', path: './assets/models/nature/plant_bushDetailed.glb', scale: 2.3 },
-    { id: 'plantBushLarge', path: './assets/models/nature/plant_bushLarge.glb', scale: 2.4 },
-    { id: 'plantBushSmall', path: './assets/models/nature/plant_bushSmall.glb', scale: 2.0 },
-    { id: 'plantFlatTall', path: './assets/models/nature/plant_flatTall.glb', scale: 2.5 },
-    { id: 'plantFlatShort', path: './assets/models/nature/plant_flatShort.glb', scale: 2.4 },
-    { id: 'grassLarge', path: './assets/models/nature/grass_large.glb', scale: 2.3 },
-    { id: 'flowerYellow', path: './assets/models/nature/flower_yellowA.glb', scale: 2.2 },
-    { id: 'flowerPurple', path: './assets/models/nature/flower_purpleA.glb', scale: 2.2 },
-    { id: 'flowerRed', path: './assets/models/nature/flower_redA.glb', scale: 2.2 },
+    { id: 'flowerYellow', path: './assets/models/nature/flower_yellowA.glb', scale: 1.8 },
+    { id: 'flowerPurple', path: './assets/models/nature/flower_purpleA.glb', scale: 1.8 },
+    { id: 'flowerRed', path: './assets/models/nature/flower_redA.glb', scale: 1.8 },
+    { id: 'plantBushSmall', path: './assets/models/nature/plant_bushSmall.glb', scale: 1.8 },
+    { id: 'plantBushDetailed', path: './assets/models/nature/plant_bushDetailed.glb', scale: 1.9 },
+    { id: 'plantFlatShort', path: './assets/models/nature/plant_flatShort.glb', scale: 1.9 },
+    { id: 'grassLarge', path: './assets/models/nature/grass_large.glb', scale: 1.9 },
   ],
-  // Forest floor details: mossy logs, stumps, mushroom clusters, boulders
+  // Minimal forest floor accents: mossy rocks, granite stones, small fallen log
   props: [
-    { id: 'mushroomRed', path: './assets/models/nature/mushroom_redGroup.glb', scale: 2.5 },
-    { id: 'mushroomTan', path: './assets/models/nature/mushroom_tanGroup.glb', scale: 2.5 },
-    { id: 'logLarge', path: './assets/models/nature/log_large.glb', scale: 2.1 },
-    { id: 'logStack', path: './assets/models/nature/log_stack.glb', scale: 2.0 },
-    { id: 'stumpRound', path: './assets/models/nature/stump_roundDetailed.glb', scale: 2.0 },
-    { id: 'stumpOld', path: './assets/models/nature/stump_old.glb', scale: 2.0 },
-    { id: 'campfireStones', path: './assets/models/nature/campfire_stones.glb', scale: 1.9 },
-    { id: 'rockSmallA', path: './assets/models/nature/rock_smallA.glb', scale: 2.4 },
-    { id: 'rockSmallB', path: './assets/models/nature/rock_smallB.glb', scale: 2.4 },
-    { id: 'rockLargeA', path: './assets/models/nature/rock_largeA.glb', scale: 2.2 },
-    { id: 'rockTallA', path: './assets/models/nature/rock_tallA.glb', scale: 2.4 },
-    { id: 'stoneLargeA', path: './assets/models/nature/stone_largeA.glb', scale: 2.3 },
+    { id: 'rockSmallA', path: './assets/models/nature/rock_smallA.glb', scale: 2.0 },
+    { id: 'rockSmallB', path: './assets/models/nature/rock_smallB.glb', scale: 2.0 },
+    { id: 'stoneLargeA', path: './assets/models/nature/stone_largeA.glb', scale: 1.8 },
+    { id: 'logLarge', path: './assets/models/nature/log_large.glb', scale: 1.6 },
+    { id: 'mushroomRed', path: './assets/models/nature/mushroom_redGroup.glb', scale: 1.8 },
   ],
 };
 
@@ -337,11 +326,11 @@ function addDashes(THREE, scene, config) {
 }
 
 /**
- * Organic, authentic natural forest scenery with overarching canopy tunnel:
- * - Layer 1 (Overarching Canopy Tunnel): Tall trees leaning inward over the road forming the green tunnel.
- * - Layer 2 (Trailside Undergrowth): Dense shrubs, ferns, wildflowers, and fallen logs along dirt verges.
- * - Layer 3 (Dense Vertical Forest Columns): Flanking groves with tall vertical trunks rising through foliage.
- * - Layer 4 (Deep Forest Stands & Rock Outcrops): Massive dark pines, plateau oaks, and granite boulders.
+ * Organic, minimalist low-poly nature scenery:
+ * - Layer 1 (Roadside Feature Trees): Elegant, well-spaced trees alternating along the trail with clear breathing room.
+ * - Layer 2 (Meadow & Rolling Knolls): Broadly spaced woodland groves giving depth without clutter.
+ * - Layer 3 (Distant Ridge & Foothills): Sparse tall pines and granite rock formations.
+ * - Layer 4 (Delicate Trailside Accents): Tasteful wildflower patches, smooth stones, and low ferns along the verge.
  */
 async function addRoadsideScenery(THREE, scene, config, loader) {
   const span = config.scenery.span;
@@ -350,8 +339,8 @@ async function addRoadsideScenery(THREE, scene, config, loader) {
 
   // Pre-load all nature GLB models categorized by type
   const loadedPools = {
-    canopyArch: [],
-    flankTrees: [],
+    roadsideTrees: [],
+    meadowTrees: [],
     undergrowth: [],
     props: [],
   };
@@ -375,166 +364,51 @@ async function addRoadsideScenery(THREE, scene, config, loader) {
     }
   }
 
-  const allTrees = [...loadedPools.canopyArch, ...loadedPools.flankTrees];
-  const hasAssets = allTrees.length > 0;
-
+  const allTrees = [...loadedPools.roadsideTrees, ...loadedPools.meadowTrees];
   const rng = createPRNG(4281);
   const pick = (arr) => (arr.length > 0 ? arr[Math.floor(rng() * arr.length)] : null);
 
-  // Generate scenic clusters across both Left (side = -1) and Right (side = +1)
+  // Generate scenic features across both Left (side = -1) and Right (side = +1)
   const sides = [-1, 1];
 
   for (const side of sides) {
-    // 1. Overarching Canopy Tunnel Trees (|X| = 4.2 to 6.2)
-    // Tall trees that lean inward over the road to form the green canopy tunnel
-    let curZ = startZ + rng() * 3.0;
+    // 1. Roadside Feature Trees (|X| = 5.6 to 7.6)
+    // Staggered with an offset between left and right sides so trees alternate naturally along the road
+    const sideOffset = side === -1 ? 0 : 8.5;
+    let curZ = startZ + 3.0 + sideOffset + rng() * 3.0;
     while (curZ < ROAD_BEHIND_PLAYER) {
-      curZ += 4.2 + rng() * 3.2; // step 4.2 - 7.4m
+      curZ += 15.0 + rng() * 11.0; // step 15m - 26m
       if (curZ >= ROAD_BEHIND_PLAYER) break;
 
       const clusterGroup = new THREE.Group();
       const baseZ = curZ;
-      const posX = side * (4.2 + rng() * 1.8);
+      const posX = side * (5.6 + rng() * 1.8);
       const posY = getTerrainElevation(Math.abs(posX));
 
-      if (loadedPools.canopyArch.length > 0) {
-        const archEntry = pick(loadedPools.canopyArch);
-        const archMesh = archEntry.model.clone(true);
-        const s = archEntry.asset.scale * (0.95 + rng() * 0.35);
-        archMesh.scale.set(s, s, s);
+      const treePool = loadedPools.roadsideTrees.length > 0 ? loadedPools.roadsideTrees : allTrees;
+      if (treePool.length > 0) {
+        const treeEntry = pick(treePool);
+        const treeMesh = treeEntry.model.clone(true);
+        const s = treeEntry.asset.scale * (0.9 + rng() * 0.25);
+        treeMesh.scale.set(s, s, s);
 
-        // Inward tilt over the dirt road to form the green canopy tunnel
-        // Left side leans right (rotation.z negative), Right side leans left (rotation.z positive)
-        const inwardLean = side === -1 ? -(0.14 + rng() * 0.12) : (0.14 + rng() * 0.12);
-        const pitchLean = (rng() - 0.5) * 0.08;
-        archMesh.rotation.set(pitchLean, rng() * Math.PI * 2, inwardLean);
-        clusterGroup.add(archMesh);
+        // Subtle organic tilt (upright, slight natural low-poly lean)
+        const tiltZ = (rng() - 0.5) * 0.06;
+        const tiltX = (rng() - 0.5) * 0.06;
+        treeMesh.rotation.set(tiltX, rng() * Math.PI * 2, tiltZ);
+        clusterGroup.add(treeMesh);
 
-        // Dense undergrowth hugging the foot of the canopy tree
-        if (loadedPools.undergrowth.length > 0) {
-          const bushEntry = pick(loadedPools.undergrowth);
-          const bush = bushEntry.model.clone(true);
-          const bs = bushEntry.asset.scale * (0.8 + rng() * 0.4);
-          bush.scale.set(bs, bs, bs);
-          bush.position.set(-side * 0.6 + (rng() - 0.5) * 0.6, 0, (rng() - 0.5) * 0.8);
-          bush.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(bush);
-        }
-
-        // 60% chance of mushrooms, wildflowers, or mossy stump at the tree base
-        if (rng() < 0.6 && loadedPools.props.length > 0) {
-          const propEntry = pick(loadedPools.props);
-          const prop = propEntry.model.clone(true);
-          const ps = propEntry.asset.scale * (0.75 + rng() * 0.35);
-          prop.scale.set(ps, ps, ps);
-          prop.position.set((rng() - 0.5) * 1.2, 0, (rng() - 0.5) * 1.2);
-          prop.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(prop);
-        }
-      }
-
-      clusterGroup.position.set(posX, posY, baseZ);
-      scene.add(clusterGroup);
-      items.push({ group: clusterGroup, baseZ, initialX: posX });
-    }
-
-    // 2. Trailside Low Undergrowth & Ground Cover (|X| = 2.8 to 4.2)
-    // Fills gaps between canopy trees along the dirt road verge
-    curZ = startZ + rng() * 2.5;
-    while (curZ < ROAD_BEHIND_PLAYER) {
-      curZ += 3.2 + rng() * 2.8;
-      if (curZ >= ROAD_BEHIND_PLAYER) break;
-
-      if (rng() < 0.75) {
-        const clusterGroup = new THREE.Group();
-        const baseZ = curZ;
-        const posX = side * (2.8 + rng() * 1.3);
-        const posY = getTerrainElevation(Math.abs(posX));
-
-        const featureRoll = rng();
-        if (featureRoll < 0.45 && loadedPools.undergrowth.length > 0) {
-          const bushEntry = pick(loadedPools.undergrowth);
-          const bush = bushEntry.model.clone(true);
-          const s = bushEntry.asset.scale * (0.75 + rng() * 0.35);
-          bush.scale.set(s, s, s);
-          bush.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(bush);
-
-          if (rng() < 0.5 && loadedPools.props.length > 0) {
-            const shroom = pick(loadedPools.props).model.clone(true);
-            shroom.scale.set(1.4, 1.4, 1.4);
-            shroom.position.set((rng() - 0.5) * 0.6, 0, (rng() - 0.5) * 0.6);
-            shroom.rotation.y = rng() * Math.PI * 2;
-            clusterGroup.add(shroom);
-          }
-        } else if (featureRoll < 0.75 && loadedPools.props.length > 0) {
-          const propEntry = pick(loadedPools.props);
-          const prop = propEntry.model.clone(true);
-          const s = propEntry.asset.scale * (0.8 + rng() * 0.35);
-          prop.scale.set(s, s, s);
-          prop.rotation.y = rng() * Math.PI * 2;
-          if (propEntry.asset.id.includes('log')) {
-            prop.rotation.y = (rng() - 0.5) * 0.5;
-          }
-          clusterGroup.add(prop);
-        } else if (loadedPools.undergrowth.length > 0) {
-          const flowerEntry = pick(loadedPools.undergrowth);
-          const flower = flowerEntry.model.clone(true);
-          const s = flowerEntry.asset.scale * (0.8 + rng() * 0.3);
-          flower.scale.set(s, s, s);
-          flower.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(flower);
-        }
-
-        clusterGroup.position.set(posX, posY, baseZ);
-        scene.add(clusterGroup);
-        items.push({ group: clusterGroup, baseZ, initialX: posX });
-      }
-    }
-
-    // 3. Dense Vertical Woodland Stands (|X| = 6.5 to 15.0) - Image 2 style
-    curZ = startZ + rng() * 3.5;
-    while (curZ < ROAD_BEHIND_PLAYER) {
-      curZ += 4.8 + rng() * 3.8;
-      if (curZ >= ROAD_BEHIND_PLAYER) break;
-
-      const clusterGroup = new THREE.Group();
-      const baseZ = curZ;
-      const posX = side * (6.5 + rng() * 7.5);
-      const posY = getTerrainElevation(Math.abs(posX));
-
-      if (hasAssets) {
-        // Vertical trunk tree
-        const primaryTree = pick(loadedPools.flankTrees.length > 0 ? loadedPools.flankTrees : allTrees);
-        const pMesh = primaryTree.model.clone(true);
-        const pScale = primaryTree.asset.scale * (0.9 + rng() * 0.4);
-        pMesh.scale.set(pScale, pScale, pScale);
-        pMesh.rotation.y = rng() * Math.PI * 2;
-        clusterGroup.add(pMesh);
-
-        // 75% chance of secondary tree in grove
-        if (rng() < 0.75) {
-          const secTree = pick(allTrees);
-          const sMesh = secTree.model.clone(true);
-          const sScale = secTree.asset.scale * (0.7 + rng() * 0.35);
-          sMesh.scale.set(sScale, sScale, sScale);
-          const offX = (rng() - 0.5) * 2.5;
-          const offZ = (rng() - 0.5) * 2.5;
-          sMesh.position.set(offX, 0, offZ);
-          sMesh.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(sMesh);
-        }
-
-        // 65% chance of base undergrowth / boulder
-        if (rng() < 0.65 && (loadedPools.undergrowth.length > 0 || loadedPools.props.length > 0)) {
-          const underEntry = rng() < 0.5 ? pick(loadedPools.undergrowth) : pick(loadedPools.props);
-          if (underEntry) {
-            const uMesh = underEntry.model.clone(true);
-            const uScale = underEntry.asset.scale * (0.7 + rng() * 0.4);
-            uMesh.scale.set(uScale, uScale, uScale);
-            uMesh.position.set((rng() - 0.5) * 1.5, 0, (rng() - 0.5) * 1.5);
-            uMesh.rotation.y = rng() * Math.PI * 2;
-            clusterGroup.add(uMesh);
+        // 35% chance of a small wildflower or small rock accent at tree base
+        if (rng() < 0.35) {
+          const accentPool = rng() < 0.6 ? loadedPools.undergrowth : loadedPools.props;
+          if (accentPool.length > 0) {
+            const accentEntry = pick(accentPool);
+            const accentMesh = accentEntry.model.clone(true);
+            const as = accentEntry.asset.scale * 0.8;
+            accentMesh.scale.set(as, as, as);
+            accentMesh.position.set((rng() - 0.5) * 0.8, 0, (rng() - 0.5) * 0.8);
+            accentMesh.rotation.y = rng() * Math.PI * 2;
+            clusterGroup.add(accentMesh);
           }
         }
       }
@@ -544,43 +418,37 @@ async function addRoadsideScenery(THREE, scene, config, loader) {
       items.push({ group: clusterGroup, baseZ, initialX: posX });
     }
 
-    // 4. Deep Forest Canopy & Ridge (|X| = 15.5 to 26.0)
-    curZ = startZ + rng() * 4.5;
+    // 2. Meadow & Rolling Knoll Trees (|X| = 9.5 to 17.0)
+    // Spacious placement across the open grass knolls
+    const meadowSideOffset = side === -1 ? 4.0 : 14.0;
+    curZ = startZ + 5.0 + meadowSideOffset + rng() * 4.0;
     while (curZ < ROAD_BEHIND_PLAYER) {
-      curZ += 6.0 + rng() * 5.0;
+      curZ += 20.0 + rng() * 14.0; // step 20m - 34m
       if (curZ >= ROAD_BEHIND_PLAYER) break;
 
       const clusterGroup = new THREE.Group();
       const baseZ = curZ;
-      const posX = side * (15.5 + rng() * 9.5);
+      const posX = side * (9.5 + rng() * 7.5);
       const posY = getTerrainElevation(Math.abs(posX));
 
-      if (hasAssets) {
-        const isRockOutcrop = rng() < 0.35 && loadedPools.props.length > 0;
-        if (isRockOutcrop) {
-          const rockEntry = pick(loadedPools.props);
-          const rMesh = rockEntry.model.clone(true);
-          const rScale = rockEntry.asset.scale * (1.1 + rng() * 0.5);
-          rMesh.scale.set(rScale, rScale, rScale);
-          rMesh.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(rMesh);
-        } else {
-          const deepTree = pick(loadedPools.flankTrees.length > 0 ? loadedPools.flankTrees : allTrees);
-          const tMesh = deepTree.model.clone(true);
-          const tScale = deepTree.asset.scale * (1.05 + rng() * 0.45);
-          tMesh.scale.set(tScale, tScale, tScale);
-          tMesh.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(tMesh);
+      const meadowPool = loadedPools.meadowTrees.length > 0 ? loadedPools.meadowTrees : allTrees;
+      if (meadowPool.length > 0) {
+        const treeEntry = pick(meadowPool);
+        const treeMesh = treeEntry.model.clone(true);
+        const s = treeEntry.asset.scale * (0.85 + rng() * 0.35);
+        treeMesh.scale.set(s, s, s);
+        treeMesh.rotation.set((rng() - 0.5) * 0.05, rng() * Math.PI * 2, (rng() - 0.5) * 0.05);
+        clusterGroup.add(treeMesh);
 
-          if (rng() < 0.65) {
-            const deepTree2 = pick(allTrees);
-            const tMesh2 = deepTree2.model.clone(true);
-            const tScale2 = deepTree2.asset.scale * (0.85 + rng() * 0.4);
-            tMesh2.scale.set(tScale2, tScale2, tScale2);
-            tMesh2.position.set((rng() - 0.5) * 3.5, 0, (rng() - 0.5) * 3.5);
-            tMesh2.rotation.y = rng() * Math.PI * 2;
-            clusterGroup.add(tMesh2);
-          }
+        // 20% chance of a second companion tree in a loose grove
+        if (rng() < 0.2 && allTrees.length > 0) {
+          const compEntry = pick(allTrees);
+          const compMesh = compEntry.model.clone(true);
+          const cs = compEntry.asset.scale * (0.7 + rng() * 0.3);
+          compMesh.scale.set(cs, cs, cs);
+          compMesh.position.set((rng() - 0.5) * 2.8, 0, (rng() - 0.5) * 2.8);
+          compMesh.rotation.y = rng() * Math.PI * 2;
+          clusterGroup.add(compMesh);
         }
       }
 
@@ -589,33 +457,81 @@ async function addRoadsideScenery(THREE, scene, config, loader) {
       items.push({ group: clusterGroup, baseZ, initialX: posX });
     }
 
-    // 5. Distant Valley Flanks (|X| = 24.0 to 29.0)
-    curZ = startZ + rng() * 6.0;
+    // 3. Distant Foothills & Ridge Features (|X| = 19.0 to 30.0)
+    // Sparse accents on the outer slopes
+    curZ = startZ + 8.0 + sideOffset + rng() * 6.0;
     while (curZ < ROAD_BEHIND_PLAYER) {
-      curZ += 9.0 + rng() * 6.0;
+      curZ += 30.0 + rng() * 20.0; // step 30m - 50m
       if (curZ >= ROAD_BEHIND_PLAYER) break;
 
       const clusterGroup = new THREE.Group();
       const baseZ = curZ;
-      const posX = side * (24.0 + rng() * 5.0);
+      const posX = side * (19.0 + rng() * 11.0);
       const posY = getTerrainElevation(Math.abs(posX));
 
-      if (hasAssets) {
-        if (rng() < 0.45 && loadedPools.props.length > 0) {
-          const rEntry = pick(loadedPools.props);
-          const rMesh = rEntry.model.clone(true);
-          const rScale = rEntry.asset.scale * (1.2 + rng() * 0.5);
-          rMesh.scale.set(rScale, rScale, rScale);
-          rMesh.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(rMesh);
-        } else {
-          const tEntry = pick(loadedPools.flankTrees.length > 0 ? loadedPools.flankTrees : allTrees);
-          const tMesh = tEntry.model.clone(true);
-          const tScale = tEntry.asset.scale * (1.15 + rng() * 0.45);
-          tMesh.scale.set(tScale, tScale, tScale);
-          tMesh.rotation.y = rng() * Math.PI * 2;
-          clusterGroup.add(tMesh);
+      const isRock = rng() < 0.35 && loadedPools.props.length > 0;
+      if (isRock) {
+        const rockEntry = pick(loadedPools.props);
+        const rockMesh = rockEntry.model.clone(true);
+        const rs = rockEntry.asset.scale * (1.1 + rng() * 0.4);
+        rockMesh.scale.set(rs, rs, rs);
+        rockMesh.rotation.y = rng() * Math.PI * 2;
+        clusterGroup.add(rockMesh);
+      } else if (allTrees.length > 0) {
+        const distTree = pick(allTrees);
+        const distMesh = distTree.model.clone(true);
+        const ds = distTree.asset.scale * (1.0 + rng() * 0.4);
+        distMesh.scale.set(ds, ds, ds);
+        distMesh.rotation.y = rng() * Math.PI * 2;
+        clusterGroup.add(distMesh);
+      }
+
+      clusterGroup.position.set(posX, posY, baseZ);
+      scene.add(clusterGroup);
+      items.push({ group: clusterGroup, baseZ, initialX: posX });
+    }
+
+    // 4. Subtle Trailside Ground Accents (|X| = 3.9 to 5.0)
+    // Clean, spaced wildflowers, small rocks, and gentle ground details along the verge
+    curZ = startZ + 7.0 + sideOffset + rng() * 4.0;
+    while (curZ < ROAD_BEHIND_PLAYER) {
+      curZ += 16.0 + rng() * 12.0; // step 16m - 28m
+      if (curZ >= ROAD_BEHIND_PLAYER) break;
+
+      const clusterGroup = new THREE.Group();
+      const baseZ = curZ;
+      const posX = side * (3.9 + rng() * 1.0);
+      const posY = getTerrainElevation(Math.abs(posX));
+
+      const roll = rng();
+      if (roll < 0.45 && loadedPools.undergrowth.length > 0) {
+        // Wildflower or low grass
+        const flowerEntry = pick(loadedPools.undergrowth);
+        const flowerMesh = flowerEntry.model.clone(true);
+        const s = flowerEntry.asset.scale * (0.8 + rng() * 0.3);
+        flowerMesh.scale.set(s, s, s);
+        flowerMesh.rotation.y = rng() * Math.PI * 2;
+        clusterGroup.add(flowerMesh);
+      } else if (roll < 0.75 && loadedPools.props.length > 0) {
+        // Small stone or rock
+        const propEntry = pick(loadedPools.props);
+        const propMesh = propEntry.model.clone(true);
+        const s = propEntry.asset.scale * (0.75 + rng() * 0.3);
+        propMesh.scale.set(s, s, s);
+        propMesh.rotation.y = rng() * Math.PI * 2;
+        if (propEntry.asset.id.includes('log')) {
+          // Orient log parallel to the trail
+          propMesh.rotation.y = (rng() - 0.5) * 0.3;
         }
+        clusterGroup.add(propMesh);
+      } else if (loadedPools.undergrowth.length > 0) {
+        // Small low bush
+        const bushEntry = pick(loadedPools.undergrowth);
+        const bushMesh = bushEntry.model.clone(true);
+        const s = bushEntry.asset.scale * (0.7 + rng() * 0.3);
+        bushMesh.scale.set(s, s, s);
+        bushMesh.rotation.y = rng() * Math.PI * 2;
+        clusterGroup.add(bushMesh);
       }
 
       clusterGroup.position.set(posX, posY, baseZ);
