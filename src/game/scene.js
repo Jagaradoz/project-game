@@ -7,8 +7,8 @@
  * timber/moss curbs, floating fireflies, and rolling misty mountain ridges.
  */
 
-import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.8.0';
-import { laneToX } from './state.js?v=1.8.0';
+import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.8.1';
+import { laneToX } from './state.js?v=1.8.1';
 
 const ROAD_THICKNESS = 0.25;
 const ROAD_TOP_Y = ROAD_THICKNESS / 2;
