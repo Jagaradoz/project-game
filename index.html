@@ -8,7 +8,7 @@
       rel="icon"
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🛡️</text></svg>"
     />
-    <link rel="stylesheet" href="./styles.css?v=1.9.0" />
+    <link rel="stylesheet" href="./styles.css?v=1.10.0" />
     <script type="importmap">
       {
         "imports": {
@@ -38,9 +38,17 @@
         </div>
 
         <div id="characterBar" class="char-picker">
+          <label for="biomeSelect" class="char-label">Biome</label>
+          <select id="biomeSelect" class="char-dropdown" aria-label="Select Biome">
+            <option value="auto" selected>🔄 Auto (by distance)</option>
+          </select>
           <label for="charSelect" class="char-label">Character</label>
           <select id="charSelect" class="char-dropdown" aria-label="Select Character Model">
             <option value="knight" selected>🛡️ Knight (Adventurer)</option>
+          <option value="rogue">🗡️ Rogue (Adventurer)</option>
+          <option value="rogueHooded">🧥 Hooded Rogue (Adventurer)</option>
+          <option value="mage">🔮 Mage (Adventurer)</option>
+          <option value="barbarian">🪓 Barbarian (Adventurer)</option>
           <option value="robot">🤖 Robot Expressive (Rigged)</option>
             <option value="xbot">🦾 Cyber X-Bot (Rigged)</option>
             <option value="soldier">🪖 Tactical Soldier (Rigged)</option>
@@ -94,10 +102,10 @@
       </details>
 
       <footer id="versionTag">
-        Dev Version: v<span id="versionNumber">1.9.0</span> (Testing Only)
+        Dev Version: v<span id="versionNumber">1.10.0</span> (Testing Only)
       </footer>
     </main>
 
-    <script type="module" src="./src/main.js?v=1.9.0"></script>
+    <script type="module" src="./src/main.js?v=1.10.0"></script>
   </body>
 </html>

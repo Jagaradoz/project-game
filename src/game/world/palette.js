@@ -74,7 +74,7 @@ export const GOLDEN_FOREST = {
   ground: {
     trail: '#8a6a45',
     trailEdge: '#6f5436',
-    verge: '#77913f',
+    verge: '#5c7d3a',
     grass: '#4a7f3e',
     grassDeep: '#31653a',
     meadow: '#54874a',

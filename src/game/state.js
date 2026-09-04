@@ -17,7 +17,7 @@
  *      still the way out of a column you cannot clear in time.
  */
 
-import { CONFIG } from '../config.js?v=1.9.0';
+import { CONFIG } from '../config.js?v=1.10.0';
 
 /** Deterministic 32-bit LCG (Numerical Recipes constants). */
 const LCG_MULTIPLIER = 1664525;
@@ -40,6 +40,12 @@ export function createGameState(seed = 1, config = CONFIG.game) {
     invulnUntilMs: -Infinity,
     /** Set on the frame a hit lands, so the view can flash without polling HP. */
     justHit: false,
+    /**
+     * Where enemies died this frame. The view needs a position to play a death
+     * animation at, and it cannot recover one from an enemy that has already
+     * been filtered out of the list.
+     */
+    justKilled: [],
     isOver: false,
     seed: seed >>> 0,
   };
@@ -66,7 +72,10 @@ export function clampLane(lane, config = CONFIG.game) {
  * @param {number} dtMs  Wall time since the last step; clamped internally.
  */
 export function updateGame(state, input, dtMs, config = CONFIG.game) {
-  if (state.isOver) return state.justHit ? { ...state, justHit: false } : state;
+  if (state.isOver) {
+    if (!state.justHit && state.justKilled.length === 0) return state;
+    return { ...state, justHit: false, justKilled: [] };
+  }
 
   const stepMs = Math.min(Math.max(dtMs, 0), config.maxFrameMs);
   const stepSec = stepMs / 1000;
@@ -121,6 +130,7 @@ export function updateGame(state, input, dtMs, config = CONFIG.game) {
     nextSpawnMs: spawned.nextSpawnMs,
     invulnUntilMs: hitCount > 0 ? elapsedMs + config.invulnMs : state.invulnUntilMs,
     justHit: hitCount > 0,
+    justKilled: shots.killed,
     isOver: hp === 0,
     seed: spawned.seed,
   };
@@ -197,6 +207,7 @@ function resolveShots(bullets, enemies, config) {
     bullets: bullets.filter((_, index) => !spentBullets.has(index)),
     enemies: enemies.filter((_, index) => !deadEnemies.has(index)),
     kills: deadEnemies.size,
+    killed: [...deadEnemies].map((index) => ({ lane: enemies[index].lane, z: enemies[index].z })),
   };
 }
 

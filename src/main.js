@@ -1,16 +1,17 @@
 /** Wiring: camera -> pose -> detectors -> input, and input -> game -> scene. */
 
-import { CONFIG } from './config.js?v=1.9.0';
-import { startCamera, describeCameraError } from './camera.js?v=1.9.0';
-import { initPose, detect } from './pose.js?v=1.9.0';
-import { resizeOverlay, clearOverlay, drawSkeleton } from './draw.js?v=1.9.0';
-import { createLateralState, updateLateral, recalibrateLateral, LATERAL } from './detectors/lateral.js?v=1.9.0';
-import { createJogState, updateJog } from './detectors/jog.js?v=1.9.0';
-import { ema } from './util/smooth.js?v=1.9.0';
-import { createGameState, updateGame, restartGame } from './game/state.js?v=1.9.0';
-import { createInput } from './game/input.js?v=1.9.0';
-import { createScene } from './game/scene.js?v=1.9.0';
-import { syncScene } from './game/render.js?v=1.9.0';
+import { CONFIG } from './config.js?v=1.10.0';
+import { startCamera, describeCameraError } from './camera.js?v=1.10.0';
+import { initPose, detect } from './pose.js?v=1.10.0';
+import { resizeOverlay, clearOverlay, drawSkeleton } from './draw.js?v=1.10.0';
+import { createLateralState, updateLateral, recalibrateLateral, LATERAL } from './detectors/lateral.js?v=1.10.0';
+import { createJogState, updateJog } from './detectors/jog.js?v=1.10.0';
+import { ema } from './util/smooth.js?v=1.10.0';
+import { createGameState, updateGame, restartGame } from './game/state.js?v=1.10.0';
+import { createInput } from './game/input.js?v=1.10.0';
+import { createScene } from './game/scene.js?v=1.10.0';
+import { BIOMES } from './game/world/biomes.js?v=1.10.0';
+import { syncScene } from './game/render.js?v=1.10.0';
 
 const el = {
   video: document.getElementById('video'),
@@ -37,6 +38,7 @@ const el = {
   finalScore: document.getElementById('finalScore'),
   restartBtn: document.getElementById('restartBtn'),
   charSelect: document.getElementById('charSelect'),
+  biomeSelect: document.getElementById('biomeSelect'),
 };
 
 /**
@@ -45,6 +47,14 @@ const el = {
  * forever.
  */
 const CHARACTER_STORAGE_KEY = 'lane_runner_char_v2';
+const BIOME_STORAGE_KEY = 'lane_runner_biome';
+const BIOME_AUTO = 'auto';
+const BIOME_ICONS = {
+  forest: '🌲',
+  autumn: '🍂',
+  highlands: '🪨',
+  oasis: '🌵',
+};
 
 /**
  * Auto quality. Pose inference and the 3D scene share one machine, and the
@@ -56,6 +66,9 @@ const QUALITY_WARMUP_FRAMES = 40;
 const QUALITY_SAMPLE_FRAMES = 120;
 const QUALITY_MEDIUM_FPS = 45;
 const QUALITY_LOW_FPS = 26;
+
+/** Simulated tail during which the harness also syncs the view. */
+const SIM_SYNC_TAIL_MS = 1500;
 
 const ctx = el.overlay.getContext('2d');
 
@@ -179,9 +192,12 @@ async function bootGame() {
     });
   }
 
+  buildBiomeOptions();
+
   try {
     sceneRefs = await createScene(el.gameCanvas);
     await applyCharacter(selectedCharacter());
+    applyBiomeChoice(selectedBiome());
   } catch (error) {
     showError('Could not load the 3D renderer. Check the network, then reload.');
     console.error(error);
@@ -223,6 +239,12 @@ function exposeTestHook() {
       const steps = Math.max(0, Math.round((Number(seconds) || 0) * 1000 / stepMs));
       for (let step = 0; step < steps; step += 1) {
         game = updateGame(game, { lane: options.lane ?? game.lane, isFiring: options.firing !== false }, stepMs);
+        // Sync the view too, or per-frame visuals that the reducer only reports
+        // once -- deaths, hit bursts -- are stepped straight past and never seen.
+        // Only for the tail of the run: syncScene walks every scatter instance,
+        // and doing that for a whole simulated minute is pointlessly slow.
+        const remainingMs = (steps - step) * stepMs;
+        if (sceneRefs && remainingMs < SIM_SYNC_TAIL_MS) syncScene(sceneRefs, game, stepMs);
       }
     },
     summary() {
@@ -235,6 +257,7 @@ function exposeTestHook() {
         calls: info?.calls ?? null,
         tris: info?.triangles ?? null,
         quality: sceneRefs?.quality ?? null,
+        corpses: sceneRefs?.enemyPool?.corpses?.filter((c) => c.group.visible).length ?? 0,
         character: player?.characterId ?? null,
         anim: player?.currentActionName ?? null,
         animRunning: Boolean(player?.currentAction?.isRunning?.()),
@@ -260,6 +283,37 @@ function gameFrame(nowMs) {
   if (game.isOver !== wasOver) toggleGameOver(game.isOver);
 
   requestAnimationFrame(gameFrame);
+}
+
+/**
+ * The biome list is the single source of truth for these options, so adding a
+ * biome does not also mean remembering to edit the markup.
+ */
+function buildBiomeOptions() {
+  if (!el.biomeSelect) return;
+
+  for (const biome of BIOMES) {
+    const option = document.createElement('option');
+    option.value = biome.id;
+    option.textContent = `${BIOME_ICONS[biome.id] ?? '•'} ${biome.name}`;
+    el.biomeSelect.append(option);
+  }
+
+  el.biomeSelect.value = selectedBiome();
+  el.biomeSelect.addEventListener('change', (event) => {
+    localStorage.setItem(BIOME_STORAGE_KEY, event.target.value);
+    applyBiomeChoice(event.target.value);
+  });
+}
+
+function selectedBiome() {
+  const saved = localStorage.getItem(BIOME_STORAGE_KEY);
+  if (saved === BIOME_AUTO) return saved;
+  return BIOMES.some((biome) => biome.id === saved) ? saved : BIOME_AUTO;
+}
+
+function applyBiomeChoice(choice) {
+  sceneRefs?.setBiomeOverride?.(choice === BIOME_AUTO ? null : choice);
 }
 
 function selectedCharacter() {

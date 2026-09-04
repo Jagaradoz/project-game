@@ -10,8 +10,14 @@
  * be loaded, so the game is always playable.
  */
 
-import { SKELETON_UTILS_URL } from '../../config.js?v=1.9.0';
-import { TRAIL_Y } from '../world/ground.js?v=1.9.0';
+import { SKELETON_UTILS_URL } from '../../config.js?v=1.10.0';
+import { TRAIL_Y } from '../world/ground.js?v=1.10.0';
+
+/** Seconds a body lies where it fell before it starts sinking away. */
+const CORPSE_HOLD_SEC = 2.2;
+const CORPSE_SINK_SEC = 1.1;
+const CORPSE_SINK_DEPTH = 2.2;
+const CORPSE_DESPAWN_Z = 26;
 
 export async function addEnemyPool(THREE, scene, config, palette, loader) {
   const rigged = await buildRiggedPool(THREE, scene, config, loader);
@@ -44,15 +50,79 @@ async function buildRiggedPool(THREE, scene, config, loader) {
     buildEnemy(THREE, scene, gltf, definition, clipFor, cloneSkeleton),
   );
 
+  // A separate, small pool. Reusing a live slot would not work: slots are keyed
+  // to the reducer's enemy array, which reshuffles the moment one dies.
+  const corpses = Array.from({ length: definition.corpseCount ?? 5 }, () =>
+    buildCorpse(THREE, scene, gltf, definition, clipFor, cloneSkeleton),
+  );
+  let nextCorpse = 0;
+
   return {
     items,
+    corpses,
     isRigged: true,
     animatedCount: definition.animatedCount ?? 8,
     animateBeyondZ: definition.animateBeyondZ ?? -70,
+
+    /** Stages a death animation where an enemy was killed. */
+    spawnDeath(x, z) {
+      const corpse = corpses[nextCorpse];
+      nextCorpse = (nextCorpse + 1) % corpses.length;
+
+      corpse.group.position.set(x, TRAIL_Y, z);
+      corpse.group.visible = true;
+      corpse.elapsed = 0;
+      corpse.sink = 0;
+
+      if (corpse.action) {
+        corpse.action.reset();
+        corpse.action.setLoop(THREE.LoopOnce, 1);
+        corpse.action.clampWhenFinished = true;
+        corpse.action.play();
+      }
+      return corpse;
+    },
+
+    /**
+     * Corpses scroll with the world, hold their final pose, then sink into the
+     * trail. Sinking rather than fading keeps them opaque: a transparent skinned
+     * mesh would need its own material clone and would sort badly against the
+     * scenery behind it.
+     */
+    updateCorpses(dtSec, worldSpeed) {
+      for (const corpse of corpses) {
+        if (!corpse.group.visible) continue;
+
+        corpse.elapsed += dtSec;
+        corpse.group.position.z += worldSpeed * dtSec;
+        corpse.mixer?.update(dtSec);
+
+        if (corpse.elapsed > CORPSE_HOLD_SEC) {
+          corpse.sink += dtSec / CORPSE_SINK_SEC;
+          corpse.group.position.y = TRAIL_Y - corpse.sink * CORPSE_SINK_DEPTH;
+        }
+
+        if (corpse.sink >= 1 || corpse.group.position.z > CORPSE_DESPAWN_Z) {
+          corpse.group.visible = false;
+        }
+      }
+    },
+
     applyPalette() {
       // Enemy colouring comes from the model's own atlas; biome palettes leave it alone.
     },
   };
+}
+
+function buildCorpse(THREE, scene, gltf, definition, clipFor, cloneSkeleton) {
+  const corpse = buildEnemy(THREE, scene, gltf, definition, clipFor, cloneSkeleton);
+  const deathClip = clipFor.death ?? clipFor.run;
+
+  corpse.action?.stop();
+  corpse.action = deathClip ? corpse.mixer.clipAction(deathClip) : null;
+  corpse.elapsed = 0;
+  corpse.sink = 0;
+  return corpse;
 }
 
 function buildEnemy(THREE, scene, gltf, definition, clipFor, cloneSkeleton) {
@@ -141,9 +211,12 @@ function buildFallbackPool(THREE, scene, config, palette) {
 
   return {
     items,
+    corpses: [],
     isRigged: false,
     animatedCount: 0,
     animateBeyondZ: 0,
+    spawnDeath() {},
+    updateCorpses() {},
     applyPalette(next) {
       coreMat.color.set(next.accents.enemy);
       ringMat.color.set(next.accents.enemyTrim);

@@ -6,15 +6,18 @@
  * wiring plus the three pools the reducer drives -- player, enemies, bullets.
  */
 
-import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.9.0';
-import { GOLDEN_FOREST } from './world/palette.js?v=1.9.0';
-import { addSky } from './world/sky.js?v=1.9.0';
-import { configureRenderer, addLighting, SHADOW_QUALITY } from './world/lighting.js?v=1.9.0';
-import { addGround, TRAIL_Y } from './world/ground.js?v=1.9.0';
-import { addScatter } from './world/scatter.js?v=1.9.0';
-import { resolveBiome, blendPalettes, activeScatterSet } from './world/biomes.js?v=1.9.0';
-import { addEnemyPool } from './actors/enemies.js?v=1.9.0';
-import { addPlayer } from './actors/player.js?v=1.9.0';
+import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.10.0';
+import { GOLDEN_FOREST } from './world/palette.js?v=1.10.0';
+import { addSky } from './world/sky.js?v=1.10.0';
+import { configureRenderer, addLighting, SHADOW_QUALITY } from './world/lighting.js?v=1.10.0';
+import { addGround, TRAIL_Y } from './world/ground.js?v=1.10.0';
+import { addScatter } from './world/scatter.js?v=1.10.0';
+import { createCurve } from './world/curve.js?v=1.10.0';
+import { addClouds } from './world/clouds.js?v=1.10.0';
+import { BIOMES, resolveBiome, blendPalettes, activeScatterSet } from './world/biomes.js?v=1.10.0';
+import { addEnemyPool } from './actors/enemies.js?v=1.10.0';
+import { addPlayer } from './actors/player.js?v=1.10.0';
+import { createEffects } from './actors/effects.js?v=1.10.0';
 
 const MOTE_COUNT = 26;
 const MOTE_SPAN = 180;
@@ -22,6 +25,8 @@ const MOTE_START_Z = 20;
 
 /** How often the biome crossfade is recomputed. Colour drifts far too slowly to need every frame. */
 const BIOME_UPDATE_MS = 120;
+/** How long a hand-picked biome takes to fade in, so the selector never snaps. */
+const BIOME_MANUAL_BLEND_MS = 1400;
 
 export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN_FOREST) {
   const THREE = await import(/* @vite-ignore */ THREE_MODULE_URL);
@@ -36,6 +41,7 @@ export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN
 
   const sky = addSky(THREE, scene, palette);
   const lighting = addLighting(THREE, scene, palette, shadowMapSize);
+  const curve = createCurve(THREE, config.curve);
   const ground = addGround(THREE, scene, config, palette);
 
   const loader = await createLoader();
@@ -44,9 +50,21 @@ export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN
     seed: config.scenery.seed,
   });
   const motes = addMotes(THREE, scene, palette);
-  const player = await addPlayer(THREE, scene, config, palette, loader);
+  const clouds = addClouds(THREE, scene, palette, config.clouds);
+  const player = await addPlayer(THREE, scene, config, palette, loader, curve);
   const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
   const bulletPool = addBulletPool(THREE, scene, config, palette);
+  const effects = createEffects(THREE, scene, palette, curve);
+
+  // Everything that shares the trail has to bend with it. The sky dome and the
+  // horizon ridges are deliberately left flat: they are notionally at infinity.
+  curve.patchObject(ground.valley.mesh);
+  for (const marker of ground.markers.items) curve.patchObject(marker.mesh);
+  for (const set of scatter.sets.values()) curve.patchObject(set.group);
+  for (const mote of motes.items) curve.patchObject(mote.mesh);
+  for (const slot of enemyPool.items) curve.patchObject(slot.group);
+  for (const corpse of enemyPool.corpses) curve.patchObject(corpse.group);
+  for (const bullet of bulletPool.items) curve.patchObject(bullet.mesh);
 
   function resize() {
     const width = canvas.clientWidth || 1;
@@ -62,25 +80,58 @@ export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN
 
   // Reused every update so the crossfade allocates nothing per frame.
   const blended = structuredClone(palette);
+  const autoScratch = structuredClone(palette);
+  let overrideFrom = structuredClone(palette);
   let lastBiomeMs = -Infinity;
+  let override = null;
+  let overrideT = 1;
 
   /**
-   * Drives the biome crossfade from distance travelled. Cheap enough to call
-   * every frame; it throttles itself.
+   * Pins the world to one biome, or returns to distance-driven cycling when
+   * given null. Either way it eases rather than snapping, from wherever the
+   * palette happens to be at the moment of the switch.
+   */
+  function setBiomeOverride(biomeId) {
+    const next = biomeId ? BIOMES.find((biome) => biome.id === biomeId) ?? null : null;
+    if ((next?.id ?? null) === (override?.id ?? null)) return;
+
+    overrideFrom = structuredClone(blended);
+    override = next;
+    overrideT = 0;
+  }
+
+  /**
+   * Drives the biome crossfade, from distance travelled or from the selector.
+   * Cheap enough to call every frame; it throttles itself.
    */
   function applyBiome(distance, elapsedMs) {
-    if (elapsedMs - lastBiomeMs < BIOME_UPDATE_MS) return;
+    const sinceMs = elapsedMs - lastBiomeMs;
+    if (sinceMs < BIOME_UPDATE_MS) return;
     lastBiomeMs = elapsedMs;
 
     const transition = resolveBiome(distance);
-    const next = blendPalettes(transition.from, transition.to, transition.t, blended);
+    const autoPalette = blendPalettes(transition.from, transition.to, transition.t, autoScratch);
+    const autoSet = activeScatterSet(transition);
+
+    let next = autoPalette;
+    let set = autoSet;
+
+    if (override || overrideT < 1) {
+      overrideT = Math.min(1, overrideT + sinceMs / BIOME_MANUAL_BLEND_MS);
+      const target = override ?? autoPalette;
+      const eased = overrideT * overrideT * (3 - 2 * overrideT);
+      next = blendPalettes(overrideFrom, target, eased, blended);
+      set = overrideT < 0.5 ? set : (override?.scatterSet ?? autoSet);
+    }
 
     sky.applyPalette(next);
     lighting.applyPalette(next, renderer);
     ground.applyPalette(next);
     motes.applyPalette(next);
+    clouds.applyPalette(next);
     scatter.applyPalette(next);
-    scatter.setActive(activeScatterSet(transition));
+    effects.applyPalette(next);
+    scatter.setActive(set);
   }
 
   /**
@@ -102,6 +153,7 @@ export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN
     }
 
     renderer.shadowMap.needsUpdate = true;
+    clouds.setVisible(level !== 'low');
     quality = level;
   }
 
@@ -121,10 +173,14 @@ export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN
     markers: ground.markers,
     scatter,
     motes,
+    clouds,
     player,
     enemyPool,
     bulletPool,
+    effects,
+    curve,
     applyBiome,
+    setBiomeOverride,
     setQuality,
     get quality() {
       return quality;

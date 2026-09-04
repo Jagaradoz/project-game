@@ -127,6 +127,19 @@ export const CONFIG = {
     /** Shadow map budget. 'high' | 'medium' | 'low' (low disables shadows). */
     quality: 'high',
 
+    /**
+     * The trail's visual bend. Purely a vertex-shader displacement -- lanes stay
+     * exactly where the reducer puts them. `rampDistance` is how far ahead the
+     * bend reaches full strength, so the ground underfoot never slides.
+     */
+    curve: {
+      amplitude: 6,
+      frequency: 0.011,
+      rampDistance: 35,
+      hillAmplitude: 2.2,
+      hillFrequency: 0.016,
+    },
+
     playerRadius: 0.75,
     playerZ: 0,
     enemyRadius: 0.65,
@@ -184,6 +197,8 @@ export const CONFIG = {
        */
       animatedCount: 8,
       animateBeyondZ: -70,
+      /** Bodies staged for the death animation, separate from the live pool. */
+      corpseCount: 5,
     },
 
     /** Trail stones marking the lane boundaries. */
@@ -236,6 +251,101 @@ export const CONFIG = {
         ],
         /** Cloned out of the model to become the thrown projectile. */
         projectilePart: '1H_Sword',
+        animations: {
+          run: 'Running_A',
+          walk: 'Walking_A',
+          idle: 'Idle',
+          shoot: 'Throw',
+          death: 'Death_A',
+          hit: 'Hit_A',
+        },
+      },
+      rogue: {
+        id: 'rogue',
+        name: 'Rogue',
+        path: './assets/models/characters/Rogue.glb',
+        scale: 1.25,
+        rotationY: Math.PI,
+        offsetY: 0,
+        hideParts: [
+          'Knife_Offhand',
+          '1H_Crossbow',
+          '2H_Crossbow',
+          'Throwable',
+          'Rogue_Cape',
+        ],
+        projectilePart: 'Knife',
+        animations: {
+          run: 'Running_A',
+          walk: 'Walking_A',
+          idle: 'Idle',
+          shoot: 'Throw',
+          death: 'Death_A',
+          hit: 'Hit_A',
+        },
+      },
+      rogueHooded: {
+        id: 'rogueHooded',
+        name: 'Hooded Rogue',
+        path: './assets/models/characters/Rogue_Hooded.glb',
+        scale: 1.25,
+        rotationY: Math.PI,
+        offsetY: 0,
+        hideParts: [
+          'Knife_Offhand',
+          '1H_Crossbow',
+          '2H_Crossbow',
+          'Throwable',
+          'Rogue_Cape',
+        ],
+        projectilePart: 'Knife',
+        animations: {
+          run: 'Running_A',
+          walk: 'Walking_A',
+          idle: 'Idle',
+          shoot: 'Throw',
+          death: 'Death_A',
+          hit: 'Hit_A',
+        },
+      },
+      mage: {
+        id: 'mage',
+        name: 'Mage',
+        path: './assets/models/characters/Mage.glb',
+        scale: 1.25,
+        rotationY: Math.PI,
+        offsetY: 0,
+        hideParts: [
+          'Spellbook',
+          'Spellbook_open',
+          '2H_Staff',
+          'Mage_Cape',
+        ],
+        /** No blade to throw: the mage gets the default bolt, which reads as a spell. */
+        animations: {
+          run: 'Running_A',
+          walk: 'Walking_A',
+          idle: 'Idle',
+          shoot: 'Throw',
+          death: 'Death_A',
+          hit: 'Hit_A',
+        },
+      },
+      barbarian: {
+        id: 'barbarian',
+        name: 'Barbarian',
+        path: './assets/models/characters/Barbarian.glb',
+        scale: 1.25,
+        rotationY: Math.PI,
+        offsetY: 0,
+        hideParts: [
+          '1H_Axe_Offhand',
+          'Barbarian_Round_Shield',
+          '2H_Axe',
+          'Mug',
+          'Barbarian_Cape',
+        ],
+        projectilePart: '1H_Axe',
         animations: {
           run: 'Running_A',
           walk: 'Walking_A',

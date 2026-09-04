@@ -12,9 +12,9 @@
  * time and never touched again, so a frame costs one float write per prop.
  */
 
-import { createRng, range } from './rng.js?v=1.9.0';
-import { repaintKitModel } from './palette.js?v=1.9.0';
-import { createHeightSampler } from './ground.js?v=1.9.0';
+import { createRng, range } from './rng.js?v=1.10.0';
+import { repaintKitModel } from './palette.js?v=1.10.0';
+import { createHeightSampler } from './ground.js?v=1.10.0';
 
 const MODEL_DIR = './assets/models/nature';
 const Z_TRANSLATION_OFFSET = 14;

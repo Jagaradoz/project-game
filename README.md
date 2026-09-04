@@ -14,7 +14,10 @@ place to shoot. Built on a webcam pose-detection testbed that answers one questi
 - Arrow keys / `A`,`D` work too, so the game is playable with no camera at all
 - Detector debug (skeleton, offsets, cadence, FPS, inference ms) still there, collapsed
 - The run travels through **four biomes** — forest, autumn, highlands, oasis — crossfading
-  every 700 m in palette and in which props line the trail
+  every 700 m in palette and in which props line the trail, or pick one from the selector
+- The trail **winds**, without the lanes moving. See "The trail that isn't there" below
+- Five rigged **adventurers** to run as, each throwing their own weapon
+- Skeletons **die where they fall** and burst into bone chips
 - 100% client side. No server processing, no login, no database, no build step.
 
 Stack: plain HTML/CSS/ES modules, [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe)
@@ -162,9 +165,12 @@ src/game/world/sky.js       vertex-coloured gradient dome
 src/game/world/lighting.js  renderer setup, sun + shadow rig
 src/game/world/ground.js    valley cross-section, trail stones, horizon ridges
 src/game/world/scatter.js   instanced scenery, one InstancedMesh per model part
+src/game/world/curve.js     the vertex-shader trail bend
+src/game/world/clouds.js    instanced drifting clouds
 src/game/world/rng.js       seeded RNG for world building
 src/game/actors/player.js   rigged character, animation graph, weapon loadout
 src/game/actors/enemies.js  rigged skeleton pool with capped mixer updates
+src/game/actors/effects.js  instanced bone-chip bursts
 src/util/landmarks.js       visibility gating + scale-invariant body measurements
 src/util/smooth.js          EMA, sliding window, cadence
 src/main.js                 wiring: pose loop, game loop, HUD
@@ -188,6 +194,28 @@ desktop FPS. Note both, plus whether the backend tile reads `GPU` or `CPU` — t
 CPU fallback engages automatically on devices where the WebGL delegate fails, and
 it is much slower.
 
+## The trail that isn't there
+
+The path visibly bends and rolls, but **the lanes never move**. A lane is an exact x in
+the reducer, and interpolating it would break the one rule the game is built on: whatever
+the input says the lane is, that is the lane this frame.
+
+So the world does not actually curve. Every vertex is displaced sideways and vertically
+in the vertex shader by a function of its world z, ramped to zero at the player
+([curve.js](src/game/world/curve.js)). Collision, spawning and lane geometry never see it;
+the trail runs dead straight underfoot and winds away into the distance.
+
+Three things have to agree on that displacement or it comes apart:
+
+| Chunk | What breaks without it |
+| --- | --- |
+| `project_vertex` | nothing bends at all |
+| `worldpos_vertex` | surfaces sample their shadow from the unbent position |
+| the depth material | objects are drawn bent but cast shadows from where they were |
+
+The ground is tessellated into 74 slices along z for the same reason — a two-slice strip
+has nothing to bend, it just shears.
+
 ## Assets and licences
 
 All 3D assets are CC0 and vendored under `assets/models/`.
@@ -195,7 +223,7 @@ All 3D assets are CC0 and vendored under `assets/models/`.
 | Asset | Source | Licence |
 | --- | --- | --- |
 | Nature kit (329 models) | [Kenney](https://kenney.nl) Nature Kit | CC0 |
-| Knight | [KayKit Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) | CC0 |
+| Knight, Rogue, Hooded Rogue, Mage, Barbarian | [KayKit Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) | CC0 |
 | Skeleton Minion | [KayKit Skeletons](https://kaylousberg.itch.io/kaykit-skeletons) | CC0 |
 | Robot / X-Bot / Soldier | three.js examples | as per three.js |
 

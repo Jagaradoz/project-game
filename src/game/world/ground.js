@@ -9,9 +9,11 @@
  * ended in mid-air about 25 units out and left the visible hard edge.
  */
 
-import { createRng, range } from './rng.js?v=1.9.0';
+import { createRng, range } from './rng.js?v=1.10.0';
 
 const GROUND_NEAR_Z = 60;
+/** Slices along z. A two-slice strip cannot show the curve; it would just shear. */
+const GROUND_Z_SLICES = 74;
 const GROUND_FAR_Z = -520;
 const TRAIL_Y = 0;
 
@@ -22,6 +24,9 @@ const RIDGE_LAYERS = [
 ];
 
 const MARKER_STONE = { radius: 0.3, height: 0.07, sides: 6 };
+const MARKER_SEED = 0x7a11;
+const MARKER_JITTER_X = 0.22;
+const MARKER_SKIP_CHANCE = 0.22;
 
 /**
  * Half a cross-section, from the trail centre outward. Mirrored for -x.
@@ -32,15 +37,20 @@ const MARKER_STONE = { radius: 0.3, height: 0.07, sides: 6 };
 function halfProfile(halfWidth) {
   return [
     { x: 0, y: TRAIL_Y, key: 'trail' },
-    { x: halfWidth, y: TRAIL_Y, key: 'trail' },
-    { x: halfWidth + 0.45, y: 0.08, key: 'trailEdge' },
-    { x: halfWidth + 1.4, y: 0.36, key: 'verge' },
-    { x: halfWidth + 4, y: 0.72, key: 'grass' },
-    { x: halfWidth + 9, y: 1.5, key: 'grass' },
-    { x: halfWidth + 16, y: 3.2, key: 'grassDeep' },
-    { x: halfWidth + 28, y: 6.4, key: 'meadow' },
-    { x: halfWidth + 48, y: 11, key: 'grassDeep' },
-    { x: halfWidth + 90, y: 17, key: 'meadow' },
+    // A near-vertical lip, not a ramp. The old shallow slope blended dirt into
+    // grass over four units, which read as an airbrushed gradient rather than a
+    // path with an edge. `hard` bands take a single flat colour so the edge
+    // stays crisp; the rest blend, because flat bands that far out turn into
+    // visible stripes running alongside the trail.
+    { x: halfWidth - 0.35, y: TRAIL_Y, key: 'trail', hard: true },
+    { x: halfWidth, y: 0.17, key: 'trailEdge', hard: true },
+    { x: halfWidth + 0.65, y: 0.24, key: 'verge', hard: true },
+    { x: halfWidth + 3, y: 0.6, key: 'grass' },
+    { x: halfWidth + 7, y: 1.2, key: 'grass' },
+    { x: halfWidth + 13, y: 2.3, key: 'grassDeep' },
+    { x: halfWidth + 22, y: 4.4, key: 'meadow' },
+    { x: halfWidth + 40, y: 8.5, key: 'grassDeep' },
+    { x: halfWidth + 75, y: 14, key: 'meadow' },
     { x: halfWidth + 200, y: 24, key: 'grassDeep' },
   ];
 }
@@ -98,14 +108,21 @@ function addValley(THREE, scene, halfWidth, palette) {
     ...profile,
   ];
 
+  const sliceDepth = (GROUND_NEAR_Z - GROUND_FAR_Z) / GROUND_Z_SLICES;
+
   for (let index = 0; index < full.length - 1; index += 1) {
     const a = full[index];
     const b = full[index + 1];
-    positions.push(
-      a.x, a.y, GROUND_NEAR_Z, b.x, b.y, GROUND_NEAR_Z, b.x, b.y, GROUND_FAR_Z,
-      a.x, a.y, GROUND_NEAR_Z, b.x, b.y, GROUND_FAR_Z, a.x, a.y, GROUND_FAR_Z,
-    );
-    bandKeys.push([a.key, b.key]);
+
+    for (let slice = 0; slice < GROUND_Z_SLICES; slice += 1) {
+      const nearZ = GROUND_NEAR_Z - slice * sliceDepth;
+      const farZ = nearZ - sliceDepth;
+      positions.push(
+        a.x, a.y, nearZ, b.x, b.y, nearZ, b.x, b.y, farZ,
+        a.x, a.y, nearZ, b.x, b.y, farZ, a.x, a.y, farZ,
+      );
+      bandKeys.push([a.key, b.key, Boolean(b.hard)]);
+    }
   }
 
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -123,18 +140,24 @@ function addValley(THREE, scene, halfWidth, palette) {
   mesh.receiveShadow = true;
   scene.add(mesh);
 
+  /**
+   * Hard bands get one flat colour so the trail edge stays a real edge. Softer
+   * bands further out interpolate, otherwise the bank reads as a set of stripes
+   * running parallel to the path.
+   */
   function paint(next) {
     const colors = geometry.attributes.color.array;
     const near = new THREE.Color();
     const far = new THREE.Color();
 
-    bandKeys.forEach(([keyA, keyB], band) => {
-      near.set(next.ground[keyA]);
+    bandKeys.forEach(([keyA, keyB, isHard], index) => {
       far.set(next.ground[keyB]);
+      near.copy(isHard ? far : new THREE.Color(next.ground[keyA]));
+
       // Vertex order per band: a, b, b, a, b, a.
       const order = [near, far, far, near, far, near];
       order.forEach((color, corner) => {
-        const offset = (band * 6 + corner) * 3;
+        const offset = (index * 6 + corner) * 3;
         colors[offset] = color.r;
         colors[offset + 1] = color.g;
         colors[offset + 2] = color.b;
@@ -168,17 +191,28 @@ function addLaneMarkers(THREE, scene, config, palette) {
 
   const period = config.markerLength + config.markerGap;
   const span = config.markerCount * period;
+  const rng = createRng(MARKER_SEED);
   const items = [];
 
   for (let lane = 1; lane < config.laneCount; lane += 1) {
-    const x = (lane - config.laneCount / 2) * config.laneWidth;
+    const laneX = (lane - config.laneCount / 2) * config.laneWidth;
+
     for (let index = 0; index < config.markerCount; index += 1) {
-      const baseZ = config.spawnZ + index * period;
+      // Gaps in the run. A stone at every single interval is what made these
+      // read as road markings rather than something the trail wore in.
+      if (rng() < MARKER_SKIP_CHANCE) continue;
+
+      const baseZ = config.spawnZ + index * period + range(rng, -period * 0.3, period * 0.3);
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(x, TRAIL_Y + MARKER_STONE.height / 4, baseZ);
-      // Each stone turned differently so a row of them does not read as a
-      // painted road marking.
-      mesh.rotation.y = index * 1.11 + lane;
+      const scale = range(rng, 0.62, 1.35);
+
+      mesh.position.set(
+        laneX + range(rng, -MARKER_JITTER_X, MARKER_JITTER_X),
+        TRAIL_Y + (MARKER_STONE.height * scale) / 4,
+        baseZ,
+      );
+      mesh.scale.set(scale, range(rng, 0.7, 1.2), scale * range(rng, 0.8, 1.25));
+      mesh.rotation.set(range(rng, -0.12, 0.12), rng() * Math.PI * 2, range(rng, -0.1, 0.1));
       mesh.receiveShadow = true;
       scene.add(mesh);
       items.push({ mesh, baseZ });

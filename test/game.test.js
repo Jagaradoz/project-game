@@ -376,3 +376,32 @@ test('game: a long stalled frame is clamped instead of teleporting the world', (
 
   assert.equal(stalled.distance, clamped.distance);
 });
+
+test('game: a kill reports where it happened so the view can stage a death', () => {
+  // Arrange: a bullet one step away from an enemy sitting in the centre lane.
+  const config = { ...CONFIG.game, spawnIntervalMs: 1e9 };
+  const enemy = { lane: 1, z: -10, previousZ: -10 };
+  const bullet = { lane: 1, z: -9, previousZ: -9 };
+  const state = { ...createGameState(1, config), enemies: [enemy], bullets: [bullet] };
+
+  // Act
+  const next = updateGame(state, { lane: 1, isFiring: false }, 100, config);
+
+  // Assert
+  assert.equal(next.score, 1);
+  assert.equal(next.justKilled.length, 1);
+  assert.equal(next.justKilled[0].lane, 1);
+  assert.ok(Number.isFinite(next.justKilled[0].z));
+});
+
+test('game: justKilled is cleared on the following frame', () => {
+  const config = { ...CONFIG.game, spawnIntervalMs: 1e9 };
+  const enemy = { lane: 1, z: -10, previousZ: -10 };
+  const bullet = { lane: 1, z: -9, previousZ: -9 };
+  const state = { ...createGameState(1, config), enemies: [enemy], bullets: [bullet] };
+
+  const killed = updateGame(state, { lane: 1, isFiring: false }, 100, config);
+  const after = updateGame(killed, { lane: 1, isFiring: false }, 100, config);
+
+  assert.equal(after.justKilled.length, 0);
+});

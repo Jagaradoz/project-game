@@ -313,8 +313,10 @@ button:disabled {
   position: absolute;
   bottom: 12px;
   left: 12px;
+  right: 12px;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   background: rgba(16, 20, 24, 0.85);
@@ -335,6 +337,9 @@ button:disabled {
 }
 
 .char-dropdown {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 220px;
   background: #1e252d;
   color: #fff;
   border: 1px solid #36414e;

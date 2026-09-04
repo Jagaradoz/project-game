@@ -8,8 +8,8 @@
  * instance buffer rather than moving Object3Ds.
  */
 
-import { CONFIG } from '../config.js?v=1.9.0';
-import { laneToX, isInvulnerable } from './state.js?v=1.9.0';
+import { CONFIG } from '../config.js?v=1.10.0';
+import { laneToX, isInvulnerable } from './state.js?v=1.10.0';
 
 /** Blink cycle while the grace window is open. */
 const BLINK_PERIOD_MS = 160;
@@ -21,12 +21,17 @@ export function syncScene(sceneRefs, state, dtMs = 16.67, config = CONFIG.game) 
 
   syncPlayer(sceneRefs.player, state, dtSec, config);
   syncEnemies(sceneRefs.enemyPool, state.enemies, state.elapsedMs, dtSec, config);
+  stageKills(sceneRefs, state, config);
+  sceneRefs.enemyPool?.updateCorpses(dtSec, state.speed);
+  sceneRefs.effects?.update(dtSec, state.speed);
   syncBullets(sceneRefs.bulletPool?.items, state.bullets, state.elapsedMs, config);
 
+  sceneRefs.curve?.update(state.distance);
   sceneRefs.applyBiome?.(state.distance, state.elapsedMs);
   syncRecycled(sceneRefs.markers, state.distance);
   sceneRefs.scatter?.scroll(state.distance);
   syncMotes(sceneRefs.motes, state.distance, state.elapsedMs);
+  sceneRefs.clouds?.scroll(state.distance, state.elapsedMs);
 }
 
 function syncPlayer(player, state, dtSec, config) {
@@ -126,6 +131,21 @@ function syncBullets(pool, bullets, elapsedMs, config) {
     mesh.position.z = bullet.z;
     // Tumbling, so a thrown blade does not slide through the air rigid.
     mesh.rotation.z = elapsedMs * 0.02 + index;
+  }
+}
+
+/**
+ * Turns the frame's kills into something you can see: a body that falls where it
+ * stood, and a burst of bone chips. The reducer reports the positions because an
+ * enemy is gone from its list by the time we get here.
+ */
+function stageKills(sceneRefs, state, config) {
+  if (state.justKilled.length === 0) return;
+
+  for (const kill of state.justKilled) {
+    const x = laneToX(kill.lane, config);
+    sceneRefs.enemyPool?.spawnDeath(x, kill.z);
+    sceneRefs.effects?.burst(x, config.enemyRadius + 0.6, kill.z);
   }
 }
 

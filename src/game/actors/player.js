@@ -7,10 +7,10 @@
  * loader or no model is available, so the game is never unplayable.
  */
 
-import { laneToX } from '../state.js?v=1.9.0';
-import { TRAIL_Y } from '../world/ground.js?v=1.9.0';
+import { laneToX } from '../state.js?v=1.10.0';
+import { TRAIL_Y } from '../world/ground.js?v=1.10.0';
 
-export async function addPlayer(THREE, scene, config, palette, loader) {
+export async function addPlayer(THREE, scene, config, palette, loader, curve = null) {
   const group = new THREE.Group();
 
   const fallbackGroup = new THREE.Group();
@@ -40,6 +40,7 @@ export async function addPlayer(THREE, scene, config, palette, loader) {
 
   group.position.set(laneToX(1, config), TRAIL_Y, config.playerZ);
   scene.add(group);
+  curve?.patchObject(fallbackGroup);
 
   const playerObj = {
     group,
@@ -58,6 +59,12 @@ export async function addPlayer(THREE, scene, config, palette, loader) {
   };
 
   const gltfCache = new Map();
+  /**
+   * Guards against a slow load landing after a newer one. Switching characters
+   * quickly used to leave the player wearing one model and driving another
+   * model's animation clips.
+   */
+  let loadToken = 0;
 
   playerObj.playAnimation = function playAnimation(name, duration = 0.2, loop = true) {
     if (!playerObj.mixer || playerObj.fallbackVisible) return;
@@ -94,6 +101,7 @@ export async function addPlayer(THREE, scene, config, palette, loader) {
   };
 
   playerObj.loadCharacter = async function loadCharacter(charId) {
+    const token = loadToken += 1;
     playerObj.characterId = charId;
 
     if (charId === 'orb' || !loader) {
@@ -121,6 +129,10 @@ export async function addPlayer(THREE, scene, config, palette, loader) {
         gltf = await loader.loadAsync(charDef.path);
         gltfCache.set(charDef.path, gltf);
       }
+
+      // Another character was picked while this one was downloading; that load
+      // owns the player now, and applying this one would half-overwrite it.
+      if (token !== loadToken) return false;
 
       if (playerObj.mixer) playerObj.mixer.stopAllAction();
       while (modelContainer.children.length > 0) {
@@ -163,6 +175,7 @@ export async function addPlayer(THREE, scene, config, palette, loader) {
       modelContainer.add(model);
       modelContainer.visible = true;
       fallbackGroup.visible = false;
+      curve?.patchObject(model);
 
       const mixer = new THREE.AnimationMixer(model);
       const actions = {};
@@ -192,6 +205,7 @@ export async function addPlayer(THREE, scene, config, palette, loader) {
       return true;
     } catch (error) {
       console.error(`Failed to load character model ${charId}:`, error);
+      if (token !== loadToken) return false;
       modelContainer.visible = false;
       fallbackGroup.visible = true;
       playerObj.fallbackVisible = true;

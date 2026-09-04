@@ -11,7 +11,7 @@
  * costs nothing to download.
  */
 
-import { GOLDEN_FOREST } from './palette.js?v=1.9.0';
+import { GOLDEN_FOREST } from './palette.js?v=1.10.0';
 
 /** Metres travelled in each biome before the next one begins. */
 export const BIOME_LENGTH = 700;
@@ -37,7 +37,7 @@ const AUTUMN = {
   ground: {
     trail: '#8a6540',
     trailEdge: '#6a4c30',
-    verge: '#8d7f38',
+    verge: '#6d6b30',
     grass: '#6d7a33',
     grassDeep: '#55632c',
     meadow: '#7c7c37',
@@ -96,7 +96,7 @@ const HIGHLANDS = {
   ground: {
     trail: '#7d7364',
     trailEdge: '#635a4d',
-    verge: '#6a7350',
+    verge: '#566044',
     grass: '#4f6547',
     grassDeep: '#3d5240',
     meadow: '#5b6a4e',
@@ -155,7 +155,7 @@ const OASIS = {
   ground: {
     trail: '#b89460',
     trailEdge: '#9a7748',
-    verge: '#bda86a',
+    verge: '#a89055',
     grass: '#a8945c',
     grassDeep: '#8d7a48',
     meadow: '#c0ab6e',
