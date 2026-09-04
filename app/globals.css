@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/**
+ * Design tokens carried over from the prototype's styles.css. Tailwind v4 reads
+ * @theme and generates the utilities, so `bg-surface`, `text-muted`,
+ * `border-accent` etc. all resolve from here. One place to restyle the app.
+ */
+@theme {
+  --color-bg: #101418;
+  --color-panel: #1b2128;
+  --color-surface: #1e252d;
+  --color-line: #36414e;
+  --color-text: #e8edf2;
+  --color-muted: #8b98a5;
+  --color-accent: #00e5ff;
+  --color-ok: #35d07f;
+  --color-off: #55606b;
+  --color-enemy: #ff3b3b;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+/**
+ * THE MIRROR. Both the video and the skeleton overlay get the SAME transform,
+ * which is why draw.ts does no flipping of its own. Change one without the
+ * other and the skeleton detaches from the body -- keep these two selectors
+ * together and applied to both nodes (see CameraStage.tsx).
+ */
+.mirrored {
+  transform: scaleX(-1);
+}

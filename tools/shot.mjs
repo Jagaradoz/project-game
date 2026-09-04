@@ -19,7 +19,7 @@ import { join, resolve } from 'node:path';
 import { launchBrowser, openPage, sleep } from './cdp.mjs';
 
 const DEFAULTS = {
-  url: 'http://localhost:5173/',
+  url: 'http://localhost:3000/play',
   out: 'docs/shots',
   dist: '0',
   w: 900,

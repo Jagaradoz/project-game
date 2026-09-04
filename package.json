@@ -1,16 +1,39 @@
 {
-  "name": "pose-test-game",
-  "version": "1.11.0",
+  "name": "webcam-exercise-game",
+  "version": "2.0.0-alpha.1",
   "private": true,
-  "type": "module",
-  "description": "Webcam pose detection MVP - lateral lean/step + jog-in-place detection in the browser",
+  "description": "Webcam-based exercise game website - pose-driven exergame (Next.js frontend)",
   "scripts": {
-    "dev": "serve . -l 5173",
-    "start": "serve . -l 5173",
-    "test": "node --test \"test/*.test.js\"",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "shot": "node tools/shot.mjs"
   },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "three": "0.180.0",
+    "zod": "4.5.4",
+    "zustand": "5.0.15"
+  },
   "devDependencies": {
-    "serve": "^14.2.6"
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.19.4",
+    "@types/react": "19.2.8",
+    "@types/react-dom": "19.2.4",
+    "@types/three": "0.180.0",
+    "@vitest/coverage-v8": "5.0.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "5.0.0"
   }
 }

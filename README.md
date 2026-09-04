@@ -18,20 +18,30 @@ place to shoot. Built on a webcam pose-detection testbed that answers one questi
 - The trail **winds**, without the lanes moving. See "The trail that isn't there" below
 - Five rigged **adventurers** to run as, each throwing their own weapon
 - Skeletons **die where they fall** and burst into bone chips
-- 100% client side. No server processing, no login, no database, no build step.
+- Pose detection is 100% client side: no video ever leaves the browser.
 
-Stack: plain HTML/CSS/ES modules, [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe)
-`PoseLandmarker` and [Three.js](https://threejs.org), both loaded from jsDelivr at pinned
-versions. Zero npm dependencies.
+Stack: **Next.js 16 (App Router) + TypeScript + Tailwind v4**, with
+[MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe) `PoseLandmarker` and
+[Three.js](https://threejs.org) as pinned npm dependencies.
+
+### How it is put together
+
+`src/engine/` is framework-free and knows nothing about React: the game reducer, the two
+pose detectors, and the whole Three.js scene live there, and `npm test` exercises them in
+plain Node. `src/engine/runtime.ts` owns the lifecycle -- both animation loops, the camera,
+the WebGL context -- and `dispose()` releases all of it, which is what makes React Strict
+Mode's double mount safe. `src/components/game/GameCanvas.tsx` is the only React component
+that touches the engine; it reads a throttled snapshot through `useSyncExternalStore`, so
+nothing re-renders at 60 Hz.
 
 ## Run locally
 
-```powershell
-cd "d:\Browser Works\test-game"
-npx -y serve . -l 5173
+```bash
+npm install
+npm run dev
 ```
 
-Open <http://localhost:5173>. The runner starts immediately on the keyboard; open
+Open <http://localhost:3000>. `/play` starts on the keyboard immediately; open
 **Camera & detector debug** and click **Start Camera** to steer with your body.
 
 `localhost` counts as a secure context, so the camera works over plain HTTP here.
@@ -41,8 +51,8 @@ First load pulls ~6 MB of WASM + model from the CDN, so give it a few seconds.
 
 Leave `serve` running and open a **second terminal**:
 
-```powershell
-ngrok http 5173
+```bash
+ngrok http 3000
 ```
 
 Open the printed `https://<random>.ngrok-free.app` URL on the phone.
@@ -51,7 +61,7 @@ Two things that will otherwise cost you time:
 
 - ngrok's free tier shows an interstitial warning page first — tap **"Visit Site"**.
 - The camera **only** works over HTTPS or localhost. Opening the LAN address
-  (`http://192.168.x.x:5173`) on your phone will fail to get camera permission.
+  (`http://192.168.x.x:3000`) on your phone will fail to get camera permission.
   Use the ngrok `https://` URL. The page detects this case and says so explicitly.
 
 If `ngrok` is not on your PATH yet:
@@ -65,13 +75,24 @@ ngrok config add-authtoken <YOUR_TOKEN>
 
 Both detectors and the whole game are pure reducers, so they run headless:
 
-```powershell
-npm test
+```bash
+npm test            # 65 tests, Vitest, no DOM and no Three.js
+npm run typecheck   # tsc --noEmit, strict
+npm run lint
+npm run build
 ```
+
+`npm run shot` is the end-to-end check: with `npm run dev` running it drives the real
+WebGL scene in headless Chrome through the `window.__lane` hook and writes
+`docs/shots/*.png`, so a rendering regression shows up as a picture.
+
+Coverage is gated at 80% over the engine's pure logic. Browser-API glue -- scene
+construction, `getUserMedia`, the MediaPipe wrapper, canvas drawing -- is excluded from
+that number and covered by `npm run shot` instead; see `vitest.config.mts`.
 
 ## Tuning
 
-Every threshold lives in [`src/config.js`](src/config.js). Nothing is hardcoded
+Every threshold lives in [`src/engine/config.ts`](src/engine/config.ts). Nothing is hardcoded
 elsewhere. The starting values are estimates from typical body proportions, not
 measurements — expect one tuning pass against your own body and camera placement.
 
@@ -147,36 +168,42 @@ and say nothing about frame rate on real hardware.
 ## Layout
 
 ```
-index.html                  game canvas + HUD, webcam thumbnail, debug panel
-styles.css                  layout only, including the mirror transform
-src/config.js               every tunable value, game included
-src/camera.js               getUserMedia, iOS quirks, readable errors
-src/pose.js                 PoseLandmarker load/detect, GPU -> CPU fallback
-src/draw.js                 skeleton overlay
-src/detectors/lateral.js    pure reducer: landmarks -> LEFT/CENTER/RIGHT
-src/detectors/jog.js        pure reducer: landmarks over time -> jogging + cadence
-src/game/state.js           pure reducer: input over time -> lanes, enemies, bullets, HP, score
-src/game/input.js           lean + keyboard -> { lane, isFiring }
-src/game/scene.js           Three.js scene assembly and the biome crossfade
-src/game/render.js          one-way sync: game state -> meshes
-src/game/world/palette.js   biome palettes + the Kenney material recolour map
-src/game/world/biomes.js    biome progression, blending, scatter-set selection
-src/game/world/sky.js       vertex-coloured gradient dome
-src/game/world/lighting.js  renderer setup, sun + shadow rig
-src/game/world/ground.js    valley cross-section, trail stones, horizon ridges
-src/game/world/scatter.js   instanced scenery, one InstancedMesh per model part
-src/game/world/trailEdge.js the vertex-shader edge wander
-src/game/world/clouds.js    instanced drifting clouds
-src/game/world/rng.js       seeded RNG for world building
-src/game/actors/player.js   rigged character, animation graph, weapon loadout
-src/game/actors/enemies.js  rigged skeleton pool with capped mixer updates
-src/game/actors/effects.js  instanced bone-chip bursts
-src/util/landmarks.js       visibility gating + scale-invariant body measurements
-src/util/smooth.js          EMA, sliding window, cadence
-src/main.js                 wiring: pose loop, game loop, HUD
-tools/cdp.mjs               dependency-free Chrome DevTools Protocol client
-tools/shot.mjs              headless screenshot harness
-test/                       headless detector + game tests
+app/                              routes, one per TOR screen
+app/(game)/play/page.tsx          the game; client-only boundary for the canvas
+app/(game)/calibrate|stages|result  camera setup, stage select, run summary
+app/(account)/login|register|profile|leaderboard
+
+src/engine/                       framework-free; no React, no JSX
+src/engine/config.ts              every tunable value, game included
+src/engine/runtime.ts             lifecycle: both loops, camera, scene, dispose()
+src/engine/types.ts               shared shapes; config types derived from CONFIG
+src/engine/core/state.ts          pure reducer: input over time -> lanes, enemies, bullets, HP, score
+src/engine/core/input.ts          lean + keyboard -> { lane, isFiring }
+src/engine/detectors/lateral.ts   pure reducer: landmarks -> LEFT/CENTER/RIGHT
+src/engine/detectors/jog.ts       pure reducer: landmarks over time -> jogging + cadence
+src/engine/pose/camera.ts         getUserMedia, iOS quirks, readable errors
+src/engine/pose/pose.ts           PoseLandmarker load/detect, GPU -> CPU fallback
+src/engine/pose/draw.ts           skeleton overlay
+src/engine/util/landmarks.ts      visibility gating + scale-invariant body measurements
+src/engine/util/smooth.ts         EMA, sliding window, cadence
+src/engine/render/scene.ts        Three.js scene assembly and the biome crossfade
+src/engine/render/sync.ts         one-way sync: game state -> meshes
+src/engine/render/world/          palette, biomes, sky, lighting, ground, scatter,
+                                  trailEdge, clouds, rng
+src/engine/render/actors/         rigged player, skeleton pool, bone-chip bursts
+
+src/components/game/GameCanvas.tsx  the ONLY React component that touches the engine
+src/components/game/               HUD, camera thumbnail, debug panel, pickers
+src/hooks/useGameRuntime.ts        useSyncExternalStore bridge to the runtime
+src/lib/store/settings.ts          persisted character + biome choice
+src/lib/api/                       typed client + mock adapter
+src/types/api.ts                   the contract shared with the backend
+
+public/assets/models/             338 CC0 .glb files, fetched at runtime
+public/catalog.html               standalone 3D asset catalogue
+tools/cdp.mjs                     dependency-free Chrome DevTools Protocol client
+tools/shot.mjs                    headless screenshot harness
+test/                             headless detector + game tests
 ```
 
 ## The two loops
@@ -203,7 +230,7 @@ on: whatever the input says the lane is, that is the lane this frame.
 What wanders is the **boundary between dirt and grass**. Every vertex is displaced
 sideways in the vertex shader by a function of its world z, weighted so it peaks at the
 trail's lip and dies to nothing at the centre and out in the bank
-([trailEdge.js](src/game/world/trailEdge.js)). Collision, spawning and lane geometry never
+([trailEdge.ts](src/engine/render/world/trailEdge.ts)). Collision, spawning and lane geometry never
 see it.
 
 The dirt is deliberately **wider than the play area** — 9.8 units against the lanes' 7.2 —
@@ -260,6 +287,6 @@ Kay Lousberg and Kenney are credited here because the art is most of what you se
 
 Every nature model is 5-17 KB, carries **no textures at all**, and names its materials
 for what they are (`grass`, `leafsGreen`, `woodBark`, `stone`). Colour is therefore a
-lookup table rather than an art job: `src/game/world/palette.js` maps material names to
+lookup table rather than an art job: `src/engine/render/world/palette.ts` maps material names to
 hex values, so the same 329 models repaint themselves for a new biome. Autumn is the
 forest with a different table — no extra download.
