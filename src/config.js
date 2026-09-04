@@ -128,16 +128,16 @@ export const CONFIG = {
     quality: 'high',
 
     /**
-     * The trail's visual bend. Purely a vertex-shader displacement -- lanes stay
-     * exactly where the reducer puts them. `rampDistance` is how far ahead the
-     * bend reaches full strength, so the ground underfoot never slides.
+     * How far the dirt's edge wanders, in world units. Purely a vertex-shader
+     * displacement -- the path runs dead straight and the lanes stay exactly
+     * where the reducer puts them; only the boundary between dirt and grass
+     * moves. `meander + pinch` must stay under the trail's margin over the
+     * lanes, or the outer lane ends up on grass.
      */
-    curve: {
-      amplitude: 6,
-      frequency: 0.011,
-      rampDistance: 35,
-      hillAmplitude: 2.2,
-      hillFrequency: 0.016,
+    trailEdge: {
+      meander: 0.55,
+      pinch: 0.35,
+      falloff: 6,
     },
 
     playerRadius: 0.75,

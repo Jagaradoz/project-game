@@ -6,18 +6,18 @@
  * wiring plus the three pools the reducer drives -- player, enemies, bullets.
  */
 
-import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.10.0';
-import { GOLDEN_FOREST } from './world/palette.js?v=1.10.0';
-import { addSky } from './world/sky.js?v=1.10.0';
-import { configureRenderer, addLighting, SHADOW_QUALITY } from './world/lighting.js?v=1.10.0';
-import { addGround, TRAIL_Y } from './world/ground.js?v=1.10.0';
-import { addScatter } from './world/scatter.js?v=1.10.0';
-import { createCurve } from './world/curve.js?v=1.10.0';
-import { addClouds } from './world/clouds.js?v=1.10.0';
-import { BIOMES, resolveBiome, blendPalettes, activeScatterSet } from './world/biomes.js?v=1.10.0';
-import { addEnemyPool } from './actors/enemies.js?v=1.10.0';
-import { addPlayer } from './actors/player.js?v=1.10.0';
-import { createEffects } from './actors/effects.js?v=1.10.0';
+import { CONFIG, THREE_MODULE_URL, GLTF_LOADER_URL } from '../config.js?v=1.11.0';
+import { GOLDEN_FOREST } from './world/palette.js?v=1.11.0';
+import { addSky } from './world/sky.js?v=1.11.0';
+import { configureRenderer, addLighting, SHADOW_QUALITY } from './world/lighting.js?v=1.11.0';
+import { addGround, trailHalfWidth, TRAIL_Y } from './world/ground.js?v=1.11.0';
+import { addScatter } from './world/scatter.js?v=1.11.0';
+import { createTrailEdge } from './world/trailEdge.js?v=1.11.0';
+import { addClouds } from './world/clouds.js?v=1.11.0';
+import { BIOMES, resolveBiome, blendPalettes, activeScatterSet } from './world/biomes.js?v=1.11.0';
+import { addEnemyPool } from './actors/enemies.js?v=1.11.0';
+import { addPlayer } from './actors/player.js?v=1.11.0';
+import { createEffects } from './actors/effects.js?v=1.11.0';
 
 const MOTE_COUNT = 26;
 const MOTE_SPAN = 180;
@@ -41,7 +41,10 @@ export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN
 
   const sky = addSky(THREE, scene, palette);
   const lighting = addLighting(THREE, scene, palette, shadowMapSize);
-  const curve = createCurve(THREE, config.curve);
+  const trailEdge = createTrailEdge(THREE, {
+    ...config.trailEdge,
+    halfWidth: trailHalfWidth(config),
+  });
   const ground = addGround(THREE, scene, config, palette);
 
   const loader = await createLoader();
@@ -51,20 +54,16 @@ export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN
   });
   const motes = addMotes(THREE, scene, palette);
   const clouds = addClouds(THREE, scene, palette, config.clouds);
-  const player = await addPlayer(THREE, scene, config, palette, loader, curve);
+  const player = await addPlayer(THREE, scene, config, palette, loader);
   const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
   const bulletPool = addBulletPool(THREE, scene, config, palette);
-  const effects = createEffects(THREE, scene, palette, curve);
+  const effects = createEffects(THREE, scene, palette);
 
-  // Everything that shares the trail has to bend with it. The sky dome and the
-  // horizon ridges are deliberately left flat: they are notionally at infinity.
-  curve.patchObject(ground.valley.mesh);
-  for (const marker of ground.markers.items) curve.patchObject(marker.mesh);
-  for (const set of scatter.sets.values()) curve.patchObject(set.group);
-  for (const mote of motes.items) curve.patchObject(mote.mesh);
-  for (const slot of enemyPool.items) curve.patchObject(slot.group);
-  for (const corpse of enemyPool.corpses) curve.patchObject(corpse.group);
-  for (const bullet of bulletPool.items) curve.patchObject(bullet.mesh);
+  // Only the ground. The displacement moves where the dirt ENDS, and nothing
+  // else needs to follow it: a grass tuft that sometimes sits on the dirt is
+  // what an encroached path edge looks like, and moving the props in lockstep
+  // with the edge would read as more machined, not less.
+  trailEdge.patchObject(ground.valley.mesh);
 
   function resize() {
     const width = canvas.clientWidth || 1;
@@ -178,7 +177,7 @@ export async function createScene(canvas, config = CONFIG.game, palette = GOLDEN
     enemyPool,
     bulletPool,
     effects,
-    curve,
+    trailEdge,
     applyBiome,
     setBiomeOverride,
     setQuality,

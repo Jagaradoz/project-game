@@ -2,33 +2,46 @@
  * Drifting low-poly clouds.
  *
  * The whole layer is one InstancedMesh, so the cost is a single draw call and a
- * few hundred triangles no matter how many clouds are up there -- cheap enough
- * that it survives the low quality tier being about shadows, not this.
+ * couple of thousand triangles no matter how many clouds are up there.
  *
- * Deliberately not bent by the trail curve: clouds read as being at infinity,
- * and swinging them sideways with the path looks wrong.
+ * They occupy a real volume rather than sitting in a band at the horizon: near
+ * ones are low, small and scroll at nearly half the world's speed, distant ones
+ * are high, large and barely move. That difference in rate is what makes them
+ * read as objects you are travelling under rather than as painted backdrop.
+ *
+ * Worth knowing: the camera aims about 7 degrees down, so the top of the frame
+ * only reaches ~24 degrees above horizontal. A cloud stays in shot only while it
+ * is further ahead than about 2.25x its height above the camera -- they sweep up
+ * out of the picture rather than passing directly overhead.
  */
 
-import { createRng, range } from './rng.js?v=1.10.0';
+import { createRng, range } from './rng.js?v=1.11.0';
 
-const CLOUD_COUNT = 16;
-const CLOUD_SPAN = 500;
-/** Always well ahead of the camera: a cloud overhead is enormous and reads as a rock. */
-const CLOUD_START_Z = -120;
-const CLOUD_MIN_Y = 62;
-const CLOUD_MAX_Y = 132;
-const CLOUD_X_SPREAD = 240;
-const DRIFT_SPEED = 0.55;
+const CLOUD_COUNT = 24;
+/** Reaches behind the camera, so clouds leave the frame instead of stopping short. */
+const CLOUD_START_Z = 140;
+const CLOUD_SPAN = 840;
+const CLOUD_MIN_Y = 34;
+const CLOUD_MAX_Y = 120;
+const CLOUD_X_SPREAD = 260;
+
+/** Scroll rate as a fraction of the world's, at the lowest and highest altitude. */
+const NEAR_PARALLAX = 0.5;
+const FAR_PARALLAX = 0.11;
+const DRIFT_SPEED = 0.6;
 const Z_TRANSLATION_OFFSET = 14;
 
 export function addClouds(THREE, scene, palette, options = {}) {
   const { seed = 0xc10d, count = CLOUD_COUNT } = options;
   const geometry = buildCloudGeometry(THREE);
-  // Unlit, like the horizon ridges. Directional lighting on a faceted blob makes
-  // it read as a boulder; the shape is carried by baked vertex shading instead.
+
+  // Unlit, like the horizon ridges: directional lighting on a faceted blob makes
+  // it read as a boulder, so the shape is carried by baked vertex shading. Fog
+  // is on, though -- the fog colour is the sky's own haze, so distant clouds
+  // dissolve into the horizon while near ones stay crisp.
   const material = new THREE.MeshBasicMaterial({
     vertexColors: true,
-    fog: false,
+    fog: true,
   });
 
   const mesh = new THREE.InstancedMesh(geometry, material, count);
@@ -40,7 +53,9 @@ export function addClouds(THREE, scene, palette, options = {}) {
   const rng = createRng(seed);
   const farZ = CLOUD_START_Z - CLOUD_SPAN;
   const baseZ = new Float32Array(count);
+  const parallax = new Float32Array(count);
   const drift = new Float32Array(count);
+
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
   const position = new THREE.Vector3();
@@ -48,15 +63,21 @@ export function addClouds(THREE, scene, palette, options = {}) {
   const axis = new THREE.Vector3(0, 1, 0);
 
   for (let index = 0; index < count; index += 1) {
-    const size = range(rng, 13, 30);
-    position.set(range(rng, -CLOUD_X_SPREAD, CLOUD_X_SPREAD), range(rng, CLOUD_MIN_Y, CLOUD_MAX_Y), farZ + rng() * CLOUD_SPAN);
+    const y = range(rng, CLOUD_MIN_Y, CLOUD_MAX_Y);
+    const altitude = (y - CLOUD_MIN_Y) / (CLOUD_MAX_Y - CLOUD_MIN_Y);
+    // High clouds are bigger, which is what keeps them readable once they are
+    // far enough away to be worth drawing at all.
+    const size = range(rng, 9, 15) + altitude * 16;
+
+    position.set(range(rng, -CLOUD_X_SPREAD, CLOUD_X_SPREAD), y, farZ + rng() * CLOUD_SPAN);
     quaternion.setFromAxisAngle(axis, rng() * Math.PI * 2);
-    scale.set(size, size * range(rng, 0.35, 0.6), size * range(rng, 0.7, 1.1));
+    scale.set(size, size * range(rng, 0.44, 0.7), size * range(rng, 0.7, 1.15));
     matrix.compose(position, quaternion, scale);
     mesh.setMatrixAt(index, matrix);
 
     baseZ[index] = position.z;
-    drift[index] = range(rng, 0.6, 1.5);
+    parallax[index] = NEAR_PARALLAX + (FAR_PARALLAX - NEAR_PARALLAX) * altitude;
+    drift[index] = range(rng, 0.5, 1.4);
   }
   mesh.instanceMatrix.needsUpdate = true;
 
@@ -64,15 +85,16 @@ export function addClouds(THREE, scene, palette, options = {}) {
     mesh,
 
     /**
-     * Clouds barely parallax -- they are meant to be far away -- and drift on
-     * their own so the sky is never completely still.
+     * Each cloud advances at its own rate, so the layer separates in depth as
+     * the run goes on instead of sliding along as one sheet.
      */
     scroll(distance, elapsedMs) {
-      const scrolled = distance * 0.05 + (elapsedMs / 1000) * DRIFT_SPEED;
+      const seconds = elapsedMs / 1000;
       const array = mesh.instanceMatrix.array;
 
       for (let index = 0; index < count; index += 1) {
-        const shifted = baseZ[index] - farZ + scrolled * drift[index];
+        const travelled = distance * parallax[index] + seconds * DRIFT_SPEED * drift[index];
+        const shifted = baseZ[index] - farZ + travelled;
         array[index * 16 + Z_TRANSLATION_OFFSET] = farZ + (shifted % CLOUD_SPAN);
       }
       mesh.instanceMatrix.needsUpdate = true;
@@ -83,22 +105,26 @@ export function addClouds(THREE, scene, palette, options = {}) {
     },
 
     applyPalette(next) {
-      // Tinted towards the sky's own haze so clouds belong to the sky they sit in.
-      material.color.set(next.sky.glow).lerp(new THREE.Color('#ffffff'), 0.72);
+      // Tinted towards the sky's own glow so clouds belong to the sky they sit in.
+      material.color.set(next.sky.glow).lerp(new THREE.Color('#ffffff'), 0.7);
     },
   };
 }
 
 /**
- * A few overlapping lumps merged into one geometry. Done by hand rather than
- * pulling in BufferGeometryUtils for a single call.
+ * Overlapping lumps merged into one geometry. Done by hand rather than pulling
+ * in BufferGeometryUtils for a single call. Enough of them to have a silhouette
+ * that survives being seen from below and close up.
  */
 function buildCloudGeometry(THREE) {
   const blobs = [
     { x: 0, y: 0, z: 0, r: 1 },
-    { x: 0.85, y: -0.15, z: 0.1, r: 0.68 },
-    { x: -0.8, y: -0.2, z: -0.05, r: 0.6 },
-    { x: 0.15, y: 0.35, z: -0.2, r: 0.55 },
+    { x: 0.95, y: -0.18, z: 0.12, r: 0.7 },
+    { x: -0.9, y: -0.22, z: -0.08, r: 0.64 },
+    { x: 0.2, y: 0.38, z: -0.22, r: 0.58 },
+    { x: -0.35, y: 0.3, z: 0.3, r: 0.5 },
+    { x: 1.55, y: -0.35, z: -0.15, r: 0.42 },
+    { x: -1.5, y: -0.34, z: 0.18, r: 0.38 },
   ];
 
   const chunks = blobs.map(({ x, y, z, r }) => {
@@ -122,7 +148,11 @@ function buildCloudGeometry(THREE) {
   return geometry;
 }
 
-/** Bright on top, faintly cool underneath. Enough form without a light touching it. */
+/**
+ * Bright warm top, cool shaded underside. The range has to be wide: a nearly
+ * white cloud against a pale sky has no silhouette at all, and there is no light
+ * touching these to give them one.
+ */
 function bakeCloudShading(positions) {
   const colors = new Float32Array(positions.length);
   let minY = Infinity;
@@ -136,10 +166,12 @@ function bakeCloudShading(positions) {
   const spread = Math.max(1e-6, maxY - minY);
   for (let index = 0; index < positions.length; index += 3) {
     const t = (positions[index + 1] - minY) / spread;
-    const shade = 0.78 + 0.22 * t;
-    colors[index] = shade;
-    colors[index + 1] = shade;
-    colors[index + 2] = shade * 0.99 + 0.01;
+    const shade = 0.58 + 0.42 * t;
+    // Undersides pick up a little sky, tops stay neutral.
+    const cool = (1 - t) * 0.06;
+    colors[index] = shade - cool * 0.5;
+    colors[index + 1] = shade - cool * 0.2;
+    colors[index + 2] = shade + cool;
   }
 
   return colors;

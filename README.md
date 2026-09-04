@@ -165,7 +165,7 @@ src/game/world/sky.js       vertex-coloured gradient dome
 src/game/world/lighting.js  renderer setup, sun + shadow rig
 src/game/world/ground.js    valley cross-section, trail stones, horizon ridges
 src/game/world/scatter.js   instanced scenery, one InstancedMesh per model part
-src/game/world/curve.js     the vertex-shader trail bend
+src/game/world/trailEdge.js the vertex-shader edge wander
 src/game/world/clouds.js    instanced drifting clouds
 src/game/world/rng.js       seeded RNG for world building
 src/game/actors/player.js   rigged character, animation graph, weapon loadout
@@ -194,27 +194,52 @@ desktop FPS. Note both, plus whether the backend tile reads `GPU` or `CPU` — t
 CPU fallback engages automatically on devices where the WebGL delegate fails, and
 it is much slower.
 
-## The trail that isn't there
+## The wandering edge
 
-The path visibly bends and rolls, but **the lanes never move**. A lane is an exact x in
-the reducer, and interpolating it would break the one rule the game is built on: whatever
-the input says the lane is, that is the lane this frame.
+The path runs dead straight to the horizon, because **the lanes never move**. A lane is an
+exact x in the reducer, and interpolating it would break the one rule the game is built
+on: whatever the input says the lane is, that is the lane this frame.
 
-So the world does not actually curve. Every vertex is displaced sideways and vertically
-in the vertex shader by a function of its world z, ramped to zero at the player
-([curve.js](src/game/world/curve.js)). Collision, spawning and lane geometry never see it;
-the trail runs dead straight underfoot and winds away into the distance.
+What wanders is the **boundary between dirt and grass**. Every vertex is displaced
+sideways in the vertex shader by a function of its world z, weighted so it peaks at the
+trail's lip and dies to nothing at the centre and out in the bank
+([trailEdge.js](src/game/world/trailEdge.js)). Collision, spawning and lane geometry never
+see it.
 
-Three things have to agree on that displacement or it comes apart:
+The dirt is deliberately **wider than the play area** — 9.8 units against the lanes' 7.2 —
+so however far the edge pinches inward, the outer lane is still on it. That is a
+guarantee, not a look: `test/world.test.js` sweeps the same wave table the GLSL is
+generated from and asserts the tightest edge never crosses the lane boundary. Measured
+clearance is 0.44 units.
+
+Two chunks have to agree on the displacement or it comes apart:
 
 | Chunk | What breaks without it |
 | --- | --- |
-| `project_vertex` | nothing bends at all |
-| `worldpos_vertex` | surfaces sample their shadow from the unbent position |
-| the depth material | objects are drawn bent but cast shadows from where they were |
+| `project_vertex` | nothing moves at all |
+| `worldpos_vertex` | the ground samples its shadow from the undisplaced position |
 
-The ground is tessellated into 74 slices along z for the same reason — a two-slice strip
-has nothing to bend, it just shears.
+(A shadow *caster* would need its depth material patched too, which `patchObject` handles.
+Today the only thing patched is the ground, which receives shadows without casting.)
+
+The ground is tessellated into 120 slices along z for the same reason — a coarse strip
+turns a wandering edge into a zigzag.
+
+Props are deliberately **not** moved with the edge. A grass tuft that sometimes sits on
+the dirt is what an encroached path edge looks like; moving them in lockstep would read as
+more machined, not less.
+
+## Clouds
+
+One InstancedMesh, so the whole layer is a single draw call. They occupy a real volume
+rather than a band at the horizon: near clouds are low, small and scroll at half the
+world's speed, distant ones are high, large and barely move. That difference in rate is
+what makes them read as objects you travel under.
+
+Worth knowing about the camera: it aims about 7 degrees down, so the top of the frame only
+reaches ~24 degrees above horizontal. A cloud stays in shot only while it is further ahead
+than roughly 2.25x its height above the camera — they sweep up out of the picture rather
+than passing directly overhead.
 
 ## Assets and licences
 

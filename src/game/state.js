@@ -17,7 +17,7 @@
  *      still the way out of a column you cannot clear in time.
  */
 
-import { CONFIG } from '../config.js?v=1.10.0';
+import { CONFIG } from '../config.js?v=1.11.0';
 
 /** Deterministic 32-bit LCG (Numerical Recipes constants). */
 const LCG_MULTIPLIER = 1664525;

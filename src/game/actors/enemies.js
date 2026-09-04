@@ -10,8 +10,8 @@
  * be loaded, so the game is always playable.
  */
 
-import { SKELETON_UTILS_URL } from '../../config.js?v=1.10.0';
-import { TRAIL_Y } from '../world/ground.js?v=1.10.0';
+import { SKELETON_UTILS_URL } from '../../config.js?v=1.11.0';
+import { TRAIL_Y } from '../world/ground.js?v=1.11.0';
 
 /** Seconds a body lies where it fell before it starts sinking away. */
 const CORPSE_HOLD_SEC = 2.2;

@@ -12,9 +12,9 @@
  * time and never touched again, so a frame costs one float write per prop.
  */
 
-import { createRng, range } from './rng.js?v=1.10.0';
-import { repaintKitModel } from './palette.js?v=1.10.0';
-import { createHeightSampler } from './ground.js?v=1.10.0';
+import { createRng, range } from './rng.js?v=1.11.0';
+import { repaintKitModel } from './palette.js?v=1.11.0';
+import { createHeightSampler } from './ground.js?v=1.11.0';
 
 const MODEL_DIR = './assets/models/nature';
 const Z_TRANSLATION_OFFSET = 14;
@@ -33,14 +33,14 @@ const FOREST_LAYERS = {
    */
   groundcover: {
     count: 700,
-    band: [3.9, 20],
+    band: [4.4, 20],
     scale: [1.3, 2.4],
     castShadow: false,
     models: ['grass', 'plant_flatTall'],
   },
   verge: {
     count: 420,
-    band: [3.9, 9],
+    band: [4.4, 9.5],
     scale: [1.2, 2.1],
     castShadow: false,
     models: [
@@ -86,14 +86,14 @@ const FOREST_LAYERS = {
 const HIGHLANDS_LAYERS = {
   groundcover: {
     count: 520,
-    band: [3.9, 20],
+    band: [4.4, 20],
     scale: [1.2, 2.1],
     castShadow: false,
     models: ['grass', 'plant_flatTall', 'rock_smallA'],
   },
   verge: {
     count: 420,
-    band: [3.9, 9],
+    band: [4.4, 9.5],
     scale: [1.3, 2.3],
     castShadow: false,
     models: [
@@ -137,14 +137,14 @@ const HIGHLANDS_LAYERS = {
 const OASIS_LAYERS = {
   groundcover: {
     count: 380,
-    band: [3.9, 20],
+    band: [4.4, 20],
     scale: [1.1, 2.0],
     castShadow: false,
     models: ['grass', 'plant_flatTall', 'stone_smallB'],
   },
   verge: {
     count: 300,
-    band: [3.9, 9],
+    band: [4.4, 9.5],
     scale: [1.3, 2.2],
     castShadow: false,
     models: ['cactus_short', 'rock_smallA', 'rock_smallG', 'stone_smallE', 'plant_bush'],

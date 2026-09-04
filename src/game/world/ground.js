@@ -7,15 +7,28 @@
  * never show a seam -- the sense of movement comes entirely from the props and
  * markers travelling past it. It replaces the old stack of box strips, which
  * ended in mid-air about 25 units out and left the visible hard edge.
+ *
+ * The wander in the trail's edge is not in this geometry: it is a vertex-shader
+ * displacement applied on top, from trailEdge.js.
  */
 
-import { createRng, range } from './rng.js?v=1.10.0';
+import { createRng, range } from './rng.js?v=1.11.0';
 
 const GROUND_NEAR_Z = 60;
-/** Slices along z. A two-slice strip cannot show the curve; it would just shear. */
-const GROUND_Z_SLICES = 74;
+/**
+ * Slices along z. The edge displacement varies with z, so a coarse strip turns
+ * a wandering edge into a zigzag -- this is the resolution of that wander.
+ */
+const GROUND_Z_SLICES = 120;
 const GROUND_FAR_Z = -520;
 const TRAIL_Y = 0;
+
+/**
+ * How far the dirt reaches beyond the outermost lane. This margin is what lets
+ * the edge wander without ever putting a lane on grass: it has to exceed the
+ * displacement's worst-case pinch (see `trailEdgeReach`).
+ */
+const TRAIL_MARGIN = 1.3;
 
 const RIDGE_LAYERS = [
   { z: -300, height: 46, spread: 300, seed: 0x51ed, key: 'near' },
@@ -29,29 +42,38 @@ const MARKER_JITTER_X = 0.22;
 const MARKER_SKIP_CHANCE = 0.22;
 
 /**
+ * Where the dirt nominally ends: past the lanes by `TRAIL_MARGIN`, so the edge
+ * has room to wander inward. The single source of truth for this number --
+ * the shader's falloff and the scatter's innermost band both read it.
+ */
+export function trailHalfWidth(config) {
+  return (config.laneCount * config.laneWidth) / 2 + TRAIL_MARGIN;
+}
+
+/**
  * Half a cross-section, from the trail centre outward. Mirrored for -x.
  *
  * The banks climb steeply on purpose: a shallow profile reads as open meadow
  * with a path across it, and the trail has to feel enclosed by the forest.
  */
-function halfProfile(halfWidth) {
+function halfProfile(dirtHalf) {
   return [
     { x: 0, y: TRAIL_Y, key: 'trail' },
-    // A near-vertical lip, not a ramp. The old shallow slope blended dirt into
-    // grass over four units, which read as an airbrushed gradient rather than a
+    // A near-vertical lip, not a ramp. A shallow slope blends dirt into grass
+    // over several units, which reads as an airbrushed gradient rather than a
     // path with an edge. `hard` bands take a single flat colour so the edge
     // stays crisp; the rest blend, because flat bands that far out turn into
     // visible stripes running alongside the trail.
-    { x: halfWidth - 0.35, y: TRAIL_Y, key: 'trail', hard: true },
-    { x: halfWidth, y: 0.17, key: 'trailEdge', hard: true },
-    { x: halfWidth + 0.65, y: 0.24, key: 'verge', hard: true },
-    { x: halfWidth + 3, y: 0.6, key: 'grass' },
-    { x: halfWidth + 7, y: 1.2, key: 'grass' },
-    { x: halfWidth + 13, y: 2.3, key: 'grassDeep' },
-    { x: halfWidth + 22, y: 4.4, key: 'meadow' },
-    { x: halfWidth + 40, y: 8.5, key: 'grassDeep' },
-    { x: halfWidth + 75, y: 14, key: 'meadow' },
-    { x: halfWidth + 200, y: 24, key: 'grassDeep' },
+    { x: dirtHalf - 0.35, y: TRAIL_Y, key: 'trail', hard: true },
+    { x: dirtHalf, y: 0.17, key: 'trailEdge', hard: true },
+    { x: dirtHalf + 0.65, y: 0.24, key: 'verge', hard: true },
+    { x: dirtHalf + 3, y: 0.6, key: 'grass' },
+    { x: dirtHalf + 7, y: 1.2, key: 'grass' },
+    { x: dirtHalf + 13, y: 2.3, key: 'grassDeep' },
+    { x: dirtHalf + 22, y: 4.4, key: 'meadow' },
+    { x: dirtHalf + 40, y: 8.5, key: 'grassDeep' },
+    { x: dirtHalf + 75, y: 14, key: 'meadow' },
+    { x: dirtHalf + 200, y: 24, key: 'grassDeep' },
   ];
 }
 
@@ -61,8 +83,7 @@ function halfProfile(halfWidth) {
  * sharing one source means the two can never drift apart.
  */
 export function createHeightSampler(config) {
-  const halfWidth = (config.laneCount * config.laneWidth) / 2;
-  const profile = halfProfile(halfWidth);
+  const profile = halfProfile(trailHalfWidth(config));
 
   return function heightAt(x) {
     const distance = Math.abs(x);
@@ -79,8 +100,7 @@ export function createHeightSampler(config) {
 }
 
 export function addGround(THREE, scene, config, palette) {
-  const halfWidth = (config.laneCount * config.laneWidth) / 2;
-  const valley = addValley(THREE, scene, halfWidth, palette);
+  const valley = addValley(THREE, scene, trailHalfWidth(config), palette);
   const markers = addLaneMarkers(THREE, scene, config, palette);
   const ridges = addRidges(THREE, scene, palette);
 
@@ -96,8 +116,8 @@ export function addGround(THREE, scene, config, palette) {
   };
 }
 
-function addValley(THREE, scene, halfWidth, palette) {
-  const profile = halfProfile(halfWidth);
+function addValley(THREE, scene, dirtHalf, palette) {
+  const profile = halfProfile(dirtHalf);
   const geometry = new THREE.BufferGeometry();
   const positions = [];
   const bandKeys = [];

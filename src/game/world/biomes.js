@@ -11,7 +11,7 @@
  * costs nothing to download.
  */
 
-import { GOLDEN_FOREST } from './palette.js?v=1.10.0';
+import { GOLDEN_FOREST } from './palette.js?v=1.11.0';
 
 /** Metres travelled in each biome before the next one begins. */
 export const BIOME_LENGTH = 700;

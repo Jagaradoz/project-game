@@ -7,10 +7,10 @@
  * loader or no model is available, so the game is never unplayable.
  */
 
-import { laneToX } from '../state.js?v=1.10.0';
-import { TRAIL_Y } from '../world/ground.js?v=1.10.0';
+import { laneToX } from '../state.js?v=1.11.0';
+import { TRAIL_Y } from '../world/ground.js?v=1.11.0';
 
-export async function addPlayer(THREE, scene, config, palette, loader, curve = null) {
+export async function addPlayer(THREE, scene, config, palette, loader) {
   const group = new THREE.Group();
 
   const fallbackGroup = new THREE.Group();
@@ -40,7 +40,6 @@ export async function addPlayer(THREE, scene, config, palette, loader, curve = n
 
   group.position.set(laneToX(1, config), TRAIL_Y, config.playerZ);
   scene.add(group);
-  curve?.patchObject(fallbackGroup);
 
   const playerObj = {
     group,
@@ -175,7 +174,6 @@ export async function addPlayer(THREE, scene, config, palette, loader, curve = n
       modelContainer.add(model);
       modelContainer.visible = true;
       fallbackGroup.visible = false;
-      curve?.patchObject(model);
 
       const mixer = new THREE.AnimationMixer(model);
       const actions = {};

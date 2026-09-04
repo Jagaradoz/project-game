@@ -16,7 +16,7 @@ const CHIP_LIFE_SEC = 0.9;
 const GRAVITY = -14;
 const HIDDEN_SCALE = 0.0001;
 
-export function createEffects(THREE, scene, palette, curve = null) {
+export function createEffects(THREE, scene, palette) {
   const geometry = new THREE.OctahedronGeometry(0.11, 0);
   const material = new THREE.MeshStandardMaterial({
     color: palette.accents.enemy,
@@ -30,7 +30,6 @@ export function createEffects(THREE, scene, palette, curve = null) {
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   scene.add(mesh);
-  curve?.patchObject(mesh);
 
   const chips = Array.from({ length: CHIP_COUNT }, () => ({
     life: 0,

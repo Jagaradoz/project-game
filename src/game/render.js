@@ -8,8 +8,8 @@
  * instance buffer rather than moving Object3Ds.
  */
 
-import { CONFIG } from '../config.js?v=1.10.0';
-import { laneToX, isInvulnerable } from './state.js?v=1.10.0';
+import { CONFIG } from '../config.js?v=1.11.0';
+import { laneToX, isInvulnerable } from './state.js?v=1.11.0';
 
 /** Blink cycle while the grace window is open. */
 const BLINK_PERIOD_MS = 160;
@@ -26,7 +26,7 @@ export function syncScene(sceneRefs, state, dtMs = 16.67, config = CONFIG.game) 
   sceneRefs.effects?.update(dtSec, state.speed);
   syncBullets(sceneRefs.bulletPool?.items, state.bullets, state.elapsedMs, config);
 
-  sceneRefs.curve?.update(state.distance);
+  sceneRefs.trailEdge?.update(state.distance);
   sceneRefs.applyBiome?.(state.distance, state.elapsedMs);
   syncRecycled(sceneRefs.markers, state.distance);
   sceneRefs.scatter?.scroll(state.distance);
