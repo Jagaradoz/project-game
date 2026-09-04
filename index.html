@@ -3,8 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Lane Runner</title>
-    <link rel="stylesheet" href="./styles.css?v=1.8.1" />
+    <title>Trail Runner</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🛡️</text></svg>"
+    />
+    <link rel="stylesheet" href="./styles.css?v=1.9.0" />
     <script type="importmap">
       {
         "imports": {
@@ -36,7 +40,8 @@
         <div id="characterBar" class="char-picker">
           <label for="charSelect" class="char-label">Character</label>
           <select id="charSelect" class="char-dropdown" aria-label="Select Character Model">
-            <option value="robot" selected>🤖 Robot Expressive (Rigged)</option>
+            <option value="knight" selected>🛡️ Knight (Adventurer)</option>
+          <option value="robot">🤖 Robot Expressive (Rigged)</option>
             <option value="xbot">🦾 Cyber X-Bot (Rigged)</option>
             <option value="soldier">🪖 Tactical Soldier (Rigged)</option>
             <option value="orb">🔮 Energy Orb (Classic)</option>
@@ -89,10 +94,10 @@
       </details>
 
       <footer id="versionTag">
-        Dev Version: v<span id="versionNumber">1.8.1</span> (Testing Only)
+        Dev Version: v<span id="versionNumber">1.9.0</span> (Testing Only)
       </footer>
     </main>
 
-    <script type="module" src="./src/main.js?v=1.8.1"></script>
+    <script type="module" src="./src/main.js?v=1.9.0"></script>
   </body>
 </html>

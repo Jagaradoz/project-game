@@ -57,6 +57,17 @@ main {
   pointer-events: none;
 }
 
+/* The sky is bright now, so the HUD needs its own ground to sit on rather than
+   relying on the scene behind it being dark. */
+#gameHud::before {
+  content: "";
+  position: absolute;
+  inset: -12px -12px -20px;
+  background: linear-gradient(180deg, rgba(9, 18, 24, 0.55), rgba(9, 18, 24, 0));
+  pointer-events: none;
+  z-index: -1;
+}
+
 .hp {
   display: flex;
   gap: 6px;
@@ -67,6 +78,7 @@ main {
   height: 10px;
   border-radius: 3px;
   background: var(--enemy);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .pip.empty {
@@ -79,7 +91,8 @@ main {
   gap: 14px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  text-shadow: 0 1px 3px #000;
+  color: #f7fbff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.5);
 }
 
 .stat {
@@ -89,7 +102,7 @@ main {
 }
 
 .statLabel {
-  color: var(--muted);
+  color: #cfe0ec;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;

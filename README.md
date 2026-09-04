@@ -4,7 +4,7 @@ Endless 3-lane runner steered with your body. Lean left/right to switch lane, jo
 place to shoot. Built on a webcam pose-detection testbed that answers one question:
 **is browser webcam pose detection fast and reliable enough to drive a game?**
 
-- 3D road, 3 lanes, geometry primitives only — blue sphere is you, red spheres are enemies
+- 3D forest trail, 3 lanes. You are a rigged **Knight**; the enemies are **skeletons**
 - **Lean LEFT–CENTER–RIGHT** maps straight onto the 3 lanes. Lane changes **snap**;
   the mapping is absolute, so lean position and lane can never drift apart
 - **The march never stops.** Jogging in place opens fire; stop jogging and the bullets
@@ -13,6 +13,8 @@ place to shoot. Built on a webcam pose-detection testbed that answers one questi
 - 3 HP, one hit each, brief grace period, then a score + distance screen
 - Arrow keys / `A`,`D` work too, so the game is playable with no camera at all
 - Detector debug (skeleton, offsets, cadence, FPS, inference ms) still there, collapsed
+- The run travels through **four biomes** — forest, autumn, highlands, oasis — crossfading
+  every 700 m in palette and in which props line the trail
 - 100% client side. No server processing, no login, no database, no build step.
 
 Stack: plain HTML/CSS/ES modules, [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe)
@@ -120,6 +122,25 @@ coordinates are in **raw, un-mirrored** camera space, so LEFT/RIGHT labels are
 emitted from *your* perspective — step to your own left and it reads `LEFT`. Flip
 `lateral.invertSides` if you disagree.
 
+## Screenshots without a human
+
+The game boots its 3D loop without ever touching the webcam, so the whole scene can be
+photographed headlessly:
+
+```bash
+npm run dev                                        # in one shell
+node tools/shot.mjs --dist=0,760,1500 --sim=6      # in another
+```
+
+Each shot lands in `docs/shots/` and prints draw calls, triangle count, the active
+character and its resolved animation clips. `--sim` steps the real reducer at a fixed
+timestep first, because software rendering is far too slow to reach an interesting
+moment in wall-clock time. `tools/cdp.mjs` drives Chrome over the DevTools Protocol
+using only Node built-ins — no browser-automation dependency.
+
+**These frames are for layout and colour review only.** They render through SwiftShader
+and say nothing about frame rate on real hardware.
+
 ## Layout
 
 ```
@@ -133,11 +154,22 @@ src/detectors/lateral.js    pure reducer: landmarks -> LEFT/CENTER/RIGHT
 src/detectors/jog.js        pure reducer: landmarks over time -> jogging + cadence
 src/game/state.js           pure reducer: input over time -> lanes, enemies, bullets, HP, score
 src/game/input.js           lean + keyboard -> { lane, isFiring }
-src/game/scene.js           Three.js scene: boxes for road, spheres for bodies
+src/game/scene.js           Three.js scene assembly and the biome crossfade
 src/game/render.js          one-way sync: game state -> meshes
+src/game/world/palette.js   biome palettes + the Kenney material recolour map
+src/game/world/biomes.js    biome progression, blending, scatter-set selection
+src/game/world/sky.js       vertex-coloured gradient dome
+src/game/world/lighting.js  renderer setup, sun + shadow rig
+src/game/world/ground.js    valley cross-section, trail stones, horizon ridges
+src/game/world/scatter.js   instanced scenery, one InstancedMesh per model part
+src/game/world/rng.js       seeded RNG for world building
+src/game/actors/player.js   rigged character, animation graph, weapon loadout
+src/game/actors/enemies.js  rigged skeleton pool with capped mixer updates
 src/util/landmarks.js       visibility gating + scale-invariant body measurements
 src/util/smooth.js          EMA, sliding window, cadence
 src/main.js                 wiring: pose loop, game loop, HUD
+tools/cdp.mjs               dependency-free Chrome DevTools Protocol client
+tools/shot.mjs              headless screenshot harness
 test/                       headless detector + game tests
 ```
 
@@ -155,3 +187,26 @@ The number the game concept lives or dies on is **inference ms on the phone**, n
 desktop FPS. Note both, plus whether the backend tile reads `GPU` or `CPU` — the
 CPU fallback engages automatically on devices where the WebGL delegate fails, and
 it is much slower.
+
+## Assets and licences
+
+All 3D assets are CC0 and vendored under `assets/models/`.
+
+| Asset | Source | Licence |
+| --- | --- | --- |
+| Nature kit (329 models) | [Kenney](https://kenney.nl) Nature Kit | CC0 |
+| Knight | [KayKit Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) | CC0 |
+| Skeleton Minion | [KayKit Skeletons](https://kaylousberg.itch.io/kaykit-skeletons) | CC0 |
+| Robot / X-Bot / Soldier | three.js examples | as per three.js |
+
+The KayKit licence text is kept alongside the models in
+`assets/models/characters/KayKit-LICENSE.txt`. Attribution is not required by CC0, but
+Kay Lousberg and Kenney are credited here because the art is most of what you see.
+
+### Why the kit recolours so cheaply
+
+Every nature model is 5-17 KB, carries **no textures at all**, and names its materials
+for what they are (`grass`, `leafsGreen`, `woodBark`, `stone`). Colour is therefore a
+lookup table rather than an art job: `src/game/world/palette.js` maps material names to
+hex values, so the same 329 models repaint themselves for a new biome. Autumn is the
+forest with a different table — no extra download.

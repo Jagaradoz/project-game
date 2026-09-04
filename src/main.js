@@ -1,16 +1,16 @@
 /** Wiring: camera -> pose -> detectors -> input, and input -> game -> scene. */
 
-import { CONFIG } from './config.js?v=1.8.1';
-import { startCamera, describeCameraError } from './camera.js?v=1.8.1';
-import { initPose, detect } from './pose.js?v=1.8.1';
-import { resizeOverlay, clearOverlay, drawSkeleton } from './draw.js?v=1.8.1';
-import { createLateralState, updateLateral, recalibrateLateral, LATERAL } from './detectors/lateral.js?v=1.8.1';
-import { createJogState, updateJog } from './detectors/jog.js?v=1.8.1';
-import { ema } from './util/smooth.js?v=1.8.1';
-import { createGameState, updateGame, restartGame } from './game/state.js?v=1.8.1';
-import { createInput } from './game/input.js?v=1.8.1';
-import { createScene } from './game/scene.js?v=1.8.1';
-import { syncScene } from './game/render.js?v=1.8.1';
+import { CONFIG } from './config.js?v=1.9.0';
+import { startCamera, describeCameraError } from './camera.js?v=1.9.0';
+import { initPose, detect } from './pose.js?v=1.9.0';
+import { resizeOverlay, clearOverlay, drawSkeleton } from './draw.js?v=1.9.0';
+import { createLateralState, updateLateral, recalibrateLateral, LATERAL } from './detectors/lateral.js?v=1.9.0';
+import { createJogState, updateJog } from './detectors/jog.js?v=1.9.0';
+import { ema } from './util/smooth.js?v=1.9.0';
+import { createGameState, updateGame, restartGame } from './game/state.js?v=1.9.0';
+import { createInput } from './game/input.js?v=1.9.0';
+import { createScene } from './game/scene.js?v=1.9.0';
+import { syncScene } from './game/render.js?v=1.9.0';
 
 const el = {
   video: document.getElementById('video'),
@@ -38,6 +38,24 @@ const el = {
   restartBtn: document.getElementById('restartBtn'),
   charSelect: document.getElementById('charSelect'),
 };
+
+/**
+ * Bumped from `lane_runner_char` when the Knight became the default: a stored
+ * choice from an older build would otherwise pin returning players to the robot
+ * forever.
+ */
+const CHARACTER_STORAGE_KEY = 'lane_runner_char_v2';
+
+/**
+ * Auto quality. Pose inference and the 3D scene share one machine, and the
+ * shadow pass is the most expensive thing we can give back, so a device that
+ * cannot hold a smooth frame loses shadow resolution before anything else.
+ * Sampled once, after a warm-up long enough for shader compilation to settle.
+ */
+const QUALITY_WARMUP_FRAMES = 40;
+const QUALITY_SAMPLE_FRAMES = 120;
+const QUALITY_MEDIUM_FPS = 45;
+const QUALITY_LOW_FPS = 26;
 
 const ctx = el.overlay.getContext('2d');
 
@@ -153,23 +171,17 @@ async function bootGame() {
   renderGameHud();
 
   if (el.charSelect) {
-    const savedChar = localStorage.getItem('lane_runner_char') || CONFIG.game.defaultCharacter || 'robot';
-    el.charSelect.value = savedChar;
-    el.charSelect.addEventListener('change', async (e) => {
-      const charId = e.target.value;
-      localStorage.setItem('lane_runner_char', charId);
-      if (sceneRefs?.player?.loadCharacter) {
-        await sceneRefs.player.loadCharacter(charId);
-      }
+    el.charSelect.value = selectedCharacter();
+    el.charSelect.addEventListener('change', async (event) => {
+      const charId = event.target.value;
+      localStorage.setItem(CHARACTER_STORAGE_KEY, charId);
+      await applyCharacter(charId);
     });
   }
 
   try {
     sceneRefs = await createScene(el.gameCanvas);
-    const savedChar = localStorage.getItem('lane_runner_char') || CONFIG.game.defaultCharacter || 'robot';
-    if (savedChar !== (CONFIG.game.defaultCharacter || 'robot') && sceneRefs.player?.loadCharacter) {
-      await sceneRefs.player.loadCharacter(savedChar);
-    }
+    await applyCharacter(selectedCharacter());
   } catch (error) {
     showError('Could not load the 3D renderer. Check the network, then reload.');
     console.error(error);
@@ -182,13 +194,61 @@ async function bootGame() {
     window.addEventListener('resize', () => sceneRefs.resize());
   }
 
+  exposeTestHook();
+
   lastGameMs = performance.now();
   requestAnimationFrame(gameFrame);
+}
+
+/**
+ * Dev hook for tools/shot.mjs. The headless harness needs to know when the scene
+ * has finished loading, needs to jump the run forward to photograph a later
+ * biome, and reads renderer.info for the draw-call budget -- none of which is
+ * reachable from the outside otherwise.
+ */
+function exposeTestHook() {
+  window.__lane = {
+    ready: true,
+    warpTo(distance) {
+      game = { ...game, distance: Number(distance) || 0 };
+    },
+    /**
+     * Steps the real reducer at a fixed timestep. Software rendering is far too
+     * slow to reach an interesting moment in wall-clock time, and a screenshot
+     * of an empty road is not worth much -- this drives the actual game logic,
+     * so what gets photographed is a state the game can really be in.
+     */
+    simulate(seconds, options = {}) {
+      const stepMs = 1000 / 60;
+      const steps = Math.max(0, Math.round((Number(seconds) || 0) * 1000 / stepMs));
+      for (let step = 0; step < steps; step += 1) {
+        game = updateGame(game, { lane: options.lane ?? game.lane, isFiring: options.firing !== false }, stepMs);
+      }
+    },
+    summary() {
+      const info = sceneRefs?.renderer?.info?.render;
+      const player = sceneRefs?.player;
+      return {
+        dist: Math.round(game.distance),
+        hp: game.hp,
+        score: game.score,
+        calls: info?.calls ?? null,
+        tris: info?.triangles ?? null,
+        quality: sceneRefs?.quality ?? null,
+        character: player?.characterId ?? null,
+        anim: player?.currentActionName ?? null,
+        animRunning: Boolean(player?.currentAction?.isRunning?.()),
+        clips: Object.keys(player?.actions ?? {}),
+      };
+    },
+  };
 }
 
 function gameFrame(nowMs) {
   const dtMs = nowMs - lastGameMs;
   lastGameMs = nowMs;
+
+  sampleQuality(dtMs);
 
   const wasOver = game.isOver;
   game = updateGame(game, input.read(), dtMs);
@@ -200,6 +260,37 @@ function gameFrame(nowMs) {
   if (game.isOver !== wasOver) toggleGameOver(game.isOver);
 
   requestAnimationFrame(gameFrame);
+}
+
+function selectedCharacter() {
+  const saved = localStorage.getItem(CHARACTER_STORAGE_KEY);
+  if (saved && CONFIG.game.characters[saved]) return saved;
+  return CONFIG.game.defaultCharacter;
+}
+
+/** Loads a character and re-skins the projectiles to match their weapon. */
+async function applyCharacter(charId) {
+  if (!sceneRefs?.player?.loadCharacter) return;
+  await sceneRefs.player.loadCharacter(charId);
+  sceneRefs.bulletPool?.setProjectile(sceneRefs.player.projectile);
+}
+
+let qualityFrames = 0;
+let qualityTotalMs = 0;
+
+function sampleQuality(dtMs) {
+  if (qualityFrames > QUALITY_WARMUP_FRAMES + QUALITY_SAMPLE_FRAMES) return;
+
+  qualityFrames += 1;
+  if (qualityFrames <= QUALITY_WARMUP_FRAMES) return;
+
+  qualityTotalMs += dtMs;
+  if (qualityFrames <= QUALITY_WARMUP_FRAMES + QUALITY_SAMPLE_FRAMES) return;
+
+  const averageFps = 1000 / (qualityTotalMs / QUALITY_SAMPLE_FRAMES);
+  if (averageFps >= QUALITY_MEDIUM_FPS) return;
+
+  sceneRefs?.setQuality?.(averageFps < QUALITY_LOW_FPS ? 'low' : 'medium');
 }
 
 function onGameKey(event) {

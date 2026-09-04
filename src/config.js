@@ -18,6 +18,7 @@ export const MEDIAPIPE_WASM_URL = `${CDN_BASE}/wasm`;
 export const THREE_VERSION = '0.180.0';
 export const THREE_MODULE_URL = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/build/three.module.js`;
 export const GLTF_LOADER_URL = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/examples/jsm/loaders/GLTFLoader.js`;
+export const SKELETON_UTILS_URL = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/examples/jsm/utils/SkeletonUtils.js`;
 
 const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker';
 
@@ -122,9 +123,9 @@ export const CONFIG = {
   game: {
     laneCount: 3,
     laneWidth: 2.4,
-    /** Paved margin outside the outer lanes, purely cosmetic. */
-    shoulderWidth: 1.2,
-    roadLength: 220,
+
+    /** Shadow map budget. 'high' | 'medium' | 'low' (low disables shadows). */
+    quality: 'high',
 
     playerRadius: 0.75,
     playerZ: 0,
@@ -167,10 +168,28 @@ export const CONFIG = {
     /** Enough meshes for the worst case; the pool is never grown at runtime. */
     enemyPoolSize: 24,
 
-    dashCount: 26,
-    dashLength: 3,
-    dashGap: 6,
-    dashWidth: 0.18,
+    enemy: {
+      path: './assets/models/characters/Skeleton_Minion.glb',
+      scale: 1.15,
+      /** Rigs in this pack face +z, which is towards the player. */
+      rotationY: 0,
+      animations: {
+        run: 'Running_A',
+        walk: 'Walking_D_Skeletons',
+        death: 'Death_A',
+      },
+      /**
+       * Skinning is the expensive part of a crowd, so only the nearest few are
+       * animated. Past this the pose is frozen, which is invisible at distance.
+       */
+      animatedCount: 8,
+      animateBeyondZ: -70,
+    },
+
+    /** Trail stones marking the lane boundaries. */
+    markerCount: 26,
+    markerLength: 3,
+    markerGap: 6,
 
     /**
      * Framed for a portrait screen: far enough back that the outer lanes stay
@@ -179,22 +198,53 @@ export const CONFIG = {
     camera: {
       fov: 62,
       x: 0,
-      y: 7.5,
-      z: 13.5,
-      lookAtY: 1.2,
-      lookAtZ: -28,
+      y: 6.9,
+      z: 12.8,
+      lookAtY: 1.6,
+      lookAtZ: -30,
     },
 
+    /**
+     * Scatter repeats every `span` metres. Bigger spans hide the repetition for
+     * longer at the cost of more instances resident at once.
+     */
     scenery: {
-      span: 260,
-      itemCount: 64,
-      mountainCount: 16,
-      segmentCount: 22,
-      segmentLength: 12,
-      fireflyCount: 24,
+      span: 320,
+      seed: 24289,
     },
 
     characters: {
+      knight: {
+        id: 'knight',
+        name: 'Knight',
+        path: './assets/models/characters/Knight.glb',
+        scale: 1.25,
+        rotationY: Math.PI,
+        offsetY: 0,
+        /**
+         * Character packs ship every weapon and shield in one file, all
+         * visible. This is the loadout: everything else is switched off.
+         */
+        hideParts: [
+          '1H_Sword_Offhand',
+          'Badge_Shield',
+          'Rectangle_Shield',
+          'Spike_Shield',
+          '2H_Sword',
+          // Seen from behind, the cape is a solid blob over the whole run cycle.
+          'Knight_Cape',
+        ],
+        /** Cloned out of the model to become the thrown projectile. */
+        projectilePart: '1H_Sword',
+        animations: {
+          run: 'Running_A',
+          walk: 'Walking_A',
+          idle: 'Idle',
+          shoot: 'Throw',
+          death: 'Death_A',
+          hit: 'Hit_A',
+        },
+      },
       robot: {
         id: 'robot',
         name: 'Expressive Robot',
@@ -249,42 +299,6 @@ export const CONFIG = {
         scale: 1.0,
       },
     },
-    defaultCharacter: 'robot',
-
-    colors: {
-      sky: '#0b2024',
-      fog: '#091c1f',
-      road: '#3a2e24',
-      roadEdge: '#2b211a',
-      curbLight: '#3a5843',
-      curbDark: '#4d3425',
-      terrain: '#143823',
-      terrainFaceted: '#1a432b',
-      terrainDeep: '#0d2618',
-      dash: '#4ade80',
-      treeTrunk: '#42281a',
-      birchTrunk: '#e2e8f0',
-      birchNotch: '#1e293b',
-      treeFoliage: '#15803d',
-      treeFoliageAlt: '#166534',
-      treeFoliageWarm: '#22c55e',
-      treeFoliageBirch: '#84cc16',
-      bushFoliage: '#10b981',
-      rock: '#475569',
-      rockAlt: '#334155',
-      rockMoss: '#2d6a4f',
-      logWood: '#543622',
-      logRings: '#d4a373',
-      shroomCap: '#dc2626',
-      shroomStem: '#fef08a',
-      waypostWood: '#3a2417',
-      lanternGlow: '#fbbf24',
-      firefly: '#86efac',
-      mountain: '#112b25',
-      mountainPeak: '#1c3e35',
-      player: '#2563eb',
-      enemy: '#ef4444',
-      bullet: '#22c55e',
-    },
+    defaultCharacter: 'knight',
   },
 };
