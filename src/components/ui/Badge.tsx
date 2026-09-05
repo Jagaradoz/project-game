@@ -1,7 +1,7 @@
 type BadgeTone = 'neutral' | 'primary' | 'ok' | 'warn' | 'danger';
 
 const TONE_CLASS: Record<BadgeTone, string> = {
-  neutral: 'border-line bg-elevated text-muted',
+  neutral: 'border-line-strong bg-elevated text-accent-text',
   primary: 'border-primary/40 bg-primary-soft text-primary',
   ok: 'border-ok/40 bg-ok-soft text-ok-text',
   warn: 'border-warn/40 bg-warn-soft text-warn-text',

@@ -8,45 +8,73 @@
  * Dark-only by choice: the gameplay screen is a lit 3D scene, and dark chrome is
  * the frame that suits it. Every pair below is checked against the surface it
  * actually lands on, not against pure black.
+ *
+ * The palette is budgeted 60/30/10, and the budget is the point:
+ *
+ *   60  `bg` -- the ground. Page background and any large empty area.
+ *   30  `surface` / `elevated` / `line` / `accent*` -- dusk indigo. Every panel,
+ *       border, secondary control and DECORATIVE ICON belongs here.
+ *   10  `primary` -- orange. Primary CTAs, the active nav item, and the one
+ *       number on a screen that matters. Nothing else.
+ *
+ * Orange used to carry both the 30 and the 10, which is why it read as loud and
+ * bland at once. If a new element needs a tint and it is not a call to action,
+ * it takes `accent`, not `primary`.
  */
 @theme {
-  /* Base surfaces, darkest to lightest. */
-  --color-bg: #0f141a;
-  --color-surface: #1a2029;
-  --color-elevated: #222b36;
+  /* 60 -- the ground. Near-neutral, so the indigo above it reads as a real hue
+     rather than as "slightly bluer dark grey". */
+  --color-bg: #0e1117;
+
+  /* 30 -- dusk indigo, darkest to lightest. Complementary to the orange, and
+     deliberately not green: green is spoken for by `ok` (cleared / unlocked). */
+  --color-surface: #171c2b;
+  --color-elevated: #212843;
   /* `line` is a decorative divider. `line-strong` is a CONTROL boundary and
-     clears 3:1 against both bg and surface, because on an input or a select the
-     border is the only thing that says a control is there (WCAG 1.4.11). */
-  --color-line: #2a3441;
-  --color-line-strong: #5a6d85;
+     clears 3:1 against bg, surface AND elevated, because on an input or a select
+     the border is the only thing that says a control is there (WCAG 1.4.11). */
+  --color-line: #2a3350;
+  --color-line-strong: #6b779f;
 
-  /* Text, in descending emphasis. `muted` clears 4.5:1 on bg and surface. */
-  --color-text: #f1f5f9;
-  --color-muted: #94a3b8;
-  /* Still >=4.5:1 on bg, surface and elevated -- the footer's safety notice is
-     set in it, and small print that carries a warning has to be readable. */
-  --color-subtle: #8593a8;
+  /* The 30 as a foreground. This is where decorative glyphs go now, and having
+     it is what lets `primary` shrink back to 10%. Both clear 4.5:1 on bg,
+     surface and elevated. */
+  --color-accent: #8492ca;
+  --color-accent-soft: #1c2440;
+  --color-accent-text: #a9b6dc;
 
-  /* Brand. Orange reads as effort and warmth against the green 3D biomes. */
+  /* Text, in descending emphasis. Tinted toward the indigo so it belongs to the
+     ground it sits on. `muted` and `subtle` both clear 4.5:1 on all three
+     surfaces -- `subtle` carries the footer's safety notice, and small print
+     that carries a warning has to be readable. */
+  --color-text: #f1f4fa;
+  --color-muted: #99a3be;
+  --color-subtle: #8a94b0;
+
+  /* 10 -- brand. Orange reads as effort and warmth against both the green 3D
+     biomes and the indigo chrome. Hue unchanged; `soft` warmed so an orange
+     chip sits on the indigo ground instead of floating over it. */
   --color-primary: #f97316;
   --color-primary-hover: #ea6a0c;
-  --color-primary-soft: #2a1a0e;
-  --color-on-primary: #0f172a;
+  --color-primary-soft: #33200f;
+  --color-on-primary: #1a1206;
   --color-ring: #f97316;
 
   /* Semantic state. Each has a soft surface for notices and a text tint that
-     stays readable on it. */
+     stays readable on it. The hues are load-bearing -- Badge, Notice, StageStrip
+     and StageButton all encode meaning in them -- so only the soft grounds moved,
+     cooled just enough to sit on indigo. */
   --color-ok: #22c55e;
-  --color-ok-soft: #0e2a1a;
+  --color-ok-soft: #0c2a1c;
   --color-ok-text: #86efac;
   --color-on-ok: #052e16;
 
   --color-warn: #f59e0b;
-  --color-warn-soft: #2c2109;
+  --color-warn-soft: #2a2110;
   --color-warn-text: #fcd34d;
 
   --color-danger: #ef4444;
-  --color-danger-soft: #2e1414;
+  --color-danger-soft: #2c1620;
   --color-danger-text: #fca5a5;
   --color-on-danger: #240404;
 
@@ -73,6 +101,8 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-text-size-adjust: 100%;
+  /* See .band -- required for the full-bleed breakout not to add a scrollbar. */
+  overflow-x: clip;
 }
 
 /**
@@ -107,6 +137,37 @@ h3 {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/**
+ * The section rhythm on the landing page.
+ *
+ * Sections used to differ only by a top border, which is why they all read as
+ * the same block repeated. A band breaks out of the centred column to paint the
+ * full viewport width, so the page alternates ground -> panel -> ground and the
+ * eye gets a reason to keep moving.
+ *
+ * `overflow-x: clip` on the body is what makes the breakout safe: 100vw counts
+ * the scrollbar, so without it every band adds a horizontal scroll. It has to be
+ * `clip` rather than `hidden` -- `hidden` would create a scroll container and
+ * kill the sticky header.
+ */
+.band {
+  margin-inline: calc(50% - 50vw);
+  padding-inline: calc(50vw - 50%);
+}
+
+/**
+ * The small tracked label above a heading. Condensed and uppercase, because the
+ * display face was loaded for the game's voice and was reaching h1-h3 only.
+ */
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent-text);
 }
 
 /**

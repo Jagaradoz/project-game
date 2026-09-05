@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LinkButton } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
+import { AccountTabs } from '@/components/account/AccountTabs';
 import { PageShell } from '@/components/ui/PageShell';
 import { getErrorMessage, repository } from '@/lib/api';
 import { formatDate, formatNumber } from '@/lib/format';
@@ -53,6 +54,8 @@ export default function LeaderboardPage() {
         </LinkButton>
       }
     >
+      <AccountTabs />
+
       <Notice tone="info">
         This table shows only the <strong>display name</strong> each player has chosen — never an
         email address or a real name. You can change yours on the edit profile page.

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { VersionTag } from '@/components/ui/VersionTag';
+import { SHELL_WIDTH } from '@/components/layout/container';
 import { Wordmark } from '@/components/layout/Wordmark';
 
 const FOOTER_LINKS = [
@@ -17,7 +18,7 @@ interface SiteFooterProps {
 export function SiteFooter({ hasLinks = true }: SiteFooterProps) {
   return (
     <footer className="mt-auto border-t border-line bg-surface">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      <div className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8`}>
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="flex max-w-sm flex-col gap-2">
             <Wordmark />

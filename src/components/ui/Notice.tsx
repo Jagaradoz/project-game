@@ -3,7 +3,7 @@ import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react';
 type Tone = 'info' | 'warn' | 'error' | 'ok';
 
 const TONE_CLASS: Record<Tone, string> = {
-  info: 'border-line bg-surface text-muted',
+  info: 'border-accent/30 bg-accent-soft text-accent-text',
   warn: 'border-warn/40 bg-warn-soft text-warn-text',
   error: 'border-danger/40 bg-danger-soft text-danger-text',
   ok: 'border-ok/40 bg-ok-soft text-ok-text',

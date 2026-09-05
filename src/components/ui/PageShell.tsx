@@ -1,20 +1,9 @@
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { SiteHeader } from '@/components/layout/SiteHeader';
+import { SHELL_WIDTH, type ShellWidth } from '@/components/layout/container';
 import type { NavVariant } from '@/components/layout/nav';
 
-export type { NavVariant };
-
-/**
- * How wide the content runs. Prose and forms stay narrow enough to read; grids
- * of stats, stages and table rows get the full width.
- */
-export type ShellWidth = 'narrow' | 'prose' | 'wide';
-
-const WIDTH_CLASS: Record<ShellWidth, string> = {
-  narrow: 'max-w-md',
-  prose: 'max-w-3xl',
-  wide: 'max-w-6xl',
-};
+export type { NavVariant, ShellWidth };
 
 interface PageShellProps {
   title: string;
@@ -43,7 +32,7 @@ export function PageShell({
       <SiteHeader variant={nav} />
 
       <main
-        className={`mx-auto flex w-full flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 ${WIDTH_CLASS[width]}`}
+        className={`mx-auto flex w-full flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 ${SHELL_WIDTH[width]}`}
       >
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-col gap-1.5">
@@ -75,7 +64,7 @@ export function BareShell({
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
-      <main className={`mx-auto w-full px-4 sm:px-6 lg:px-8 ${WIDTH_CLASS[width]}`}>{children}</main>
+      <main className={`mx-auto w-full px-4 sm:px-6 lg:px-8 ${SHELL_WIDTH[width]}`}>{children}</main>
       <SiteFooter />
     </div>
   );

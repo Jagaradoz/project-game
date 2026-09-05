@@ -74,9 +74,9 @@ const CAUTIONS = [
 export default function HomePage() {
   return (
     <BareShell>
-      <section className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-2 lg:gap-16 lg:py-24">
+      <section className="flex flex-col gap-8 py-12 sm:py-16">
         <div className="flex flex-col items-start gap-6">
-          <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary-soft px-3 py-1 text-xs font-semibold tracking-wide text-primary uppercase">
+          <span className="eyebrow inline-flex items-center gap-2">
             <Sparkles aria-hidden size={14} />
             Webcam exercise game
           </span>
@@ -86,7 +86,7 @@ export default function HomePage() {
             <span className="block text-primary">with your whole body</span>
           </h1>
 
-          <p className="m-0 max-w-xl text-lg leading-relaxed text-muted">
+          <p className="m-0 max-w-xl text-lg leading-relaxed text-text/85">
             Trail Runner turns a webcam into a motion controller. Jog in place to attack, step
             sideways to switch lanes, and keep moving to keep going. Every frame is processed in your
             browser — no video is ever uploaded.
@@ -107,48 +107,51 @@ export default function HomePage() {
         </div>
 
         <ol className="m-0 flex list-none flex-col gap-3 rounded-xl border border-line bg-surface p-5 sm:p-6">
-          <li className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">
-            How it works
-          </li>
+          <li className="eyebrow">How it works</li>
           {STEPS.map((step, index) => (
-            <li key={step.title} className="flex gap-4 rounded-lg bg-elevated p-4">
+            <li key={step.title} className="flex items-start gap-4 rounded-lg bg-elevated p-4">
               <span
                 aria-hidden
-                className="grid size-10 flex-none place-items-center rounded-lg bg-primary-soft text-primary"
+                className="font-display text-2xl leading-none font-bold text-accent tabular-nums"
               >
-                <step.icon size={20} />
+                {index + 1}
               </span>
               <div className="flex flex-col gap-1">
-                <h2 className="m-0 text-base font-semibold text-text">
-                  <span className="text-primary tabular-nums">{index + 1}.</span> {step.title}
+                <h2 className="m-0 flex items-center gap-2 text-base font-semibold text-text">
+                  <step.icon aria-hidden size={17} className="flex-none text-accent" />
+                  {step.title}
                 </h2>
-                <p className="m-0 text-sm leading-relaxed text-muted">{step.body}</p>
+                <p className="m-0 text-sm leading-relaxed text-text/80">{step.body}</p>
               </div>
             </li>
           ))}
         </ol>
       </section>
 
-      <section className="border-t border-line py-12 sm:py-16" aria-labelledby="features-heading">
+      <section className="band bg-surface py-12 sm:py-16" aria-labelledby="features-heading">
         <h2 id="features-heading" className="m-0 text-3xl font-bold sm:text-4xl">
           Built to keep you moving
         </h2>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
+        <ul className="m-0 mt-8 flex list-none flex-col gap-5 p-0">
           {FEATURES.map((feature) => (
-            <Card key={feature.title} title={feature.title} icon={<feature.icon size={20} />}>
-              <p className="m-0 text-sm leading-relaxed text-muted">{feature.body}</p>
-            </Card>
+            <li key={feature.title} className="flex items-start gap-4">
+              <feature.icon aria-hidden size={22} className="mt-0.5 flex-none text-accent" />
+              <div className="flex flex-col gap-1">
+                <h3 className="m-0 text-lg font-semibold text-text">{feature.title}</h3>
+                <p className="m-0 leading-relaxed text-text/80">{feature.body}</p>
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
-      <section className="border-t border-line py-12 sm:py-16" aria-labelledby="controls-heading">
-        <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr] lg:gap-12">
+      <section className="py-12 sm:py-16" aria-labelledby="controls-heading">
+        <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-4">
             <h2 id="controls-heading" className="m-0 text-3xl font-bold sm:text-4xl">
               Three movements, that&rsquo;s all
             </h2>
-            <p className="m-0 leading-relaxed text-muted">
+            <p className="m-0 leading-relaxed text-text/85">
               The whole game runs on movements you already know. Nothing to memorise, and nothing
               that needs a free hand.
             </p>
@@ -171,7 +174,7 @@ export default function HomePage() {
               >
                 <span
                   aria-hidden
-                  className="grid size-11 flex-none place-items-center rounded-lg bg-elevated text-primary"
+                  className="grid size-11 flex-none place-items-center rounded-lg bg-elevated text-accent"
                 >
                   <control.icon size={22} />
                 </span>
@@ -185,20 +188,21 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-line py-12 sm:py-16" aria-labelledby="safety-heading">
-        <div className="grid gap-4 md:grid-cols-2">
+      <section className="band bg-surface py-12 sm:py-16" aria-labelledby="safety-heading">
+        <div className="flex flex-col gap-4">
           <Card
             title="Before you start"
             icon={<TriangleAlert size={20} />}
-            className="self-start md:col-span-2 lg:col-span-1"
+            tone="primary"
+            className="self-stretch bg-bg"
           >
             <h2 id="safety-heading" className="sr-only">
               Safety and privacy
             </h2>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm text-muted">
+            <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm text-text/85">
               {CAUTIONS.map((item) => (
                 <li key={item} className="flex gap-2.5">
-                  <span aria-hidden className="mt-2 size-1.5 flex-none rounded-full bg-primary" />
+                  <span aria-hidden className="mt-2 size-1.5 flex-none rounded-full bg-accent" />
                   {item}
                 </li>
               ))}
@@ -215,8 +219,9 @@ export default function HomePage() {
               title="Taking part in the study"
               note="Participant data handling"
               icon={<ShieldCheck size={20} />}
+              className="bg-bg"
             >
-              <p className="m-0 text-sm leading-relaxed text-muted">
+              <p className="m-0 text-sm leading-relaxed text-text/80">
                 This project studies how game elements affect motivation to move. If you are in the
                 control group, read the information sheet and give consent before you begin.
               </p>
@@ -233,7 +238,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-line py-12 sm:py-16">
+      <section className="py-12 sm:py-16">
         <div className="flex flex-col items-center gap-6 rounded-xl border border-line bg-surface px-6 py-12 text-center">
           <span
             aria-hidden
@@ -244,7 +249,7 @@ export default function HomePage() {
           <h2 className="m-0 max-w-lg text-3xl font-bold sm:text-4xl">
             Set your camera up once, then just run
           </h2>
-          <p className="m-0 max-w-xl leading-relaxed text-muted">
+          <p className="m-0 max-w-xl leading-relaxed text-text/85">
             Calibration takes under a minute and only has to happen once per session. After that,
             every stage is one click away.
           </p>

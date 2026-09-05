@@ -22,6 +22,7 @@ import { GameHud } from '@/components/game/GameHud';
 import { GameOverOverlay } from '@/components/game/GameOverOverlay';
 import { ScenePickers } from '@/components/game/ScenePickers';
 import { Notice } from '@/components/ui/Notice';
+import { SHELL_WIDTH } from '@/components/layout/container';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 
@@ -130,10 +131,20 @@ export default function GameCanvas() {
     <div className="flex min-h-dvh flex-col">
       <SiteHeader hasCta={false} />
 
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6">
+      <main className={`mx-auto flex w-full ${SHELL_WIDTH.wide} flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6`}>
         <div
           ref={containerRef}
-          className="relative mx-auto aspect-3/4 max-h-[78vh] w-full touch-manipulation overflow-hidden rounded-xl border border-line bg-bg sm:aspect-4/5 lg:aspect-16/10"
+          /*
+           * Portrait at every size. CONFIG.game.camera is framed for a tall
+           * viewport -- "far enough back that the outer lanes stay inside a
+           * narrow viewport" -- and the old lg:aspect-16/10 fought that framing.
+           *
+           * The ratio has to be driven by WIDTH, capped so the derived height
+           * still fits the viewport. Capping height instead (max-h) lets a short
+           * window squash the box back to landscape, which is the bug this
+           * screen started with.
+           */
+          className="relative mx-auto aspect-3/4 w-full max-w-[calc(80vh*3/4)] touch-manipulation overflow-hidden rounded-xl border border-line bg-bg"
         >
           <canvas ref={gameCanvasRef} className="block h-full w-full" />
 

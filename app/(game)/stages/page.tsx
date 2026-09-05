@@ -99,7 +99,7 @@ export default function StagesPage() {
       {!biomes ? (
         <p className="m-0 text-sm text-muted">Loading stages…</p>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="flex flex-col gap-4">
           {biomes.map((biome) => (
             <BiomeCard
               key={biome.biomeId}

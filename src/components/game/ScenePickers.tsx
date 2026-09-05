@@ -92,7 +92,7 @@ function Label({
   return (
     <label
       htmlFor={htmlFor}
-      className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.08em] text-primary uppercase"
+      className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.08em] text-accent-text uppercase"
     >
       {icon && <span aria-hidden className="flex">{icon}</span>}
       {children}

@@ -85,14 +85,14 @@ export default function HowToPlayPage() {
         a webcam is the only hardware the game needs.
       </p>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="flex flex-col gap-4">
         <Card title="Controls" icon={<Footprints size={20} />}>
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {CONTROLS.map((control) => (
               <li key={control.move} className="flex gap-3.5 rounded-lg bg-elevated p-3.5">
                 <span
                   aria-hidden
-                  className="grid size-10 flex-none place-items-center rounded-lg bg-primary-soft text-primary"
+                  className="grid size-10 flex-none place-items-center rounded-lg bg-accent-soft text-accent"
                 >
                   <control.icon size={20} />
                 </span>
@@ -109,10 +109,10 @@ export default function HowToPlayPage() {
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {SETUP.map((item) => (
               <li key={item.title} className="flex gap-3">
-                <item.icon aria-hidden size={18} className="mt-0.5 flex-none text-primary" />
+                <item.icon aria-hidden size={18} className="mt-0.5 flex-none text-accent" />
                 <div className="flex flex-col gap-0.5">
                   <span className="text-sm font-semibold text-text">{item.title}</span>
-                  <span className="text-sm leading-relaxed text-muted">{item.body}</span>
+                  <span className="text-sm leading-relaxed text-text/80">{item.body}</span>
                 </div>
               </li>
             ))}
@@ -130,7 +130,7 @@ export default function HowToPlayPage() {
         </p>
       </Card>
 
-      <div className="grid items-start gap-4 md:grid-cols-2">
+      <div className="flex flex-col gap-4">
         <Notice tone="warn" title="Safety">
           Stop playing immediately if you feel dizzy, get chest pain, become short of breath or feel
           unusually tired. This is not a medical device and is not used to diagnose any condition.

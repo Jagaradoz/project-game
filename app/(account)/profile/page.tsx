@@ -23,6 +23,7 @@ import { LinkButton, Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
+import { AccountTabs } from '@/components/account/AccountTabs';
 import { PageShell } from '@/components/ui/PageShell';
 import { StageStrip } from '@/components/ui/ProgressBar';
 import { StatGrid, StatTile } from '@/components/ui/StatTile';
@@ -67,6 +68,8 @@ export default function ProfilePage() {
       subtitle="Your accumulated statistics, biome progress and recent runs."
       width="wide"
     >
+      <AccountTabs />
+
       {error && <Notice tone="error">{error}</Notice>}
 
       {!profile ? (
@@ -78,7 +81,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-4">
                 <span
                   aria-hidden
-                  className="grid size-12 place-items-center rounded-full bg-primary-soft font-display text-xl font-bold text-primary"
+                  className="grid size-12 place-items-center rounded-full bg-accent-soft font-display text-xl font-bold text-accent-text"
                 >
                   {profile.user.displayName.slice(0, 1).toUpperCase()}
                 </span>
@@ -147,7 +150,7 @@ export default function ProfilePage() {
             </StatGrid>
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+          <div className="flex flex-col gap-4">
             {/* TOR 3: ระบบ Biome และ Stage. */}
             <Card title="Biome progress" icon={<Map size={20} />}>
               <div className="flex flex-col gap-4">

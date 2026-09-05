@@ -67,7 +67,7 @@ export default function CalibrationPanel() {
           never drawn to, so it is kept out of the layout and out of the a11y tree. */}
       <canvas ref={gameCanvasRef} hidden aria-hidden />
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:items-start">
+      <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
           <PoseStage
             videoRef={videoRef}

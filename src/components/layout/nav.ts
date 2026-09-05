@@ -1,14 +1,4 @@
-import {
-  ChartColumn,
-  House,
-  BookOpen,
-  Camera,
-  Gamepad2,
-  Map,
-  ShieldCheck,
-  User,
-  type LucideIcon,
-} from 'lucide-react';
+import { BookOpen, Map, ShieldCheck, User, type LucideIcon } from 'lucide-react';
 
 export type NavVariant = 'game' | 'study';
 
@@ -18,15 +8,22 @@ export interface NavLink {
   icon: LucideIcon;
 }
 
-/** Every player-facing route, in the order a player meets them. */
+/**
+ * The three destinations a player navigates to deliberately. Everything else
+ * reached the header by being a route rather than by being a destination:
+ *
+ *   Home        -- the Wordmark is already the link home.
+ *   Play        -- the header's CTA is the Play link; two of them is one too many.
+ *   Calibrate   -- a step inside a flow, not a place. Linked from the landing
+ *                  page, /how-to-play, /stages and the footer.
+ *   Leaderboard -- a view of /profile, and reached by AccountTabs there. It has
+ *                  no other inbound link, so that tab strip is load-bearing:
+ *                  drop it and the route is orphaned.
+ */
 export const GAME_NAV: readonly NavLink[] = [
-  { href: '/', label: 'Home', icon: House },
   { href: '/how-to-play', label: 'How to Play', icon: BookOpen },
-  { href: '/calibrate', label: 'Calibrate', icon: Camera },
   { href: '/stages', label: 'Stages', icon: Map },
-  { href: '/play', label: 'Play', icon: Gamepad2 },
   { href: '/profile', label: 'Profile', icon: User },
-  { href: '/leaderboard', label: 'Leaderboard', icon: ChartColumn },
 ];
 
 /**

@@ -6,6 +6,7 @@ import { Menu, Play, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { LinkButton } from '@/components/ui/Button';
+import { SHELL_WIDTH } from '@/components/layout/container';
 import { Wordmark } from '@/components/layout/Wordmark';
 import { GAME_NAV, STUDY_NAV, type NavLink, type NavVariant } from '@/components/layout/nav';
 
@@ -82,7 +83,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+      <div className={`mx-auto flex h-16 ${SHELL_WIDTH.wide} items-center gap-4 px-4 sm:px-6 lg:px-8`}>
         <Wordmark />
 
         <nav aria-label="Main" className="ml-auto hidden items-center gap-1 lg:flex">
@@ -124,7 +125,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
           ref={panelRef}
           className="border-t border-line bg-bg lg:hidden"
         >
-          <nav aria-label="Main" className="mx-auto flex max-w-6xl flex-col p-3 sm:px-6">
+          <nav aria-label="Main" className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col p-3 sm:px-6`}>
             {links.map((link) => (
               <NavItem key={link.href} link={link} pathname={pathname} isStacked />
             ))}

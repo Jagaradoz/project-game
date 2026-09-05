@@ -60,7 +60,7 @@ export default function ConsentPage() {
         </p>
       </Card>
 
-      <div className="grid items-start gap-4 md:grid-cols-2">
+      <div className="flex flex-col gap-4">
         <Card title="What is collected" icon={<Check size={20} />}>
           <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-sm text-muted">
             {COLLECTED.map((item) => (
