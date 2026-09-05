@@ -1,90 +1,165 @@
+import {
+  Camera,
+  Footprints,
+  Lightbulb,
+  Map,
+  MoveHorizontal,
+  Pause,
+  Ruler,
+  ShieldCheck,
+  Shirt,
+  TriangleAlert,
+} from 'lucide-react';
+
 import { Card } from '@/components/ui/Card';
 import { LinkButton } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { PageShell } from '@/components/ui/PageShell';
 
-export const metadata = { title: 'วิธีเล่น' };
+/* TOR 3: หน้าแรกและคำแนะนำการใช้งาน -- game details, controls and cautions. */
+
+export const metadata = { title: 'How to Play' };
 
 const CONTROLS = [
   {
-    move: 'ก้าวหรือเอียงตัวไปทางซ้าย / ขวา',
-    effect: 'ตัวละครเปลี่ยนเลนไปทางนั้นทันที มี 3 เลน คือ ซ้าย กลาง ขวา',
+    icon: MoveHorizontal,
+    move: 'Step or lean left / right',
+    effect:
+      'The runner switches to that lane immediately. There are three lanes: left, centre and right.',
   },
   {
-    move: 'วิ่งอยู่กับที่ (ยกเข่าสลับซ้าย-ขวา)',
-    effect: 'ตัวละครยิงโจมตีศัตรูอัตโนมัติอย่างต่อเนื่อง',
+    icon: Footprints,
+    move: 'Jog in place (lift your knees alternately)',
+    effect: 'The runner attacks continuously for as long as you keep the rhythm going.',
   },
   {
-    move: 'หยุดนิ่ง',
-    effect: 'การยิงหยุดทันที แต่ตัวละครยังเดินหน้าต่อ จึงต้องเคลื่อนไหวตลอดเวลา',
+    icon: Pause,
+    move: 'Stand still',
+    effect:
+      'Attacking stops at once, but the runner keeps moving forward — so you have to keep moving too.',
   },
 ];
 
 const SETUP = [
-  'ยืนห่างจากกล้องประมาณ 1.5–2 เมตร ให้เห็นร่างกายตั้งแต่ศีรษะถึงเข่า',
-  'เว้นพื้นที่ว่างรอบตัวอย่างน้อย 1 ช่วงแขน เพื่อก้าวซ้าย-ขวาได้อย่างปลอดภัย',
-  'จัดให้มีแสงสว่างเพียงพอ ส่องมาทางด้านหน้า และหลีกเลี่ยงแสงย้อนจากหน้าต่างด้านหลัง',
-  'สวมเสื้อผ้าที่เห็นรูปร่างชัดเจน หลีกเลี่ยงเสื้อผ้าสีกลืนกับฉากหลัง',
-  'เก็บของที่อาจสะดุดออกจากพื้นที่เล่น และเล่นบนพื้นที่ไม่ลื่น',
+  {
+    icon: Ruler,
+    title: 'Distance',
+    body: 'Stand roughly 1.5–2 metres from the camera, close enough that it sees you from head to knee.',
+  },
+  {
+    icon: MoveHorizontal,
+    title: 'Space',
+    body: 'Keep at least an arm span clear around you so you can step sideways safely.',
+  },
+  {
+    icon: Lightbulb,
+    title: 'Lighting',
+    body: 'Light your face from the front. Avoid a bright window behind you — backlight hides your outline.',
+  },
+  {
+    icon: Shirt,
+    title: 'Clothing',
+    body: 'Wear something that shows your outline, and avoid colours that blend into the wall behind you.',
+  },
+  {
+    icon: TriangleAlert,
+    title: 'Floor',
+    body: 'Clear anything you could trip over, and play on a surface that is not slippery.',
+  },
 ];
 
 export default function HowToPlayPage() {
   return (
     <PageShell
-      title="วิธีเล่น"
-      tor="TOR 3: หน้าแรกและคำแนะนำการใช้งาน — รายละเอียดเกม วิธีการเล่น และข้อควรระวัง"
+      title="How to Play"
+      subtitle="Everything you need before your first run: the controls, how to set up your space, and how progression works."
+      width="wide"
+      actions={
+        <LinkButton href="/calibrate" variant="primary" icon={<Camera size={18} />}>
+          Set up your camera
+        </LinkButton>
+      }
     >
-      <p className="m-0 text-sm leading-relaxed text-muted">
-        เกมนี้ใช้การเคลื่อนไหวร่างกายของคุณเป็นตัวควบคุมโดยตรง ไม่มีการควบคุมด้วยเมาส์
-        และไม่จำเป็นต้องใช้อุปกรณ์เสริมใด ๆ นอกจากกล้องเว็บแคม
+      <p className="m-0 max-w-3xl text-lg leading-relaxed text-muted">
+        Your movement is the input. There is nothing to click during a run and no accessory to buy —
+        a webcam is the only hardware the game needs.
       </p>
 
-      <Card title="การควบคุม">
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {CONTROLS.map((control) => (
-            <li key={control.move} className="flex flex-col gap-0.5">
-              <span className="text-sm font-semibold text-accent">{control.move}</span>
-              <span className="text-sm text-muted">{control.effect}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Controls" icon={<Footprints size={20} />}>
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            {CONTROLS.map((control) => (
+              <li key={control.move} className="flex gap-3.5 rounded-lg bg-elevated p-3.5">
+                <span
+                  aria-hidden
+                  className="grid size-10 flex-none place-items-center rounded-lg bg-primary-soft text-primary"
+                >
+                  <control.icon size={20} />
+                </span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-text">{control.move}</span>
+                  <span className="text-sm leading-relaxed text-muted">{control.effect}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
 
-      <Card title="จัดพื้นที่ก่อนเริ่มเล่น">
-        <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted">
-          {SETUP.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </Card>
+        <Card title="Set up your space" icon={<Ruler size={20} />}>
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            {SETUP.map((item) => (
+              <li key={item.title} className="flex gap-3">
+                <item.icon aria-hidden size={18} className="mt-0.5 flex-none text-primary" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-semibold text-text">{item.title}</span>
+                  <span className="text-sm leading-relaxed text-muted">{item.body}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
 
-      <Card title="ด่านและความก้าวหน้า" note="TOR 3: ระบบ Biome และ Stage">
-        <p className="m-0 text-sm text-muted">
-          เกมแบ่งออกเป็นหลายพื้นที่ (Biome) แต่ละพื้นที่มี 10 ด่าน (Stage)
-          แต่ละด่านมีเป้าหมายเป็นจำนวนศัตรูที่ต้องกำจัด เมื่อผ่านด่านหนึ่งจะปลดล็อกด่านถัดไป
-          และเมื่อผ่านครบทั้ง 10 ด่านจะปลดล็อกพื้นที่ถัดไป
-          คุณสามารถเลือกระดับความยากเริ่มต้นได้เองตามความสามารถ
+      {/* TOR 3: ระบบ Biome และ Stage. */}
+      <Card title="Stages and progression" icon={<Map size={20} />}>
+        <p className="m-0 max-w-3xl text-sm leading-relaxed text-muted">
+          The game is divided into biomes, and each biome holds ten stages. Every stage sets a target
+          number of enemies to defeat. Clearing a stage unlocks the next one, and clearing all ten
+          unlocks the next biome. You choose your starting difficulty, and you can change it whenever
+          you like — easier difficulties give you more health, slower enemies and a smaller target.
         </p>
       </Card>
 
-      <Notice tone="warn" title="ข้อควรระวังด้านความปลอดภัย">
-        หากรู้สึกเวียนศีรษะ เจ็บหน้าอก หายใจไม่ทัน หรือเหนื่อยผิดปกติ ให้หยุดเล่นทันที
-        ระบบนี้ไม่ใช่อุปกรณ์ทางการแพทย์และไม่ใช้สำหรับวินิจฉัยโรค
-        จำนวนการเคลื่อนไหวที่แสดงเป็นค่าที่ระบบตรวจวัดได้ ไม่ใช่ค่าพลังงานที่ได้รับการรับรองทางการแพทย์
-        ผู้ที่มีโรคประจำตัวควรปรึกษาแพทย์ก่อนออกกำลังกาย
-      </Notice>
+      <div className="grid items-start gap-4 md:grid-cols-2">
+        <Notice tone="warn" title="Safety">
+          Stop playing immediately if you feel dizzy, get chest pain, become short of breath or feel
+          unusually tired. This is not a medical device and is not used to diagnose any condition.
+          The movement count shown is what the system detects, not a clinically validated measure of
+          energy expenditure. If you have a pre-existing condition, talk to a doctor before
+          exercising.
+        </Notice>
 
-      <Notice tone="ok" title="ความเป็นส่วนตัว">
-        การประมวลผลภาพและการตรวจจับท่าทางทั้งหมดทำงานบนเบราว์เซอร์ของคุณ
-        ภาพและวิดีโอจากกล้องจะไม่ถูกส่งไปยังเซิร์ฟเวอร์และไม่ถูกบันทึกไว้ที่ใด
-      </Notice>
+        <Notice tone="ok" title="Privacy">
+          All image processing and pose detection runs in your browser. Video frames from your camera
+          are never sent to a server and are never stored anywhere.
+        </Notice>
+      </div>
 
-      <div className="flex flex-wrap gap-2">
-        <LinkButton href="/calibrate" variant="primary" className="flex-[1_1_180px]">
-          ไปหน้าปรับเทียบกล้อง
+      <div className="flex flex-col gap-3 lg:flex-row">
+        <LinkButton
+          href="/calibrate"
+          variant="primary"
+          size="lg"
+          icon={<Camera size={20} />}
+          className="flex-1"
+        >
+          Set up your camera
         </LinkButton>
-        <LinkButton href="/stages" className="flex-[1_1_180px]">
-          เลือกด่าน
+        <LinkButton href="/stages" size="lg" icon={<Map size={20} />} className="flex-1">
+          Browse stages
+        </LinkButton>
+        <LinkButton href="/consent" size="lg" icon={<ShieldCheck size={20} />} className="flex-1">
+          Study information
         </LinkButton>
       </div>
     </PageShell>

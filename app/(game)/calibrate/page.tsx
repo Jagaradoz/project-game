@@ -10,25 +10,27 @@
  */
 
 import dynamic from 'next/dynamic';
+import { LoaderCircle } from 'lucide-react';
 
 import { PageShell } from '@/components/ui/PageShell';
 
 const CalibrationPanel = dynamic(() => import('@/components/game/CalibrationPanel'), {
   ssr: false,
-  loading: () => <p className="m-0 text-sm text-muted">กำลังเตรียมระบบตรวจจับ...</p>,
+  loading: () => (
+    <p className="m-0 flex items-center gap-2 text-sm text-muted">
+      <LoaderCircle aria-hidden size={16} className="animate-spin" />
+      Preparing the detection system…
+    </p>
+  ),
 });
 
 export default function CalibratePage() {
   return (
     <PageShell
-      title="ปรับเทียบกล้อง"
-      tor="TOR 3: ระบบขออนุญาตใช้กล้อง + ระบบปรับเทียบกล้อง"
+      title="Camera Setup"
+      subtitle="A one-minute check that the camera can see you clearly enough to control the game. Everything is processed on your device."
+      width="wide"
     >
-      <p className="m-0 text-sm leading-relaxed text-muted">
-        ขั้นตอนนี้ตรวจสอบว่ากล้องมองเห็นคุณชัดเจนพอสำหรับควบคุมเกม
-        ภาพจากกล้องถูกประมวลผลบนเครื่องของคุณเท่านั้น และไม่ถูกส่งไปที่ใด
-      </p>
-
       <CalibrationPanel />
     </PageShell>
   );

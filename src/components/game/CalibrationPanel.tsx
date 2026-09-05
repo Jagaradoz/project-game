@@ -8,6 +8,18 @@
  * stays disabled until every check passes.
  */
 
+import {
+  BookOpen,
+  Crosshair,
+  Gauge,
+  ListChecks,
+  Map,
+  MoveHorizontal,
+  Ruler,
+  Sun,
+  Video,
+  VideoOff,
+} from 'lucide-react';
 import { useMemo, useRef } from 'react';
 
 import { PoseStage } from '@/components/pose/PoseStage';
@@ -50,117 +62,130 @@ export default function CalibrationPanel() {
   const isReady = checks.every((check) => check.isPassing);
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-4">
+    <div ref={containerRef} className="flex flex-col gap-6">
       {/* The engine expects a game canvas even in pose mode; in this mode it is
           never drawn to, so it is kept out of the layout and out of the a11y tree. */}
       <canvas ref={gameCanvasRef} hidden aria-hidden />
 
-      <PoseStage
-        videoRef={videoRef}
-        overlayRef={overlayRef}
-        isCameraRunning={snapshot.isCameraRunning}
-        idleLabel="กดปุ่ม “เปิดกล้อง” เพื่อเริ่มปรับเทียบ"
-      />
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:items-start">
+        <div className="flex flex-col gap-4">
+          <PoseStage
+            videoRef={videoRef}
+            overlayRef={overlayRef}
+            isCameraRunning={snapshot.isCameraRunning}
+            idleLabel="Press “Start camera” to begin calibration"
+          />
 
-      {snapshot.error && (
-        <Notice tone="error" title="เข้าถึงกล้องไม่สำเร็จ">
-          {snapshot.error}
-          <span className="block pt-1">
-            หากไม่อนุญาตให้ใช้กล้อง จะไม่สามารถเข้าสู่หน้าเกมได้
-            คุณสามารถอนุญาตได้จากแถบที่อยู่ของเบราว์เซอร์แล้วลองอีกครั้ง
-          </span>
-        </Notice>
-      )}
+          {snapshot.error && (
+            <Notice tone="error" title="Could not access the camera">
+              {snapshot.error}
+              <span className="block pt-1">
+                Without camera permission you cannot enter the game. You can grant it from your
+                browser&rsquo;s address bar and try again.
+              </span>
+            </Notice>
+          )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          className="flex-[1_1_160px]"
-          onClick={snapshot.isCameraRunning ? actions.stopCamera : actions.startCamera}
-        >
-          {snapshot.isCameraRunning ? 'ปิดกล้อง' : 'เปิดกล้อง'}
-        </Button>
-        <Button
-          variant="secondary"
-          className="flex-[1_1_160px]"
-          onClick={actions.recalibrate}
-          disabled={!snapshot.isCameraRunning}
-        >
-          ตั้งจุดกึ่งกลางใหม่
-        </Button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              className="flex-1"
+              icon={snapshot.isCameraRunning ? <VideoOff size={18} /> : <Video size={18} />}
+              onClick={snapshot.isCameraRunning ? actions.stopCamera : actions.startCamera}
+            >
+              {snapshot.isCameraRunning ? 'Stop camera' : 'Start camera'}
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              icon={<Crosshair size={18} />}
+              onClick={actions.recalibrate}
+              disabled={!snapshot.isCameraRunning}
+            >
+              Reset centre point
+            </Button>
+          </div>
+
+          <p role="status" className="m-0 text-sm text-muted">
+            {snapshot.status}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <Card title="Pre-flight checklist" icon={<ListChecks size={20} />}>
+            <CalibrationChecklist checks={checks} />
+          </Card>
+
+          {isReady ? (
+            <Notice tone="ok" title="You are ready to play">
+              The system can see you clearly and has detected both kinds of movement.
+            </Notice>
+          ) : (
+            <Notice tone="info">
+              Complete every item above to unlock the game.
+            </Notice>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <LinkButton
+              href="/stages"
+              variant="primary"
+              icon={<Map size={18} />}
+              className={`flex-1 ${isReady ? '' : 'pointer-events-none opacity-50'}`}
+              aria-disabled={!isReady}
+              // A disabled link is still focusable and still activatable by keyboard,
+              // so it is removed from the tab order rather than only greyed out.
+              tabIndex={isReady ? undefined : -1}
+            >
+              Choose a stage
+            </LinkButton>
+            <LinkButton href="/how-to-play" icon={<BookOpen size={18} />} className="flex-1">
+              Read the guide
+            </LinkButton>
+          </div>
+        </div>
       </div>
 
-      <p role="status" className="m-0 text-sm text-muted">
-        {snapshot.status}
-      </p>
-
-      <Card title="รายการตรวจสอบก่อนเริ่มเล่น">
-        <CalibrationChecklist checks={checks} />
-      </Card>
-
-      <Card title="ค่าที่ตรวจวัดได้">
+      <Card title="Live measurements" icon={<Gauge size={20} />}>
         <StatGrid>
           <StatTile
-            label="ความสว่าง"
+            label="Brightness"
+            icon={<Sun size={16} />}
             value={snapshot.luma === null ? '--' : `${Math.round(snapshot.luma * 100)}%`}
-            detail="ค่าเฉลี่ยความสว่างของภาพ"
+            detail="Average image brightness"
           />
           <StatTile
-            label="ระยะห่าง"
+            label="Distance"
+            icon={<Ruler size={16} />}
             value={
               snapshot.shoulderWidth === null
                 ? '--'
                 : `${Math.round(snapshot.shoulderWidth * 100)}%`
             }
-            detail="ความกว้างไหล่เทียบกับเฟรม"
+            detail="Shoulder width relative to the frame"
           />
           <StatTile
-            label="ก้าวซ้าย-ขวา"
+            label="Sideways step"
+            icon={<MoveHorizontal size={16} />}
             value={snapshot.hasBody ? snapshot.lateralLabel : '--'}
-            detail={`offset ${snapshot.lateralOffset.toFixed(2)}`}
+            detail={`Offset ${snapshot.lateralOffset.toFixed(2)}`}
           />
           <StatTile
-            label="วิ่งอยู่กับที่"
-            value={snapshot.isJogging ? 'กำลังวิ่ง' : 'หยุด'}
-            detail={`${Math.round(snapshot.cadenceSpm)} ก้าว/นาที`}
+            label="Jog in place"
+            icon={<Gauge size={16} />}
+            value={snapshot.isJogging ? 'Jogging' : 'Idle'}
+            detail={`${Math.round(snapshot.cadenceSpm)} steps/min`}
           />
           <StatTile
-            label="FPS"
+            label="Frame rate"
             value={snapshot.fps === null ? '--' : snapshot.fps.toFixed(0)}
             detail={
               snapshot.inferenceMs === null
-                ? 'ความหน่วง -- ms'
-                : `ความหน่วง ${snapshot.inferenceMs.toFixed(1)} ms`
+                ? 'Latency -- ms'
+                : `Latency ${snapshot.inferenceMs.toFixed(1)} ms`
             }
           />
         </StatGrid>
       </Card>
-
-      {isReady ? (
-        <Notice tone="ok" title="พร้อมเริ่มเล่นแล้ว">
-          ระบบตรวจพบคุณในตำแหน่งที่เหมาะสม และตรวจจับการเคลื่อนไหวทั้งสองแบบได้แล้ว
-        </Notice>
-      ) : (
-        <Notice tone="info">
-          ทำรายการตรวจสอบด้านบนให้ครบก่อน จึงจะเข้าสู่หน้าเกมได้
-        </Notice>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        <LinkButton
-          href="/stages"
-          variant="primary"
-          className={`flex-[1_1_180px] ${isReady ? '' : 'pointer-events-none opacity-50'}`}
-          aria-disabled={!isReady}
-          // A disabled link is still focusable and still activatable by keyboard,
-          // so it is removed from the tab order rather than only greyed out.
-          tabIndex={isReady ? undefined : -1}
-        >
-          เลือกด่านและเริ่มเล่น
-        </LinkButton>
-        <LinkButton href="/how-to-play" className="flex-[1_1_180px]">
-          อ่านวิธีเล่นอีกครั้ง
-        </LinkButton>
-      </div>
     </div>
   );
 }

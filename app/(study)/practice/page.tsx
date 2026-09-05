@@ -6,6 +6,7 @@
  */
 
 import dynamic from 'next/dynamic';
+import { LoaderCircle, ShieldCheck } from 'lucide-react';
 
 import { LinkButton } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
@@ -15,7 +16,12 @@ import { useConsent } from '@/lib/store/consent';
 
 const PracticePanel = dynamic(() => import('@/components/game/PracticePanel'), {
   ssr: false,
-  loading: () => <p className="m-0 text-sm text-muted">กำลังเตรียมระบบตรวจจับ...</p>,
+  loading: () => (
+    <p className="m-0 flex items-center gap-2 text-sm text-muted">
+      <LoaderCircle aria-hidden size={16} className="animate-spin" />
+      Preparing the detection system…
+    </p>
+  ),
 });
 
 export default function PracticePage() {
@@ -27,27 +33,33 @@ export default function PracticePage() {
 
   return (
     <PageShell
-      title="โหมดเคลื่อนไหว (กลุ่มควบคุม)"
-      tor="TOR 3: การประเมินแรงจูงใจ — กิจกรรมการเคลื่อนไหวแบบเดียวกัน โดยไม่มีองค์ประกอบของเกม"
+      title="Movement Mode"
+      subtitle="The same movement activity, recorded through the same detection system, with no game elements."
+      width="wide"
       // The chrome is stripped too: a nav link to the leaderboard or the stage
       // list would put a game element in front of the control group.
       nav="study"
     >
-      <p className="m-0 text-sm leading-relaxed text-muted">
-        โหมดนี้ใช้ระบบตรวจจับท่าทางชุดเดียวกับเกม และนับจำนวนการเคลื่อนไหวแบบเดียวกัน
-        แต่ไม่มีตัวละคร ศัตรู คะแนน หรือด่าน
+      <p className="m-0 max-w-3xl leading-relaxed text-muted">
+        This mode uses the same pose detection as the game and counts movement the same way, but
+        there is no character, no opponent, no score and no stage.
       </p>
 
       {!isReady ? null : acceptedAt ? (
         <PracticePanel />
       ) : (
         <>
-          <Notice tone="warn" title="ต้องให้ความยินยอมก่อน">
-            โหมดนี้เป็นส่วนหนึ่งของการเก็บข้อมูลวิจัย
-            กรุณาอ่านคำชี้แจงและให้ความยินยอมก่อนเริ่มใช้งาน
+          <Notice tone="warn" title="Consent is required first">
+            This mode is part of the research data collection. Please read the information sheet and
+            give your consent before starting.
           </Notice>
-          <LinkButton href="/consent" variant="primary" className="self-start">
-            อ่านคำชี้แจงและให้ความยินยอม
+          <LinkButton
+            href="/consent"
+            variant="primary"
+            icon={<ShieldCheck size={18} />}
+            className="self-start"
+          >
+            Read the information sheet
           </LinkButton>
         </>
       )}

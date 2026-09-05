@@ -1,8 +1,12 @@
 'use client';
 
+/* TOR 3: ระบบ Biome และ Stage -- ten stages per biome, unlocked in order. */
+
 import { useRouter } from 'next/navigation';
+import { Camera, Check, Lock, Play, Target } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { LinkButton } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
@@ -51,16 +55,23 @@ export default function StagesPage() {
 
   return (
     <PageShell
-      title="เลือก Stage และ Biome"
-      tor="TOR 3: ระบบ Biome และ Stage — แต่ละพื้นที่มี 10 ด่าน ปลดล็อกตามลำดับ"
+      title="Stages"
+      subtitle="Ten stages per biome, cleared in order. Clear a biome to unlock the next one."
+      width="wide"
+      actions={
+        <LinkButton href="/calibrate" icon={<Camera size={18} />}>
+          Calibrate first
+        </LinkButton>
+      }
     >
       {error && <Notice tone="error">{error}</Notice>}
 
-      <Card title="ระดับความยากเริ่มต้น" note="TOR 3: ผู้เล่นสามารถเลือกระดับความยากเริ่มต้นได้">
+      {/* TOR 3: ผู้เล่นสามารถเลือกระดับความยากเริ่มต้นได้. */}
+      <Card title="Starting difficulty" icon={<Target size={20} />}>
         <div
           role="radiogroup"
-          aria-label="ระดับความยากเริ่มต้น"
-          className="flex flex-wrap gap-2"
+          aria-label="Starting difficulty"
+          className="grid grid-cols-3 gap-2 sm:max-w-md"
         >
           {DIFFICULTIES.map((option) => (
             <button
@@ -69,40 +80,38 @@ export default function StagesPage() {
               role="radio"
               aria-checked={difficulty === option}
               onClick={() => setDifficulty(option)}
-              className={`min-h-12 flex-[1_1_100px] cursor-pointer rounded-lg border px-4 py-3 font-semibold transition-colors ${
+              className={`min-h-12 cursor-pointer rounded-lg border px-4 py-3 font-semibold transition-colors ${
                 difficulty === option
-                  ? 'border-accent bg-accent text-[#04121a]'
-                  : 'border-line text-text'
+                  ? 'border-primary bg-primary text-on-primary'
+                  : 'border-line-strong bg-elevated text-text hover:border-muted'
               }`}
             >
               {difficultyLabel(option)}
             </button>
           ))}
         </div>
-        <p className="m-0 text-xs text-muted">
-          ระดับที่ง่ายกว่าจะมีพลังชีวิตมากขึ้น ศัตรูมาช้าลง และเป้าหมายต่อด่านน้อยลง
-          เปลี่ยนได้ทุกเมื่อ และมีผลกับด่านที่เริ่มเล่นครั้งถัดไป
+        <p className="m-0 max-w-2xl text-sm text-muted">
+          Easier difficulties give you more health, slower enemies and a smaller target per stage.
+          You can change this at any time; it applies to the next stage you start.
         </p>
       </Card>
 
       {!biomes ? (
-        <p className="m-0 text-sm text-muted">กำลังโหลด...</p>
+        <p className="m-0 text-sm text-muted">Loading stages…</p>
       ) : (
-        biomes.map((biome) => (
-          <BiomeCard
-            key={biome.biomeId}
-            biome={biome}
-            difficulty={difficulty}
-            selectedBiomeId={stageBiomeId}
-            selectedStage={stageNumber}
-            onPlay={play}
-          />
-        ))
+        <div className="grid gap-4 xl:grid-cols-2">
+          {biomes.map((biome) => (
+            <BiomeCard
+              key={biome.biomeId}
+              biome={biome}
+              difficulty={difficulty}
+              selectedBiomeId={stageBiomeId}
+              selectedStage={stageNumber}
+              onPlay={play}
+            />
+          ))}
+        </div>
       )}
-
-      <LinkButton href="/calibrate" className="self-start">
-        ปรับเทียบกล้องก่อนเล่น
-      </LinkButton>
     </PageShell>
   );
 }
@@ -127,12 +136,23 @@ function BiomeCard({
 
   return (
     <Card
-      title={biome.isUnlocked ? biome.name : `🔒 ${biome.name}`}
+      title={biome.name}
+      icon={biome.isUnlocked ? <Play size={20} /> : <Lock size={20} />}
       note={
         biome.isUnlocked
-          ? `ผ่านแล้ว ${cleared} จาก ${biome.stages.length} ด่าน`
-          : 'ปลดล็อกเมื่อผ่านครบทุกด่านของพื้นที่ก่อนหน้า'
+          ? `${cleared} of ${biome.stages.length} stages cleared`
+          : 'Unlocks when every stage of the previous biome is cleared'
       }
+      actions={
+        biome.isUnlocked ? (
+          <Badge tone={cleared === biome.stages.length ? 'ok' : 'primary'}>
+            {cleared === biome.stages.length ? 'Complete' : 'Unlocked'}
+          </Badge>
+        ) : (
+          <Badge icon={<Lock size={12} />}>Locked</Badge>
+        )
+      }
+      className={biome.isUnlocked ? '' : 'opacity-70'}
     >
       <div className="grid grid-cols-5 gap-2">
         {biome.stages.map((stage) => (
@@ -157,7 +177,7 @@ interface StageButtonProps {
 }
 
 function StageButton({ stage, goalKills, isSelected, onPlay }: StageButtonProps) {
-  const status = stage.isCleared ? 'ผ่านแล้ว' : stage.isUnlocked ? 'พร้อมเล่น' : 'ยังไม่ปลดล็อก';
+  const status = stage.isCleared ? 'cleared' : stage.isUnlocked ? 'ready to play' : 'locked';
 
   return (
     <button
@@ -166,21 +186,33 @@ function StageButton({ stage, goalKills, isSelected, onPlay }: StageButtonProps)
       onClick={onPlay}
       // The label carries what the colour alone conveys, so the grid is usable
       // without seeing it.
-      aria-label={`ด่าน ${stage.stageNumber} — ${status}, เป้าหมาย ${goalKills} ตัว${
-        stage.bestScore === null ? '' : `, คะแนนสูงสุด ${stage.bestScore}`
+      aria-label={`Stage ${stage.stageNumber} — ${status}, target ${goalKills} enemies${
+        stage.bestScore === null ? '' : `, best score ${stage.bestScore}`
       }`}
-      title={`เป้าหมาย ${goalKills} ตัว`}
-      className={`flex aspect-square min-h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-colors disabled:cursor-not-allowed disabled:border-line disabled:bg-panel disabled:text-off ${
+      title={`Target: ${goalKills} enemies`}
+      className={`flex aspect-square min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-colors disabled:cursor-not-allowed disabled:border-line disabled:bg-bg disabled:text-subtle ${
         stage.isCleared
-          ? 'border-ok bg-[#14291f] text-ok'
+          ? 'border-ok/50 bg-ok-soft text-ok-text hover:border-ok'
           : isSelected
-            ? 'border-accent bg-accent text-[#04121a]'
-            : 'border-line bg-surface text-text'
+            ? 'border-primary bg-primary text-on-primary'
+            : 'border-line-strong bg-elevated text-text hover:border-muted'
       }`}
     >
-      <span className="text-lg leading-none tabular-nums">{stage.stageNumber}</span>
-      <span className="text-[10px] leading-none font-normal opacity-80">
-        {stage.isUnlocked ? `🎯 ${formatNumber(goalKills)}` : '🔒'}
+      <span className="font-display text-xl leading-none tabular-nums">{stage.stageNumber}</span>
+      <span
+        aria-hidden
+        className="flex items-center gap-0.5 text-[10px] leading-none font-normal opacity-90"
+      >
+        {!stage.isUnlocked ? (
+          <Lock size={11} />
+        ) : stage.isCleared ? (
+          <Check size={11} />
+        ) : (
+          <>
+            <Target size={11} />
+            {formatNumber(goalKills)}
+          </>
+        )}
       </span>
     </button>
   );

@@ -35,17 +35,17 @@ test('numbers round and group; nonsense renders a dash', () => {
 });
 
 test('metres carry their unit', () => {
-  assert.equal(formatMetres(1500), '1,500 ม.');
+  assert.equal(formatMetres(1500), '1,500 m');
   assert.equal(formatMetres(null), '--');
 });
 
 test('a delta is signed, and zero says so in words', () => {
   assert.equal(formatDelta(120), '+120');
   assert.equal(formatDelta(-45), '-45');
-  assert.equal(formatDelta(0), 'เท่าเดิม');
+  assert.equal(formatDelta(0), 'No change');
 });
 
-test('dates render in the Thai locale, and junk renders a dash', () => {
+test('dates render, and junk renders a dash', () => {
   const iso = '2026-03-15T08:30:00.000Z';
 
   // Not asserting the exact string: the locale data decides that, and pinning

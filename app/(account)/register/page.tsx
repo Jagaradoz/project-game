@@ -1,7 +1,10 @@
 'use client';
 
+/* TOR 3: ระบบสมาชิกและเข้าสู่ระบบ. */
+
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Lock, Mail, User, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 import { LocalAccountNotice } from '@/components/account/LocalAccountNotice';
@@ -48,52 +51,59 @@ export default function RegisterPage() {
   }
 
   return (
-    <PageShell title="สมัครสมาชิก" tor="TOR 3: ระบบสมาชิกและเข้าสู่ระบบ">
+    <PageShell
+      title="Create an Account"
+      subtitle="An account keeps your progress and puts your display name on the leaderboard."
+      width="narrow"
+    >
       <LocalAccountNotice />
 
       <Card>
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
           <Field
-            label="อีเมล"
+            label="Email"
             type="email"
             autoComplete="email"
+            icon={<Mail size={18} />}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             error={errors.email}
-            hint="ใช้อีเมลนี้เข้าสู่ระบบ และจะไม่สามารถแก้ไขได้ภายหลัง"
+            hint="You will sign in with this address, and it cannot be changed later."
           />
 
           <Field
-            label="ชื่อในเกม"
+            label="Display name"
             autoComplete="nickname"
+            icon={<User size={18} />}
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
             error={errors.displayName}
-            hint="ชื่อนี้จะแสดงในตารางคะแนนแทนอีเมลของคุณ"
+            hint="This is what appears on the leaderboard instead of your email."
           />
 
           <Field
-            label="รหัสผ่าน"
+            label="Password"
             type="password"
             autoComplete="new-password"
+            icon={<Lock size={18} />}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             error={errors.password}
-            hint={`อย่างน้อย ${PASSWORD_MIN} ตัวอักษร`}
+            hint={`At least ${PASSWORD_MIN} characters.`}
           />
 
           {formError && <Notice tone="error">{formError}</Notice>}
 
-          <Button type="submit" disabled={isSubmitting} isFullWidth>
-            {isSubmitting ? 'กำลังสมัคร...' : 'สมัครสมาชิก'}
+          <Button type="submit" isLoading={isSubmitting} icon={<UserPlus size={18} />} isFullWidth>
+            {isSubmitting ? 'Creating account…' : 'Create account'}
           </Button>
         </form>
       </Card>
 
       <p className="m-0 text-center text-sm text-muted">
-        มีบัญชีอยู่แล้ว?{' '}
-        <Link href="/login" className="font-semibold text-accent">
-          เข้าสู่ระบบ
+        Already have an account?{' '}
+        <Link href="/login" className="font-semibold text-primary">
+          Sign in
         </Link>
       </p>
     </PageShell>

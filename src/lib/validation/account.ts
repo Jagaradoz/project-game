@@ -2,8 +2,8 @@
  * Input validation for the account forms.
  *
  * One place, shared by the forms and by both repository implementations, so a
- * rule can never hold in the UI and not in the data layer. Messages are Thai
- * because they are rendered straight under the field.
+ * rule can never hold in the UI and not in the data layer. Messages are written
+ * for the player, because they are rendered straight under the field.
  *
  * TOR 3 (ระบบสมาชิกและเข้าสู่ระบบ) is what these encode: email format is
  * checked, the email is fixed at registration, and the display name is what
@@ -27,20 +27,20 @@ export const emailSchema = z
   .toLowerCase()
   .pipe(
     z
-      .email({ message: 'รูปแบบอีเมลไม่ถูกต้อง' })
-      .max(254, { message: 'อีเมลยาวเกินไป' }),
+      .email({ message: 'Enter a valid email address' })
+      .max(254, { message: 'That email address is too long' }),
   );
 
 export const passwordSchema = z
   .string()
-  .min(PASSWORD_MIN, { message: `รหัสผ่านต้องมีอย่างน้อย ${PASSWORD_MIN} ตัวอักษร` })
-  .max(PASSWORD_MAX, { message: `รหัสผ่านต้องไม่เกิน ${PASSWORD_MAX} ตัวอักษร` });
+  .min(PASSWORD_MIN, { message: `Password must be at least ${PASSWORD_MIN} characters` })
+  .max(PASSWORD_MAX, { message: `Password must be ${PASSWORD_MAX} characters or fewer` });
 
 export const displayNameSchema = z
   .string()
   .trim()
-  .min(DISPLAY_NAME_MIN, { message: `ชื่อในเกมต้องมีอย่างน้อย ${DISPLAY_NAME_MIN} ตัวอักษร` })
-  .max(DISPLAY_NAME_MAX, { message: `ชื่อในเกมต้องไม่เกิน ${DISPLAY_NAME_MAX} ตัวอักษร` });
+  .min(DISPLAY_NAME_MIN, { message: `Display name must be at least ${DISPLAY_NAME_MIN} characters` })
+  .max(DISPLAY_NAME_MAX, { message: `Display name must be ${DISPLAY_NAME_MAX} characters or fewer` });
 
 export const registerSchema = z.object({
   email: emailSchema,
@@ -50,7 +50,7 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, { message: 'กรุณากรอกรหัสผ่าน' }),
+  password: z.string().min(1, { message: 'Enter your password' }),
 });
 
 export const profileEditSchema = z.object({

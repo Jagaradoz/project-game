@@ -1,10 +1,19 @@
+import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react';
+
 type Tone = 'info' | 'warn' | 'error' | 'ok';
 
 const TONE_CLASS: Record<Tone, string> = {
-  info: 'border-line bg-panel text-muted',
-  warn: 'border-[#6b5a1f] bg-[#2a2513] text-[#f2d98b]',
-  error: 'border-[#6b2a2a] bg-[#3a1c1c] text-[#ffb4b4]',
-  ok: 'border-[#255c42] bg-[#14291f] text-[#8fe3b8]',
+  info: 'border-line bg-surface text-muted',
+  warn: 'border-warn/40 bg-warn-soft text-warn-text',
+  error: 'border-danger/40 bg-danger-soft text-danger-text',
+  ok: 'border-ok/40 bg-ok-soft text-ok-text',
+};
+
+const TONE_ICON: Record<Tone, typeof Info> = {
+  info: Info,
+  warn: TriangleAlert,
+  error: CircleAlert,
+  ok: CircleCheck,
 };
 
 interface NoticeProps {
@@ -14,14 +23,21 @@ interface NoticeProps {
 }
 
 export function Notice({ tone = 'info', title, children }: NoticeProps) {
+  const Glyph = TONE_ICON[tone];
+
   return (
     <div
       // Errors interrupt; the rest are announced only when the reader arrives.
       role={tone === 'error' ? 'alert' : 'note'}
-      className={`flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-sm ${TONE_CLASS[tone]}`}
+      className={`flex items-start gap-3 rounded-lg border px-3.5 py-3 text-sm ${TONE_CLASS[tone]}`}
     >
-      {title && <strong className="font-semibold">{title}</strong>}
-      <div>{children}</div>
+      {/* Decorative: the tone is already carried by the title and the copy. */}
+      <Glyph aria-hidden size={18} className="mt-0.5 flex-none" />
+
+      <div className="flex min-w-0 flex-col gap-1">
+        {title && <strong className="font-semibold">{title}</strong>}
+        <div className="leading-relaxed">{children}</div>
+      </div>
     </div>
   );
 }

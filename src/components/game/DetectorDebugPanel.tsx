@@ -1,3 +1,7 @@
+import { Crosshair, Video, VideoOff } from 'lucide-react';
+
+import { Button } from '@/components/ui/Button';
+import { StatGrid, StatTile } from '@/components/ui/StatTile';
 import { LATERAL } from '@/engine/detectors/lateral';
 import type { HudSnapshot } from '@/engine/runtime';
 
@@ -11,6 +15,8 @@ interface DetectorDebugPanelProps {
 /**
  * The measurement surface for TOR 3.4: detector state, inference latency and
  * frame rate, which is what the technical evaluation is reported from.
+ *
+ * Collapsed by default -- it is an instrument, not part of playing.
  */
 export function DetectorDebugPanel({
   snapshot,
@@ -25,18 +31,29 @@ export function DetectorDebugPanel({
       : snapshot.lateralLabel;
 
   return (
-    <details className="rounded-lg bg-panel px-3 py-2">
-      <summary className="cursor-pointer text-[13px] tracking-[0.04em] uppercase text-muted">
-        Camera &amp; detector debug
+    <details className="rounded-xl border border-line bg-surface px-4 py-3">
+      <summary className="cursor-pointer text-[13px] font-semibold tracking-[0.04em] text-muted uppercase">
+        Camera &amp; detector diagnostics
       </summary>
 
-      <div className="mt-2.5 flex flex-col gap-2.5">
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={snapshot.isCameraRunning ? onStopCamera : onStartCamera}>
-            {snapshot.isCameraRunning ? 'Stop Camera' : 'Start Camera'}
+      <div className="mt-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button
+            variant="secondary"
+            className="flex-1"
+            icon={snapshot.isCameraRunning ? <VideoOff size={18} /> : <Video size={18} />}
+            onClick={snapshot.isCameraRunning ? onStopCamera : onStartCamera}
+          >
+            {snapshot.isCameraRunning ? 'Stop camera' : 'Start camera'}
           </Button>
-          <Button onClick={onRecalibrate} disabled={!snapshot.isCameraRunning}>
-            Recalibrate Center
+          <Button
+            variant="secondary"
+            className="flex-1"
+            icon={<Crosshair size={18} />}
+            onClick={onRecalibrate}
+            disabled={!snapshot.isCameraRunning}
+          >
+            Reset centre point
           </Button>
         </div>
 
@@ -44,89 +61,39 @@ export function DetectorDebugPanel({
           {snapshot.status}
         </p>
 
-        <section className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
-          <Tile
-            label="Lean / Step"
+        <StatGrid>
+          <StatTile
+            label="Lean / step"
             value={lateralText}
-            isActive={snapshot.isCalibrated && snapshot.lateralLabel !== LATERAL.CENTER}
-            detail={`offset ${snapshot.lateralOffset.toFixed(2)} sw`}
+            isHighlighted={snapshot.isCalibrated && snapshot.lateralLabel !== LATERAL.CENTER}
+            detail={`Offset ${snapshot.lateralOffset.toFixed(2)} sw`}
           />
-          <Tile
-            label="Jog In Place"
+          <StatTile
+            label="Jog in place"
             value={snapshot.isJogging ? 'JOGGING' : 'NO'}
-            isActive={snapshot.isJogging}
+            isHighlighted={snapshot.isJogging}
             detail={`${Math.round(snapshot.cadenceSpm)} spm · ${snapshot.stepCount} steps · Δ ${snapshot.kneeDelta.toFixed(2)}`}
           />
-          <Tile
-            label="FPS"
+          <StatTile
+            label="Frame rate"
             value={snapshot.fps === null ? '--' : snapshot.fps.toFixed(0)}
             detail={
               snapshot.inferenceMs === null
-                ? 'inference -- ms'
-                : `inference ${snapshot.inferenceMs.toFixed(1)} ms`
+                ? 'Inference -- ms'
+                : `Inference ${snapshot.inferenceMs.toFixed(1)} ms`
             }
           />
-          <Tile
+          <StatTile
             label="Backend"
             value={snapshot.delegate ?? '--'}
-            isSmall
             detail={
               snapshot.poseModel
                 ? `${snapshot.poseModel} model · ${snapshot.cameraLabel ?? ''}`
                 : '--'
             }
           />
-        </section>
+        </StatGrid>
       </div>
     </details>
-  );
-}
-
-function Button({
-  children,
-  onClick,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="min-h-12 flex-[1_1_160px] cursor-pointer rounded-lg border-0 bg-accent px-4 py-3 font-semibold text-[#04121a] disabled:cursor-not-allowed disabled:bg-off disabled:text-[#aab4bd]"
-    >
-      {children}
-    </button>
-  );
-}
-
-function Tile({
-  label,
-  value,
-  detail,
-  isActive,
-  isSmall,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  isActive?: boolean;
-  isSmall?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5 rounded-lg bg-panel px-3 py-2.5">
-      <span className="text-[11px] tracking-[0.08em] uppercase text-muted">{label}</span>
-      <span
-        className={`font-bold tabular-nums leading-[1.1] ${isSmall ? 'text-lg' : 'text-[28px]'} ${
-          isActive ? 'text-ok' : ''
-        }`}
-      >
-        {value}
-      </span>
-      <span className="text-xs tabular-nums text-muted">{detail}</span>
-    </div>
   );
 }

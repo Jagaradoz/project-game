@@ -1,13 +1,30 @@
 'use client';
 
+/* TOR 3: หน้าโปรไฟล์ผู้เล่น -- accumulated stats and play history. */
+
 import Link from 'next/link';
+import {
+  Activity,
+  ArrowRight,
+  ChartColumn,
+  Lock,
+  LogOut,
+  Map,
+  Pencil,
+  Swords,
+  Timer,
+  Trophy,
+  UserPlus,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { Badge } from '@/components/ui/Badge';
 import { LinkButton, Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
 import { PageShell } from '@/components/ui/PageShell';
+import { StageStrip } from '@/components/ui/ProgressBar';
 import { StatGrid, StatTile } from '@/components/ui/StatTile';
 import { difficultyLabel } from '@/engine/core/stage';
 import { getErrorMessage, repository } from '@/lib/api';
@@ -45,31 +62,45 @@ export default function ProfilePage() {
   const isGuest = session === null;
 
   return (
-    <PageShell title="โปรไฟล์ผู้เล่น" tor="TOR 3: หน้าโปรไฟล์ผู้เล่น">
+    <PageShell
+      title="Profile"
+      subtitle="Your accumulated statistics, biome progress and recent runs."
+      width="wide"
+    >
       {error && <Notice tone="error">{error}</Notice>}
 
       {!profile ? (
-        <p className="m-0 text-sm text-muted">กำลังโหลด...</p>
+        <p className="m-0 text-sm text-muted">Loading your profile…</p>
       ) : (
         <>
           <Card>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-lg font-bold">{profile.user.displayName}</span>
-                <span className="text-xs text-muted">
-                  {profile.user.email || 'ยังไม่ได้สมัครสมาชิก'}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <span
+                  aria-hidden
+                  className="grid size-12 place-items-center rounded-full bg-primary-soft font-display text-xl font-bold text-primary"
+                >
+                  {profile.user.displayName.slice(0, 1).toUpperCase()}
                 </span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-display text-xl font-bold">{profile.user.displayName}</span>
+                  <span className="text-sm text-muted">
+                    {profile.user.email || 'Playing as a guest'}
+                  </span>
+                </div>
               </div>
 
               {isGuest ? (
-                <LinkButton href="/register" variant="primary">
-                  สมัครสมาชิก
+                <LinkButton href="/register" variant="primary" icon={<UserPlus size={18} />}>
+                  Create an account
                 </LinkButton>
               ) : (
-                <div className="flex gap-2">
-                  <LinkButton href="/profile/edit">แก้ไขข้อมูล</LinkButton>
-                  <Button variant="secondary" onClick={signOut}>
-                    ออกจากระบบ
+                <div className="flex flex-wrap gap-2">
+                  <LinkButton href="/profile/edit" icon={<Pencil size={18} />}>
+                    Edit profile
+                  </LinkButton>
+                  <Button variant="secondary" onClick={signOut} icon={<LogOut size={18} />}>
+                    Sign out
                   </Button>
                 </div>
               )}
@@ -78,70 +109,99 @@ export default function ProfilePage() {
 
           {isGuest && (
             <Notice tone="info">
-              คุณกำลังเล่นแบบไม่ได้เข้าสู่ระบบ สถิติจะถูกเก็บไว้ในเครื่องนี้เท่านั้น
-              หากสมัครสมาชิก สถิติที่มีอยู่จะถูกโอนไปยังบัญชีของคุณโดยอัตโนมัติ
+              You are playing without an account, so your statistics are kept on this device only. If
+              you create an account, everything you have already earned moves across automatically.
             </Notice>
           )}
 
-          <Card title="สถิติสะสม" note="TOR 3: สถิติสะสมและประวัติการเล่น">
+          {/* TOR 3: สถิติสะสมและประวัติการเล่น. */}
+          <Card title="Accumulated statistics" icon={<ChartColumn size={20} />}>
             <StatGrid>
-              <StatTile label="จำนวนรอบที่เล่น" value={formatNumber(profile.stats.totalRuns)} />
               <StatTile
-                label="คะแนนสูงสุด"
+                label="Runs played"
+                icon={<Map size={16} />}
+                value={formatNumber(profile.stats.totalRuns)}
+              />
+              <StatTile
+                label="Best score"
+                icon={<Trophy size={16} />}
                 value={formatNumber(profile.stats.bestScore)}
                 isHighlighted
               />
-              <StatTile label="เวลาเล่นรวม" value={formatDuration(profile.stats.totalDurationMs)} />
               <StatTile
-                label="การเคลื่อนไหวสะสม"
-                value={formatNumber(profile.stats.totalMovementCount)}
-                detail="ค่าที่ระบบตรวจวัด ไม่ใช่ค่าพลังงาน"
+                label="Total play time"
+                icon={<Timer size={16} />}
+                value={formatDuration(profile.stats.totalDurationMs)}
               />
               <StatTile
-                label="ศัตรูที่กำจัดรวม"
+                label="Total movements"
+                icon={<Activity size={16} />}
+                value={formatNumber(profile.stats.totalMovementCount)}
+                detail="Detected by the system, not an energy figure"
+              />
+              <StatTile
+                label="Enemies defeated"
+                icon={<Swords size={16} />}
                 value={formatNumber(profile.stats.totalEnemiesKilled)}
               />
             </StatGrid>
           </Card>
 
-          <Card title="ความคืบหน้าแต่ละพื้นที่" note="TOR 3: ระบบ Biome และ Stage">
-            <div className="flex flex-col gap-3">
-              {profile.biomes.map((biome) => (
-                <BiomeRow key={biome.biomeId} biome={biome} />
-              ))}
-            </div>
-            <Link href="/stages" className="text-sm font-semibold text-accent">
-              ไปหน้าเลือกด่าน →
-            </Link>
-          </Card>
-
-          <Card title="ประวัติการเล่นล่าสุด">
-            {profile.recentRuns.length === 0 ? (
-              <EmptyState title="ยังไม่มีประวัติการเล่น">
-                เล่นสักรอบแล้วผลจะมาแสดงที่นี่
-              </EmptyState>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                {profile.recentRuns.map((run) => (
-                  <li
-                    key={run.id}
-                    className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg bg-surface px-3 py-2.5 text-sm"
-                  >
-                    <span className="font-semibold">
-                      {biomeName(run.biomeId)} · ด่าน {run.stageNumber}
-                    </span>
-                    <span className="tabular-nums text-muted">
-                      {formatNumber(run.score)} คะแนน · {formatDuration(run.durationMs)}
-                    </span>
-                    <span className="basis-full text-xs text-muted">
-                      {formatDate(run.completedAt)} · {difficultyLabel(run.difficulty)} ·{' '}
-                      {run.isCleared ? 'ผ่านด่าน' : 'ไม่ผ่าน'}
-                    </span>
-                  </li>
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            {/* TOR 3: ระบบ Biome และ Stage. */}
+            <Card title="Biome progress" icon={<Map size={20} />}>
+              <div className="flex flex-col gap-4">
+                {profile.biomes.map((biome) => (
+                  <BiomeRow key={biome.biomeId} biome={biome} />
                 ))}
-              </ul>
-            )}
-          </Card>
+              </div>
+              <Link
+                href="/stages"
+                className="flex items-center gap-1.5 text-sm font-semibold text-primary no-underline"
+              >
+                Go to stage select
+                <ArrowRight aria-hidden size={16} />
+              </Link>
+            </Card>
+
+            <Card title="Recent runs" icon={<Timer size={20} />}>
+              {profile.recentRuns.length === 0 ? (
+                <EmptyState
+                  title="No runs yet"
+                  icon={<Map size={22} />}
+                  action={
+                    <LinkButton href="/stages" variant="primary" icon={<Map size={18} />}>
+                      Choose a stage
+                    </LinkButton>
+                  }
+                >
+                  Play a run and it will show up here.
+                </EmptyState>
+              ) : (
+                <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                  {profile.recentRuns.map((run) => (
+                    <li
+                      key={run.id}
+                      className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-line bg-elevated px-3.5 py-3 text-sm"
+                    >
+                      <span className="font-semibold">
+                        {biomeName(run.biomeId)} &middot; Stage {run.stageNumber}
+                      </span>
+                      <span className="tabular-nums text-muted">
+                        {formatNumber(run.score)} pts &middot; {formatDuration(run.durationMs)}
+                      </span>
+                      <span className="flex basis-full items-center gap-2 text-xs text-muted">
+                        {formatDate(run.completedAt)} &middot; {difficultyLabel(run.difficulty)}
+                        <Badge tone={run.isCleared ? 'ok' : 'neutral'}>
+                          {run.isCleared ? 'Cleared' : 'Not cleared'}
+                        </Badge>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
         </>
       )}
     </PageShell>
@@ -152,30 +212,22 @@ function BiomeRow({ biome }: { biome: BiomeProgress }) {
   const cleared = biome.stages.filter((stage) => stage.isCleared).length;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className={biome.isUnlocked ? 'font-semibold' : 'font-semibold text-muted'}>
-          {biome.isUnlocked ? biome.name : `🔒 ${biome.name}`}
+        <span className={`flex items-center gap-1.5 font-semibold ${biome.isUnlocked ? '' : 'text-muted'}`}>
+          {!biome.isUnlocked && <Lock aria-hidden size={14} />}
+          {biome.name}
+          {!biome.isUnlocked && <span className="sr-only"> — locked</span>}
         </span>
         <span className="tabular-nums text-muted">
-          {cleared}/{biome.stages.length} ด่าน
+          {cleared}/{biome.stages.length} stages
         </span>
       </div>
 
-      <div
-        className="flex gap-1"
-        role="img"
-        aria-label={`${biome.name}: ผ่านแล้ว ${cleared} จาก ${biome.stages.length} ด่าน`}
-      >
-        {biome.stages.map((stage) => (
-          <span
-            key={stage.stageNumber}
-            className={`h-1.5 flex-1 rounded-full ${
-              stage.isCleared ? 'bg-ok' : stage.isUnlocked ? 'bg-accent opacity-40' : 'bg-off opacity-40'
-            }`}
-          />
-        ))}
-      </div>
+      <StageStrip
+        stages={biome.stages}
+        label={`${biome.name}: ${cleared} of ${biome.stages.length} stages cleared`}
+      />
     </div>
   );
 }

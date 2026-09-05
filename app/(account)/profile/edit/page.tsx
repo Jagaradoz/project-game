@@ -1,6 +1,9 @@
 'use client';
 
+/* TOR 3: ระบบสมาชิกและเข้าสู่ระบบ -- editing the account's display name. */
+
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, LogIn, Mail, Save, User, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 import { LocalAccountNotice } from '@/components/account/LocalAccountNotice';
@@ -12,6 +15,8 @@ import { PageShell } from '@/components/ui/PageShell';
 import { useSession } from '@/hooks/useSession';
 import { getErrorMessage, repository } from '@/lib/api';
 import { fieldErrors, profileEditSchema } from '@/lib/validation/account';
+
+const SUBTITLE = 'Change the name other players see on the leaderboard.';
 
 export default function ProfileEditPage() {
   const router = useRouter();
@@ -59,24 +64,29 @@ export default function ProfileEditPage() {
 
   if (isLoading) {
     return (
-      <PageShell title="แก้ไขข้อมูลส่วนตัว" tor="TOR 3: ระบบสมาชิกและเข้าสู่ระบบ">
-        <p className="m-0 text-sm text-muted">กำลังโหลด...</p>
+      <PageShell title="Edit Profile" subtitle={SUBTITLE} width="narrow">
+        <p className="m-0 text-sm text-muted">Loading…</p>
       </PageShell>
     );
   }
 
   if (!session) {
     return (
-      <PageShell title="แก้ไขข้อมูลส่วนตัว" tor="TOR 3: ระบบสมาชิกและเข้าสู่ระบบ">
-        <Notice tone="info" title="ต้องเข้าสู่ระบบก่อน">
-          หน้านี้ใช้แก้ไขข้อมูลบัญชีของคุณ กรุณาเข้าสู่ระบบหรือสมัครสมาชิกก่อน
+      <PageShell title="Edit Profile" subtitle={SUBTITLE} width="narrow">
+        <Notice tone="info" title="Sign in first">
+          This page edits your account details. Please sign in or create an account to continue.
         </Notice>
-        <div className="flex flex-wrap gap-2">
-          <LinkButton href="/login" variant="primary" className="flex-[1_1_160px]">
-            เข้าสู่ระบบ
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <LinkButton
+            href="/login"
+            variant="primary"
+            icon={<LogIn size={18} />}
+            className="flex-1"
+          >
+            Sign in
           </LinkButton>
-          <LinkButton href="/register" className="flex-[1_1_160px]">
-            สมัครสมาชิก
+          <LinkButton href="/register" icon={<UserPlus size={18} />} className="flex-1">
+            Create an account
           </LinkButton>
         </div>
       </PageShell>
@@ -84,49 +94,59 @@ export default function ProfileEditPage() {
   }
 
   return (
-    <PageShell title="แก้ไขข้อมูลส่วนตัว" tor="TOR 3: ระบบสมาชิกและเข้าสู่ระบบ">
-      <LocalAccountNotice />
+    <PageShell title="Edit Profile" subtitle={SUBTITLE} width="narrow">
+      <>
+        <LocalAccountNotice />
 
-      <Card>
-        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-          <Field
-            label="อีเมล"
-            type="email"
-            value={session.user.email}
-            readOnly
-            disabled
-            // TOR 3 is explicit: ไม่สามารถแก้ไขอีเมลที่ใช้สมัครสมาชิกได้. The
-            // field is shown rather than hidden so the player can see which
-            // account they are editing.
-            hint="อีเมลถูกกำหนดตอนสมัครสมาชิกและไม่สามารถแก้ไขได้"
-          />
+        <Card>
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+            <Field
+              label="Email"
+              type="email"
+              icon={<Mail size={18} />}
+              value={session.user.email}
+              readOnly
+              disabled
+              // TOR 3 is explicit: the email used to register cannot be changed.
+              // The field is shown rather than hidden so the player can see
+              // which account they are editing.
+              hint="Your email is set when you register and cannot be changed."
+            />
 
-          <Field
-            label="ชื่อในเกม"
-            autoComplete="nickname"
-            value={displayName}
-            onChange={(event) => setDraft(event.target.value)}
-            error={errors.displayName}
-            hint="ชื่อนี้จะแสดงในตารางคะแนนแทนอีเมลของคุณ"
-          />
+            <Field
+              label="Display name"
+              autoComplete="nickname"
+              icon={<User size={18} />}
+              value={displayName}
+              onChange={(event) => setDraft(event.target.value)}
+              error={errors.displayName}
+              hint="This is what appears on the leaderboard instead of your email."
+            />
 
-          {formError && <Notice tone="error">{formError}</Notice>}
-          {isSaved && <Notice tone="ok">บันทึกข้อมูลเรียบร้อยแล้ว</Notice>}
+            {formError && <Notice tone="error">{formError}</Notice>}
+            {isSaved && <Notice tone="ok">Your changes have been saved.</Notice>}
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={isSubmitting} className="flex-[1_1_160px]">
-              {isSubmitting ? 'กำลังบันทึก...' : 'บันทึก'}
-            </Button>
-            <Button
-              variant="secondary"
-              className="flex-[1_1_160px]"
-              onClick={() => router.push('/profile')}
-            >
-              กลับหน้าโปรไฟล์
-            </Button>
-          </div>
-        </form>
-      </Card>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="submit"
+                isLoading={isSubmitting}
+                icon={<Save size={18} />}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Saving…' : 'Save changes'}
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<ArrowLeft size={18} />}
+                className="flex-1"
+                onClick={() => router.push('/profile')}
+              >
+                Back to profile
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </>
     </PageShell>
   );
 }

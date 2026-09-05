@@ -1,14 +1,24 @@
 interface EmptyStateProps {
   title: string;
+  /** Decorative glyph above the title. */
+  icon?: React.ReactNode;
+  /** What to do about it -- usually a LinkButton. */
+  action?: React.ReactNode;
   children?: React.ReactNode;
 }
 
 /** Says why a list is empty and what to do about it, rather than showing nothing. */
-export function EmptyState({ title, children }: EmptyStateProps) {
+export function EmptyState({ title, icon, action, children }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-line px-4 py-8 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line px-4 py-10 text-center">
+      {icon && (
+        <span aria-hidden className="grid size-11 place-items-center rounded-full bg-elevated text-muted">
+          {icon}
+        </span>
+      )}
       <p className="m-0 font-semibold text-text">{title}</p>
-      {children && <div className="text-sm text-muted">{children}</div>}
+      {children && <div className="max-w-sm text-sm text-muted">{children}</div>}
+      {action && <div className="pt-1">{action}</div>}
     </div>
   );
 }

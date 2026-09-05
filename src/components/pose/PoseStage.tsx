@@ -1,3 +1,4 @@
+import { VideoOff } from 'lucide-react';
 import type { RefObject } from 'react';
 
 interface PoseStageProps {
@@ -21,7 +22,7 @@ export function PoseStage({
   videoRef,
   overlayRef,
   isCameraRunning,
-  idleLabel = 'กล้องยังไม่เปิด',
+  idleLabel = 'The camera is not on',
 }: PoseStageProps) {
   return (
     <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl border border-line bg-black">
@@ -35,8 +36,9 @@ export function PoseStage({
       <canvas ref={overlayRef} className="mirrored absolute inset-0 h-full w-full" />
 
       {!isCameraRunning && (
-        <div className="absolute inset-0 grid place-items-center p-4 text-center text-sm text-muted">
-          {idleLabel}
+        <div className="absolute inset-0 grid place-content-center justify-items-center gap-3 p-4 text-center">
+          <VideoOff aria-hidden size={28} className="text-subtle" />
+          <p className="m-0 max-w-xs text-sm text-muted">{idleLabel}</p>
         </div>
       )}
     </div>

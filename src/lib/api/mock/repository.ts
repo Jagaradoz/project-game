@@ -48,7 +48,7 @@ import type {
 export const GUEST_USER: User = {
   id: 'guest-local',
   email: '',
-  displayName: 'ผู้เล่นทั่วไป',
+  displayName: 'Guest Runner',
   createdAt: '1970-01-01T00:00:00.000Z',
 };
 
@@ -164,14 +164,14 @@ export function createMockRepository(): GameRepository {
     async register(input: RegisterInput): Promise<AuthSession> {
       const parsed = registerSchema.safeParse(input);
       if (!parsed.success) {
-        throw new ApiError(parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง', 400);
+        throw new ApiError(parsed.error.issues[0]?.message ?? 'Those details are not valid', 400);
       }
 
       const db = readDb();
       const { email, password, displayName } = parsed.data;
 
       if (db.accounts.some((account) => account.email === email)) {
-        throw new ApiError('อีเมลนี้ถูกใช้สมัครสมาชิกแล้ว', 409);
+        throw new ApiError('That email address is already registered', 409);
       }
 
       const passwordSalt = createSalt();
@@ -201,7 +201,7 @@ export function createMockRepository(): GameRepository {
     async login(input: LoginInput): Promise<AuthSession> {
       const parsed = loginSchema.safeParse(input);
       if (!parsed.success) {
-        throw new ApiError(parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง', 400);
+        throw new ApiError(parsed.error.issues[0]?.message ?? 'Those details are not valid', 400);
       }
 
       const db = readDb();
@@ -209,7 +209,7 @@ export function createMockRepository(): GameRepository {
 
       // One message for both cases, so the form cannot be used to discover
       // which emails are registered.
-      const rejection = new ApiError('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 401);
+      const rejection = new ApiError('Incorrect email address or password', 401);
       if (!account) throw rejection;
 
       const digest = await derivePasswordDigest(parsed.data.password, account.passwordSalt);
@@ -227,12 +227,12 @@ export function createMockRepository(): GameRepository {
     async updateDisplayName(displayName: string): Promise<User> {
       const parsed = displayNameSchema.safeParse(displayName);
       if (!parsed.success) {
-        throw new ApiError(parsed.error.issues[0]?.message ?? 'ชื่อไม่ถูกต้อง', 400);
+        throw new ApiError(parsed.error.issues[0]?.message ?? 'That name is not valid', 400);
       }
 
       const db = readDb();
       const account = findAccount(db, db.sessionUserId);
-      if (!account) throw new ApiError('กรุณาเข้าสู่ระบบก่อนแก้ไขข้อมูล', 401);
+      if (!account) throw new ApiError('Sign in before editing your profile', 401);
 
       const updated: MockAccount = { ...account, displayName: parsed.data };
       writeDb({
@@ -265,10 +265,10 @@ export function createMockRepository(): GameRepository {
 
     async submitRun(input: SubmitRunInput): Promise<RunResult> {
       if (!isKnownBiome(input.biomeId)) {
-        throw new ApiError(`ไม่รู้จัก Biome "${input.biomeId}"`, 400);
+        throw new ApiError(`Unknown biome "${input.biomeId}"`, 400);
       }
       if (!isValidStageNumber(input.stageNumber)) {
-        throw new ApiError(`Stage ต้องอยู่ระหว่าง 1 ถึง ${STAGES_PER_BIOME}`, 400);
+        throw new ApiError(`Stage must be between 1 and ${STAGES_PER_BIOME}`, 400);
       }
       if (!input.clientRunId) {
         throw new ApiError('clientRunId is required for idempotent submission.', 400);
@@ -277,7 +277,7 @@ export function createMockRepository(): GameRepository {
       const db = readDb();
       const user = currentUser(db);
 
-      // TOR 3: ป้องกันการบันทึกคะแนนซ้ำจากผลการเล่นครั้งเดียวกัน. /result is
+      // TOR 3: one finished run must never be recorded twice. /result is
       // reachable by reload, so this path is hit in normal use, not just on retry.
       const existing = db.runs.find((run) => run.clientRunId === input.clientRunId);
       if (existing) return existing;
@@ -310,7 +310,7 @@ export function createMockRepository(): GameRepository {
       const nameFor = (userId: string): string =>
         userId === GUEST_USER.id
           ? GUEST_USER.displayName
-          : (findAccount(db, userId)?.displayName ?? 'ผู้เล่น');
+          : (findAccount(db, userId)?.displayName ?? 'Player');
 
       return [...bestByUser.values()]
         .sort((a, b) => b.score - a.score || a.completedAt.localeCompare(b.completedAt))

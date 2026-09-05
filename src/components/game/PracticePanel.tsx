@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * The control group, per TOR 3 (การประเมินแรงจูงใจและการใช้งาน):
- * กลุ่มควบคุมทำกิจกรรมการเคลื่อนไหวรูปแบบเดียวกันผ่านระบบตรวจจับท่าทาง
- * แต่ไม่มีตัวละคร ศัตรู คะแนน หรือองค์ประกอบเกม.
+ * The control group, per TOR 3 (การประเมินแรงจูงใจและการใช้งาน): the control
+ * condition performs the same movement activity through the same pose detection
+ * with no character, opponent, score or game element.
  *
  * The absence of game elements is the experiment's independent variable, so it
  * is a correctness requirement here, not a styling choice: no character, no
@@ -15,6 +15,7 @@
  * comparison in Proposal 9.3.
  */
 
+import { Activity, Crosshair, Footprints, Gauge, Timer, Video, VideoOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { PoseStage } from '@/components/pose/PoseStage';
@@ -70,65 +71,80 @@ export default function PracticePanel() {
     sessionMs > 0 ? Math.min(100, Math.round((snapshot.movementMs / sessionMs) * 100)) : 0;
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-4">
+    <div ref={containerRef} className="flex flex-col gap-6">
       <canvas ref={gameCanvasRef} hidden aria-hidden />
 
-      <PoseStage
-        videoRef={videoRef}
-        overlayRef={overlayRef}
-        isCameraRunning={snapshot.isCameraRunning}
-        idleLabel="กดปุ่ม “เปิดกล้อง” เพื่อเริ่มบันทึกการเคลื่อนไหว"
-      />
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:items-start">
+        <div className="flex flex-col gap-4">
+          <PoseStage
+            videoRef={videoRef}
+            overlayRef={overlayRef}
+            isCameraRunning={snapshot.isCameraRunning}
+            idleLabel="Press “Start camera” to begin recording your movement"
+          />
 
-      {snapshot.error && <Notice tone="error">{snapshot.error}</Notice>}
+          {snapshot.error && <Notice tone="error">{snapshot.error}</Notice>}
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          className="flex-[1_1_160px]"
-          onClick={snapshot.isCameraRunning ? actions.stopCamera : actions.startCamera}
-        >
-          {snapshot.isCameraRunning ? 'หยุดและปิดกล้อง' : 'เปิดกล้อง'}
-        </Button>
-        <Button
-          variant="secondary"
-          className="flex-[1_1_160px]"
-          onClick={actions.recalibrate}
-          disabled={!snapshot.isCameraRunning}
-        >
-          ตั้งจุดกึ่งกลางใหม่
-        </Button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              className="flex-1"
+              icon={snapshot.isCameraRunning ? <VideoOff size={18} /> : <Video size={18} />}
+              onClick={snapshot.isCameraRunning ? actions.stopCamera : actions.startCamera}
+            >
+              {snapshot.isCameraRunning ? 'Stop and close camera' : 'Start camera'}
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              icon={<Crosshair size={18} />}
+              onClick={actions.recalibrate}
+              disabled={!snapshot.isCameraRunning}
+            >
+              Reset centre point
+            </Button>
+          </div>
+
+          <p role="status" className="m-0 text-sm text-muted">
+            {snapshot.status}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <Card title="Movement detected" icon={<Activity size={20} />}>
+            <StatGrid>
+              <StatTile
+                label="Total movements"
+                icon={<Activity size={16} />}
+                value={formatNumber(snapshot.movementCount)}
+                detail="Jog steps plus sideways steps"
+              />
+              <StatTile
+                label="Jog steps"
+                icon={<Footprints size={16} />}
+                value={formatNumber(snapshot.stepCount)}
+              />
+              <StatTile
+                label="Time moving"
+                icon={<Timer size={16} />}
+                value={formatDuration(snapshot.movementMs)}
+                detail={`${movingShare}% of the session`}
+              />
+              <StatTile label="Total time" value={formatDuration(sessionMs)} />
+              <StatTile
+                label="Current cadence"
+                icon={<Gauge size={16} />}
+                value={snapshot.isJogging ? `${Math.round(snapshot.cadenceSpm)}` : '0'}
+                detail="Steps per minute"
+              />
+            </StatGrid>
+          </Card>
+
+          <Notice tone="info">
+            There is no character, opponent, score or stage in this mode — it only counts movement.
+            Move at whatever pace suits you: step from side to side, and jog in place in bursts.
+          </Notice>
+        </div>
       </div>
-
-      <p role="status" className="m-0 text-sm text-muted">
-        {snapshot.status}
-      </p>
-
-      <Card title="จำนวนการเคลื่อนไหวที่ตรวจจับได้">
-        <StatGrid>
-          <StatTile
-            label="การเคลื่อนไหวทั้งหมด"
-            value={formatNumber(snapshot.movementCount)}
-            detail="ก้าวขณะวิ่งอยู่กับที่ + การก้าวซ้าย-ขวา"
-          />
-          <StatTile label="ก้าววิ่งอยู่กับที่" value={formatNumber(snapshot.stepCount)} />
-          <StatTile
-            label="เวลาที่เคลื่อนไหว"
-            value={formatDuration(snapshot.movementMs)}
-            detail={`${movingShare}% ของเวลาทั้งหมด`}
-          />
-          <StatTile label="เวลาทั้งหมด" value={formatDuration(sessionMs)} />
-          <StatTile
-            label="จังหวะปัจจุบัน"
-            value={snapshot.isJogging ? `${Math.round(snapshot.cadenceSpm)}` : '0'}
-            detail="ก้าวต่อนาที"
-          />
-        </StatGrid>
-      </Card>
-
-      <Notice tone="info">
-        โหมดนี้ไม่มีตัวละคร ศัตรู คะแนน หรือด่าน เป็นการนับจำนวนการเคลื่อนไหวเพียงอย่างเดียว
-        เคลื่อนไหวตามที่สะดวก โดยก้าวซ้าย-ขวาสลับกัน และวิ่งอยู่กับที่เป็นช่วง ๆ
-      </Notice>
     </div>
   );
 }

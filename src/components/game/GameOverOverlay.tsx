@@ -1,3 +1,6 @@
+import { ChartColumn, RotateCcw, Trophy } from 'lucide-react';
+
+import { Button } from '@/components/ui/Button';
 import type { HudSnapshot } from '@/engine/runtime';
 
 interface GameOverOverlayProps {
@@ -22,42 +25,49 @@ export function GameOverOverlay({
   if (!snapshot.isOver) return null;
 
   return (
-    <div className="absolute inset-0 z-[3] grid content-center justify-items-center gap-2.5 bg-[rgba(16,20,24,0.86)] p-6 text-center">
-      <h2 className="m-0 text-[26px] font-bold">
-        {snapshot.isCleared ? 'ผ่านด่าน!' : 'จบรอบแล้ว'}
+    <div className="absolute inset-0 z-[3] grid content-center justify-items-center gap-3 bg-[rgba(15,20,26,0.9)] p-6 text-center backdrop-blur-sm">
+      <span
+        aria-hidden
+        className={`grid size-14 place-items-center rounded-full ${
+          snapshot.isCleared ? 'bg-ok-soft text-ok' : 'bg-elevated text-muted'
+        }`}
+      >
+        {snapshot.isCleared ? <Trophy size={26} /> : <RotateCcw size={26} />}
+      </span>
+
+      <h2 className="m-0 text-3xl font-bold">
+        {snapshot.isCleared ? 'Stage cleared' : 'Run complete'}
       </h2>
 
       <p className="m-0 tabular-nums text-muted">
-        {snapshot.score} คะแนน &middot; {Math.round(snapshot.distance)} ม.
+        {snapshot.score} points &middot; {Math.round(snapshot.distance)} m
         {snapshot.goalKills !== null && (
-          <> &middot; กำจัด {snapshot.killCount}/{snapshot.goalKills}</>
+          <> &middot; {snapshot.killCount}/{snapshot.goalKills} defeated</>
         )}
       </p>
 
       {!snapshot.isCleared && snapshot.goalKills !== null && (
-        <p className="m-0 max-w-[280px] text-sm text-muted">
-          ยังไม่ถึงเป้าหมายของด่านนี้ ลองใหม่ได้ทันที หรือปรับระดับความยากให้เหมาะกับคุณ
+        <p className="m-0 max-w-xs text-sm leading-relaxed text-muted">
+          You did not reach this stage&rsquo;s target. Go again straight away, or pick a difficulty
+          that suits you better.
         </p>
       )}
 
-      <div className="flex flex-wrap justify-center gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onRestart}
-          className="min-h-12 min-w-[150px] cursor-pointer rounded-lg border-0 bg-accent px-4 py-3 font-semibold text-[#04121a]"
-        >
-          เล่นอีกครั้ง
-        </button>
+      <div className="flex flex-wrap justify-center gap-3 pt-2">
+        <Button onClick={onRestart} icon={<RotateCcw size={18} />} className="min-w-[160px]">
+          Play again
+        </Button>
 
         {onSeeResult && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={onSeeResult}
-            disabled={isSubmitting}
-            className="min-h-12 min-w-[150px] cursor-pointer rounded-lg border border-line bg-transparent px-4 py-3 font-semibold text-text disabled:cursor-not-allowed disabled:text-muted"
+            isLoading={isSubmitting}
+            icon={<ChartColumn size={18} />}
+            className="min-w-[160px]"
           >
-            {isSubmitting ? 'กำลังบันทึก...' : 'ดูสรุปผล'}
-          </button>
+            {isSubmitting ? 'Saving…' : 'See summary'}
+          </Button>
         )}
       </div>
     </div>

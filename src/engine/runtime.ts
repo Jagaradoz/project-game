@@ -583,7 +583,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       // Pose mode has no scene and no game: /calibrate and /practice want the
       // detectors alone. startCamera() drives the pose loop from there.
       if (mode === 'pose') {
-        setStatus('พร้อมเปิดกล้อง');
+        setStatus('Ready to start the camera.');
         return;
       }
 

@@ -1,5 +1,19 @@
 'use client';
 
+/* TOR 3: หน้าสรุปผลหลังเล่น -- the post-run summary. */
+
+import {
+  Activity,
+  ChartColumn,
+  Footprints,
+  House,
+  Map,
+  Route,
+  RotateCcw,
+  Swords,
+  Timer,
+  Trophy,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { LinkButton } from '@/components/ui/Button';
@@ -11,7 +25,7 @@ import { StatGrid, StatTile } from '@/components/ui/StatTile';
 import { difficultyLabel } from '@/engine/core/stage';
 import { getErrorMessage, repository } from '@/lib/api';
 import { biomeName } from '@/lib/api/catalog';
-import { formatDelta, formatDuration, formatNumber } from '@/lib/format';
+import { formatDelta, formatDuration, formatMetres, formatNumber } from '@/lib/format';
 import { useRunStore } from '@/lib/store/run';
 import type { ProfileSummary, RunResult } from '@/types/api';
 
@@ -45,47 +59,86 @@ export default function ResultPage() {
   }, [lastRun]);
 
   return (
-    <PageShell title="สรุปผลหลังเล่น" tor="TOR 3: หน้าสรุปผลหลังเล่น">
+    <PageShell
+      title="Run Summary"
+      subtitle="How this run went, and how it compares with your own history."
+      width="wide"
+    >
       {error && <Notice tone="error">{error}</Notice>}
 
       {!run ? (
-        <EmptyState title="ยังไม่มีผลการเล่น">
-          เมื่อเล่นจบสักรอบ ผลจะมาแสดงที่นี่
+        <EmptyState
+          title="No runs yet"
+          icon={<ChartColumn size={22} />}
+          action={
+            <LinkButton href="/stages" variant="primary" icon={<Map size={18} />}>
+              Choose a stage
+            </LinkButton>
+          }
+        >
+          Finish a run and your results will show up here.
         </EmptyState>
       ) : (
         <>
-          <Notice tone={run.isCleared ? 'ok' : 'info'} title={run.isCleared ? 'ผ่านด่านแล้ว' : 'จบรอบแล้ว'}>
-            {biomeName(run.biomeId)} · ด่าน {run.stageNumber} · ระดับ{difficultyLabel(run.difficulty)}
+          <Notice
+            tone={run.isCleared ? 'ok' : 'info'}
+            title={run.isCleared ? 'Stage cleared' : 'Run complete'}
+          >
+            {biomeName(run.biomeId)} &middot; Stage {run.stageNumber} &middot;{' '}
+            {difficultyLabel(run.difficulty)}
             {run.isCleared
-              ? ' — ด่านถัดไปถูกปลดล็อกแล้ว'
-              : ' — ยังไม่ถึงเป้าหมายของด่านนี้ ลองอีกครั้งได้เลย'}
+              ? ' — the next stage is now unlocked.'
+              : ' — you did not reach the target for this stage. Try again whenever you like.'}
           </Notice>
 
-          <Card title="ผลรอบนี้">
+          <Card title="This run" icon={<Trophy size={20} />}>
             <StatGrid>
-              <StatTile label="คะแนน" value={formatNumber(run.score)} isHighlighted />
-              <StatTile label="ศัตรูที่กำจัด" value={formatNumber(run.enemiesKilled)} />
-              <StatTile label="ระยะเวลาเล่น" value={formatDuration(run.durationMs)} />
               <StatTile
-                label="การเคลื่อนไหว"
-                value={formatNumber(run.movementCount)}
-                detail="ค่าที่ระบบตรวจวัด ไม่ใช่ค่าพลังงาน"
+                label="Score"
+                icon={<Trophy size={16} />}
+                value={formatNumber(run.score)}
+                isHighlighted
               />
-              <StatTile label="ระยะทาง" value={`${formatNumber(run.distanceM)} ม.`} />
+              <StatTile
+                label="Enemies defeated"
+                icon={<Swords size={16} />}
+                value={formatNumber(run.enemiesKilled)}
+              />
+              <StatTile
+                label="Session length"
+                icon={<Timer size={16} />}
+                value={formatDuration(run.durationMs)}
+              />
+              <StatTile
+                label="Movements"
+                icon={<Footprints size={16} />}
+                value={formatNumber(run.movementCount)}
+                detail="Detected by the system, not an energy figure"
+              />
+              <StatTile
+                label="Distance"
+                icon={<Route size={16} />}
+                value={formatMetres(run.distanceM)}
+              />
             </StatGrid>
           </Card>
 
           {profile && <ComparisonCard run={run} profile={profile} />}
 
-          <div className="flex flex-wrap gap-2">
-            <LinkButton href="/play" variant="primary" className="flex-[1_1_160px]">
-              เล่นอีกครั้ง
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <LinkButton
+              href="/play"
+              variant="primary"
+              icon={<RotateCcw size={18} />}
+              className="flex-1"
+            >
+              Play again
             </LinkButton>
-            <LinkButton href="/stages" className="flex-[1_1_160px]">
-              เลือกด่าน
+            <LinkButton href="/stages" icon={<Map size={18} />} className="flex-1">
+              Choose a stage
             </LinkButton>
-            <LinkButton href="/" className="flex-[1_1_160px]">
-              หน้าแรก
+            <LinkButton href="/" icon={<House size={18} />} className="flex-1">
+              Home
             </LinkButton>
           </div>
         </>
@@ -95,7 +148,7 @@ export default function ResultPage() {
 }
 
 /**
- * TOR 3: แสดงผลเปรียบเทียบกับประวัติการเล่นของผู้เล่นเอง.
+ * TOR 3: comparison against the player's own history.
  *
  * Deliberately self-comparison, not a comparison against other players --
  * Alsawaier (2018) on self-competition, cited in Proposal 6, and it keeps the
@@ -110,32 +163,37 @@ function ComparisonCard({ run, profile }: { run: RunResult; profile: ProfileSumm
   const isPersonalBest = run.score >= profile.stats.bestScore && profile.stats.totalRuns > 0;
 
   return (
-    <Card title="เทียบกับสถิติของตัวเอง">
+    <Card title="Compared with your own record" icon={<ChartColumn size={20} />}>
       {isPersonalBest && (
-        <p className="m-0 font-semibold text-ok">🎉 คะแนนสูงสุดใหม่ของคุณ!</p>
+        <p className="m-0 flex items-center gap-2 font-semibold text-ok-text">
+          <Trophy aria-hidden size={18} />
+          New personal best
+        </p>
       )}
 
       <StatGrid>
-        <StatTile label="คะแนนสูงสุดของคุณ" value={formatNumber(profile.stats.bestScore)} />
-        <StatTile label="จำนวนรอบที่เล่นทั้งหมด" value={formatNumber(profile.stats.totalRuns)} />
+        <StatTile label="Your best score" value={formatNumber(profile.stats.bestScore)} />
+        <StatTile label="Runs played" value={formatNumber(profile.stats.totalRuns)} />
         {previous ? (
           <>
             <StatTile
-              label="เทียบคะแนนกับรอบก่อน"
+              label="Score vs last time"
+              icon={<Trophy size={16} />}
               value={formatDelta(run.score - previous.score)}
-              detail={`รอบก่อน ${formatNumber(previous.score)} คะแนน`}
+              detail={`Last time: ${formatNumber(previous.score)} points`}
             />
             <StatTile
-              label="เทียบการเคลื่อนไหว"
+              label="Movement vs last time"
+              icon={<Activity size={16} />}
               value={formatDelta(run.movementCount - previous.movementCount)}
-              detail={`รอบก่อน ${formatNumber(previous.movementCount)}`}
+              detail={`Last time: ${formatNumber(previous.movementCount)}`}
             />
           </>
         ) : (
           <StatTile
-            label="เทียบกับรอบก่อน"
+            label="Compared with last time"
             value="--"
-            detail="นี่เป็นครั้งแรกที่คุณเล่นด่านนี้"
+            detail="This is your first run on this stage"
           />
         )}
       </StatGrid>

@@ -1,7 +1,10 @@
 'use client';
 
+/* TOR 3: ระบบสมาชิกและเข้าสู่ระบบ. */
+
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { LogIn, Lock, Mail } from 'lucide-react';
 import { useState } from 'react';
 
 import { LocalAccountNotice } from '@/components/account/LocalAccountNotice';
@@ -47,24 +50,30 @@ export default function LoginPage() {
   }
 
   return (
-    <PageShell title="เข้าสู่ระบบ" tor="TOR 3: ระบบสมาชิกและเข้าสู่ระบบ">
+    <PageShell
+      title="Sign In"
+      subtitle="Sign in to keep your statistics across sessions."
+      width="narrow"
+    >
       <LocalAccountNotice />
 
       <Card>
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
           <Field
-            label="อีเมล"
+            label="Email"
             type="email"
             autoComplete="email"
+            icon={<Mail size={18} />}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             error={errors.email}
           />
 
           <Field
-            label="รหัสผ่าน"
+            label="Password"
             type="password"
             autoComplete="current-password"
+            icon={<Lock size={18} />}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             error={errors.password}
@@ -72,21 +81,21 @@ export default function LoginPage() {
 
           {formError && <Notice tone="error">{formError}</Notice>}
 
-          <Button type="submit" disabled={isSubmitting} isFullWidth>
-            {isSubmitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+          <Button type="submit" isLoading={isSubmitting} icon={<LogIn size={18} />} isFullWidth>
+            {isSubmitting ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
       </Card>
 
       <p className="m-0 text-center text-sm text-muted">
-        ยังไม่มีบัญชี?{' '}
-        <Link href="/register" className="font-semibold text-accent">
-          สมัครสมาชิก
+        Don&rsquo;t have an account?{' '}
+        <Link href="/register" className="font-semibold text-primary">
+          Create one
         </Link>
       </p>
 
-      <p className="m-0 text-center text-xs text-muted">
-        คุณสามารถเล่นเกมได้โดยไม่ต้องเข้าสู่ระบบ สถิติจะถูกเก็บไว้ในเครื่องนี้
+      <p className="m-0 text-center text-xs text-subtle">
+        You can play without signing in — your statistics are kept on this device.
       </p>
     </PageShell>
   );

@@ -1,65 +1,82 @@
-import Link from 'next/link';
+import { SiteFooter } from '@/components/layout/SiteFooter';
+import { SiteHeader } from '@/components/layout/SiteHeader';
+import type { NavVariant } from '@/components/layout/nav';
 
-import { VersionTag } from '@/components/ui/VersionTag';
-
-interface NavLink {
-  href: string;
-  label: string;
-}
-
-/** Every route in the TOR screen list, in the order a player meets them. */
-const GAME_NAV: NavLink[] = [
-  { href: '/', label: 'หน้าแรก' },
-  { href: '/how-to-play', label: 'วิธีเล่น' },
-  { href: '/calibrate', label: 'ปรับเทียบกล้อง' },
-  { href: '/stages', label: 'เลือกด่าน' },
-  { href: '/play', label: 'เล่นเกม' },
-  { href: '/profile', label: 'โปรไฟล์' },
-  { href: '/leaderboard', label: 'ตารางคะแนน' },
-];
+export type { NavVariant };
 
 /**
- * The control group's nav.
- *
- * TOR 3 puts the control condition through the same movements with no game
- * elements, so the chrome has to honour that too: a link reading "ตารางคะแนน"
- * or "เลือกด่าน" is a game element on screen, and it would leak the very
- * variable the comparison in Proposal 9.3 is trying to isolate.
+ * How wide the content runs. Prose and forms stay narrow enough to read; grids
+ * of stats, stages and table rows get the full width.
  */
-const STUDY_NAV: NavLink[] = [{ href: '/consent', label: 'คำชี้แจงและความยินยอม' }];
+export type ShellWidth = 'narrow' | 'prose' | 'wide';
 
-export type NavVariant = 'game' | 'study';
+const WIDTH_CLASS: Record<ShellWidth, string> = {
+  narrow: 'max-w-md',
+  prose: 'max-w-3xl',
+  wide: 'max-w-6xl',
+};
 
 interface PageShellProps {
   title: string;
-  /** The TOR clause this screen satisfies. Useful during review; harmless after. */
-  tor?: string;
-  /** 'study' strips every game affordance from the chrome. See STUDY_NAV. */
+  /** One line under the heading, saying what this screen is for. */
+  subtitle?: string;
+  /** 'study' strips every game affordance from the chrome. See nav.ts. */
   nav?: NavVariant;
+  width?: ShellWidth;
+  /** Controls that belong to the page, beside its heading. */
+  actions?: React.ReactNode;
   children?: React.ReactNode;
 }
 
-export function PageShell({ title, tor, nav = 'game', children }: PageShellProps) {
-  const links = nav === 'study' ? STUDY_NAV : GAME_NAV;
+export function PageShell({
+  title,
+  subtitle,
+  nav = 'game',
+  width = 'prose',
+  actions,
+  children,
+}: PageShellProps) {
+  const isStudy = nav === 'study';
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-[720px] flex-col gap-4 p-4">
-      <nav aria-label="เมนูหลัก" className="flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-muted">
-        {links.map((link) => (
-          <Link key={link.href} href={link.href} className="hover:text-accent">
-            {link.label}
-          </Link>
-        ))}
-      </nav>
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader variant={nav} />
 
-      <header className="flex flex-col gap-1">
-        <h1 className="m-0 text-2xl font-bold">{title}</h1>
-        {tor && <p className="m-0 text-[13px] text-muted">{tor}</p>}
-      </header>
+      <main
+        className={`mx-auto flex w-full flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 ${WIDTH_CLASS[width]}`}
+      >
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <h1 className="m-0 text-3xl font-bold sm:text-4xl">{title}</h1>
+            {subtitle && <p className="m-0 max-w-2xl text-muted">{subtitle}</p>}
+          </div>
+          {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+        </header>
 
-      {children}
+        {children}
+      </main>
 
-      <VersionTag />
-    </main>
+      <SiteFooter hasLinks={!isStudy} />
+    </div>
+  );
+}
+
+/**
+ * A page that supplies its own hero instead of the standard heading -- the
+ * landing page. Same chrome, no <header>.
+ */
+export function BareShell({
+  width = 'wide',
+  children,
+}: {
+  width?: ShellWidth;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader />
+      <main className={`mx-auto w-full px-4 sm:px-6 lg:px-8 ${WIDTH_CLASS[width]}`}>{children}</main>
+      <SiteFooter />
+    </div>
   );
 }

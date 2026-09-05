@@ -112,13 +112,13 @@ test("an error envelope surfaces the server's message", async () => {
   const { apiRequest, ApiError } = await loadClient(BASE_URL);
   vi.stubGlobal(
     'fetch',
-    respondWith({ success: false, data: null, error: 'อีเมลนี้ถูกใช้แล้ว' }, { ok: false, status: 409 }),
+    respondWith({ success: false, data: null, error: 'That email address is already registered' }, { ok: false, status: 409 }),
   );
 
   await assert.rejects(
     () => apiRequest('/thing', { schema: payloadSchema.nullable() }),
     (error: unknown) =>
-      error instanceof ApiError && error.status === 409 && error.message === 'อีเมลนี้ถูกใช้แล้ว',
+      error instanceof ApiError && error.status === 409 && error.message === 'That email address is already registered',
   );
 });
 

@@ -9,6 +9,7 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { Footprints, MoveHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useGameRuntime } from '@/hooks/useGameRuntime';
@@ -20,7 +21,9 @@ import { DetectorDebugPanel } from '@/components/game/DetectorDebugPanel';
 import { GameHud } from '@/components/game/GameHud';
 import { GameOverOverlay } from '@/components/game/GameOverOverlay';
 import { ScenePickers } from '@/components/game/ScenePickers';
-import { VersionTag } from '@/components/ui/VersionTag';
+import { Notice } from '@/components/ui/Notice';
+import { SiteFooter } from '@/components/layout/SiteFooter';
+import { SiteHeader } from '@/components/layout/SiteHeader';
 
 export default function GameCanvas() {
   const router = useRouter();
@@ -54,8 +57,9 @@ export default function GameCanvas() {
   /**
    * One idempotency key per finished run, minted when the run ends and cleared
    * when the next one starts. Reusing it across a retry is the point: TOR 3
-   * requires ป้องกันการบันทึกคะแนนซ้ำ, and this screen can submit twice --
-   * once automatically, once if the player presses "ดูสรุปผล".
+   * requires that one finished run is never recorded twice, and this screen
+   * can submit twice -- once automatically, once if the player presses
+   * "See summary".
    */
   const clientRunIdRef = useRef<string | null>(null);
   const submittedRef = useRef(false);
@@ -123,57 +127,65 @@ export default function GameCanvas() {
   }, [restart, snapshot.isOver]);
 
   return (
-    <main className="mx-auto flex max-w-[720px] flex-col gap-3 p-3">
-      <div
-        ref={containerRef}
-        className="relative mx-auto aspect-3/4 max-h-[78vh] w-full overflow-hidden rounded-xl bg-bg touch-manipulation"
-      >
-        <canvas ref={gameCanvasRef} className="block h-full w-full" />
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader hasCta={false} />
 
-        <GameHud snapshot={snapshot} />
-        <CameraStage
-          videoRef={videoRef}
-          overlayRef={overlayRef}
-          isCameraRunning={snapshot.isCameraRunning}
-        />
-        <ScenePickers
-          character={character}
-          biome={biome}
-          onCharacterChange={setCharacter}
-          onBiomeChange={setBiome}
-        />
-        <GameOverOverlay
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6">
+        <div
+          ref={containerRef}
+          className="relative mx-auto aspect-3/4 max-h-[78vh] w-full touch-manipulation overflow-hidden rounded-xl border border-line bg-bg sm:aspect-4/5 lg:aspect-16/10"
+        >
+          <canvas ref={gameCanvasRef} className="block h-full w-full" />
+
+          <GameHud snapshot={snapshot} />
+          <CameraStage
+            videoRef={videoRef}
+            overlayRef={overlayRef}
+            isCameraRunning={snapshot.isCameraRunning}
+          />
+          <ScenePickers
+            character={character}
+            biome={biome}
+            onCharacterChange={setCharacter}
+            onBiomeChange={setBiome}
+          />
+          <GameOverOverlay
+            snapshot={snapshot}
+            onRestart={restart}
+            onSeeResult={seeResult}
+            isSubmitting={isSubmitting}
+          />
+        </div>
+
+        <p className="m-0 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[13px] text-muted">
+          <span className="flex items-center gap-1.5">
+            <MoveHorizontal aria-hidden size={15} />
+            Step or lean sideways to change lane
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Footprints aria-hidden size={15} />
+            Jog in place to attack
+          </span>
+          <span className="text-subtle">Arrow keys also work</span>
+        </p>
+
+        {snapshot.error && <Notice tone="error">{snapshot.error}</Notice>}
+
+        {submitError && (
+          <Notice tone="error" title="Your result was not saved">
+            {submitError}
+          </Notice>
+        )}
+
+        <DetectorDebugPanel
           snapshot={snapshot}
-          onRestart={restart}
-          onSeeResult={seeResult}
-          isSubmitting={isSubmitting}
+          onStartCamera={actions.startCamera}
+          onStopCamera={actions.stopCamera}
+          onRecalibrate={actions.recalibrate}
         />
-      </div>
+      </main>
 
-      <p className="m-0 text-center text-[13px] text-muted">
-        ก้าวหรือเอียงตัวซ้าย-ขวาเพื่อเปลี่ยนเลน &middot; วิ่งอยู่กับที่เพื่อยิง (ปุ่มลูกศรใช้ได้เช่นกัน)
-      </p>
-
-      {snapshot.error && (
-        <p role="alert" className="m-0 rounded-lg bg-[#3a1c1c] px-3 py-2.5 text-sm text-[#ffb4b4]">
-          {snapshot.error}
-        </p>
-      )}
-
-      {submitError && (
-        <p role="alert" className="m-0 rounded-lg bg-[#3a1c1c] px-3 py-2.5 text-sm text-[#ffb4b4]">
-          บันทึกผลไม่สำเร็จ: {submitError}
-        </p>
-      )}
-
-      <DetectorDebugPanel
-        snapshot={snapshot}
-        onStartCamera={actions.startCamera}
-        onStopCamera={actions.stopCamera}
-        onRecalibrate={actions.recalibrate}
-      />
-
-      <VersionTag />
-    </main>
+      <SiteFooter />
+    </div>
   );
 }

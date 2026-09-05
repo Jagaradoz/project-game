@@ -1,3 +1,5 @@
+import { Circle, CircleCheck } from 'lucide-react';
+
 import type { HudSnapshot } from '@/engine/runtime';
 import { classifyDistance, classifyLighting } from '@/engine/util/luma';
 
@@ -9,8 +11,8 @@ export interface CalibrationCheck {
 }
 
 /**
- * The gate on TOR 3 (ระบบปรับเทียบกล้อง):
- * ไม่อนุญาตให้เริ่มเกมจนกว่าระบบจะตรวจพบผู้เล่นในตำแหน่งที่เหมาะสม.
+ * The gate on TOR 3 (ระบบปรับเทียบกล้อง): the run may not start until the system
+ * has found the player in a workable position.
  *
  * A pure function of the snapshot plus the rehearsal progress, so the rule that
  * decides whether the run may start is one readable list rather than a
@@ -26,72 +28,72 @@ export function buildChecks(
   return [
     {
       id: 'camera',
-      label: 'เปิดกล้องแล้ว',
-      detail: snapshot.isCameraRunning ? 'กล้องกำลังทำงาน' : 'ยังไม่ได้เปิดกล้อง',
+      label: 'Camera is on',
+      detail: snapshot.isCameraRunning ? 'The camera is running' : 'The camera is not started yet',
       isPassing: snapshot.isCameraRunning,
     },
     {
       id: 'body',
-      label: 'ระบบมองเห็นร่างกาย',
-      detail: snapshot.hasBody ? 'ตรวจพบร่างกาย' : 'ยังไม่พบร่างกายในเฟรม',
+      label: 'Your body is visible',
+      detail: snapshot.hasBody ? 'Body detected' : 'No body found in the frame yet',
       isPassing: snapshot.hasBody,
     },
     {
       id: 'knees',
-      label: 'เห็นถึงระดับเข่า',
+      label: 'Visible down to the knees',
       detail: snapshot.kneesVisible
-        ? 'เห็นเข่าทั้งสองข้าง'
-        : 'ถอยห่างหรือปรับมุมกล้องให้เห็นเข่า — จำเป็นต่อการตรวจจับการวิ่งอยู่กับที่',
+        ? 'Both knees are visible'
+        : 'Step back or tilt the camera until your knees are in frame — jog detection needs them',
       isPassing: snapshot.kneesVisible,
     },
     {
       id: 'distance',
-      label: 'ระยะห่างเหมาะสม',
+      label: 'Distance is right',
       detail:
         distance === null
-          ? 'รอตรวจจับร่างกาย'
+          ? 'Waiting for body detection'
           : distance === 'far'
-            ? 'ไกลเกินไป — ขยับเข้าใกล้กล้อง'
+            ? 'Too far away — move closer to the camera'
             : distance === 'close'
-              ? 'ใกล้เกินไป — ถอยห่างจากกล้อง'
-              : 'ระยะห่างกำลังดี',
+              ? 'Too close — step back from the camera'
+              : 'Distance looks good',
       isPassing: distance === 'ok',
     },
     {
       id: 'lighting',
-      label: 'แสงสว่างเพียงพอ',
+      label: 'Lighting is sufficient',
       detail:
         lighting === null
-          ? 'รอตรวจวัดแสง'
+          ? 'Waiting for a light reading'
           : lighting === 'dark'
-            ? 'แสงน้อยเกินไป — เพิ่มแสงด้านหน้า'
+            ? 'Too dark — add light in front of you'
             : lighting === 'bright'
-              ? 'แสงจ้าเกินไป — ลดแสงย้อนจากด้านหลัง'
-              : 'แสงกำลังดี',
+              ? 'Too bright — reduce the backlight behind you'
+              : 'Lighting looks good',
       isPassing: lighting === 'ok',
     },
     {
       id: 'calibrated',
-      label: 'ตั้งจุดกึ่งกลางแล้ว',
+      label: 'Centre point set',
       detail: snapshot.isCalibrated
-        ? 'ตั้งจุดกึ่งกลางเรียบร้อย'
-        : 'ยืนนิ่งกลางเฟรมสักครู่เพื่อตั้งจุดกึ่งกลาง',
+        ? 'Centre point captured'
+        : 'Stand still in the middle of the frame for a moment to set your centre',
       isPassing: snapshot.isCalibrated,
     },
     {
       id: 'lean',
-      label: 'ทดลองก้าวซ้าย-ขวา',
+      label: 'Sideways step tested',
       detail: rehearsal.hasLeaned
-        ? 'ตรวจจับการก้าวซ้าย-ขวาได้แล้ว'
-        : 'ลองก้าวหรือเอียงตัวไปทางซ้ายและขวา',
+        ? 'Sideways movement detected'
+        : 'Try stepping or leaning to the left and to the right',
       isPassing: rehearsal.hasLeaned,
     },
     {
       id: 'jog',
-      label: 'ทดลองวิ่งอยู่กับที่',
+      label: 'Jog in place tested',
       detail: rehearsal.hasJogged
-        ? 'ตรวจจับจังหวะการวิ่งอยู่กับที่ได้แล้ว'
-        : 'ลองวิ่งอยู่กับที่ ยกเข่าสลับซ้าย-ขวา',
+        ? 'Jogging rhythm detected'
+        : 'Try jogging in place, lifting your knees alternately',
       isPassing: rehearsal.hasJogged,
     },
   ];
@@ -99,18 +101,22 @@ export function buildChecks(
 
 export function CalibrationChecklist({ checks }: { checks: CalibrationCheck[] }) {
   return (
-    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+    <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
       {checks.map((check) => (
-        <li key={check.id} className="flex items-start gap-2.5 text-sm">
-          <span aria-hidden className={check.isPassing ? 'text-ok' : 'text-muted'}>
-            {check.isPassing ? '✓' : '○'}
-          </span>
+        <li key={check.id} className="flex items-start gap-3 text-sm">
+          {/* Decorative: the pass/fail state is spelled out in the label below. */}
+          {check.isPassing ? (
+            <CircleCheck aria-hidden size={18} className="mt-0.5 flex-none text-ok" />
+          ) : (
+            <Circle aria-hidden size={18} className="mt-0.5 flex-none text-subtle" />
+          )}
+
           <span className="flex flex-col gap-0.5">
-            <span className={check.isPassing ? 'font-semibold text-ok' : 'font-semibold text-text'}>
+            <span className={`font-semibold ${check.isPassing ? 'text-ok-text' : 'text-text'}`}>
               {check.label}
-              <span className="sr-only">{check.isPassing ? ' — ผ่าน' : ' — ยังไม่ผ่าน'}</span>
+              <span className="sr-only">{check.isPassing ? ' — passed' : ' — not passed yet'}</span>
             </span>
-            <span className="text-xs text-muted">{check.detail}</span>
+            <span className="text-xs leading-relaxed text-muted">{check.detail}</span>
           </span>
         </li>
       ))}

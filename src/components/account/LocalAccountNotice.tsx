@@ -14,10 +14,12 @@ export function LocalAccountNotice() {
   if (!IS_MOCK_MODE) return null;
 
   return (
-    <Notice tone="warn" title="บัญชีนี้เก็บอยู่ในเบราว์เซอร์นี้เท่านั้น">
-      ระบบสมาชิกจริงจะมาพร้อมกับส่วน Backend ขณะนี้บัญชีและสถิติถูกเก็บไว้ในเครื่องของคุณ
-      ไม่ได้ส่งไปที่เซิร์ฟเวอร์ และจะหายไปหากล้างข้อมูลเบราว์เซอร์
-      <strong className="block pt-1">กรุณาอย่าใช้รหัสผ่านจริงที่คุณใช้กับบริการอื่น</strong>
+    <Notice tone="warn" title="This account is stored only in this browser">
+      Real accounts arrive with the backend. For now your account and statistics live on this device,
+      are never sent to a server, and will be lost if you clear your browser data.
+      <strong className="block pt-1">
+        Please do not reuse a password you use for any other service.
+      </strong>
     </Notice>
   );
 }

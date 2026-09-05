@@ -1,12 +1,30 @@
-import Link from 'next/link';
+import { Compass, House, Map } from 'lucide-react';
+
+import { LinkButton } from '@/components/ui/Button';
 
 export default function NotFound() {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-[720px] flex-col justify-center gap-4 p-4">
-      <h1 className="m-0 text-2xl font-bold">Page not found</h1>
-      <Link href="/" className="text-accent">
-        Back to the start
-      </Link>
+    <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-5 px-4 text-center">
+      <span
+        aria-hidden
+        className="grid size-14 place-items-center rounded-full bg-primary-soft text-primary"
+      >
+        <Compass size={26} />
+      </span>
+
+      <h1 className="m-0 text-3xl font-bold">This trail doesn&rsquo;t exist</h1>
+      <p className="m-0 text-sm leading-relaxed text-muted">
+        The page you were looking for isn&rsquo;t here. It may have moved, or the link may be wrong.
+      </p>
+
+      <div className="flex flex-col gap-3 self-stretch sm:flex-row sm:self-auto">
+        <LinkButton href="/" variant="primary" icon={<House size={18} />}>
+          Back to home
+        </LinkButton>
+        <LinkButton href="/stages" icon={<Map size={18} />}>
+          Browse stages
+        </LinkButton>
+      </div>
     </main>
   );
 }

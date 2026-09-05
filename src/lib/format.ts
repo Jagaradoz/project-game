@@ -1,5 +1,5 @@
 /**
- * Display formatting, in Thai.
+ * Display formatting.
  *
  * One module so a duration reads the same on /result, /profile and
  * /leaderboard. Every function tolerates junk input -- these render values that
@@ -26,16 +26,16 @@ export function formatDuration(ms: number | null | undefined): string {
 
 export function formatNumber(value: number | null | undefined): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
-  return new Intl.NumberFormat('th-TH').format(Math.round(value));
+  return new Intl.NumberFormat('en-US').format(Math.round(value));
 }
 
-/** Buddhist-era short date, which is what a Thai reader expects. */
+/** A short, unambiguous date -- "15 Mar 2026", never 03/15 vs 15/03. */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '--';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '--';
 
-  return new Intl.DateTimeFormat('th-TH', {
+  return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -47,7 +47,7 @@ export function formatDateTime(iso: string | null | undefined): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '--';
 
-  return new Intl.DateTimeFormat('th-TH', {
+  return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -58,12 +58,12 @@ export function formatDateTime(iso: string | null | undefined): string {
 
 export function formatMetres(value: number | null | undefined): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
-  return `${formatNumber(value)} ม.`;
+  return `${formatNumber(value)} m`;
 }
 
 /** A signed delta for "better or worse than last time" comparisons. */
 export function formatDelta(value: number): string {
-  if (!Number.isFinite(value) || value === 0) return 'เท่าเดิม';
+  if (!Number.isFinite(value) || value === 0) return 'No change';
   const sign = value > 0 ? '+' : '-';
   return `${sign}${formatNumber(Math.abs(value))}`;
 }

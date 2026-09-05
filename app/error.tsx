@@ -1,6 +1,9 @@
 'use client';
 
+import { House, RotateCcw, TriangleAlert } from 'lucide-react';
 import { useEffect } from 'react';
+
+import { Button, LinkButton } from '@/components/ui/Button';
 
 export default function GlobalError({
   error,
@@ -14,16 +17,25 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-[720px] flex-col justify-center gap-4 p-4">
-      <h1 className="m-0 text-2xl font-bold">Something went wrong</h1>
-      <p className="m-0 text-sm text-muted">{error.message}</p>
-      <button
-        type="button"
-        onClick={reset}
-        className="min-h-12 max-w-[220px] cursor-pointer rounded-lg border-0 bg-accent px-4 py-3 font-semibold text-[#04121a]"
+    <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-5 px-4 text-center">
+      <span
+        aria-hidden
+        className="grid size-14 place-items-center rounded-full bg-danger-soft text-danger"
       >
-        Try again
-      </button>
+        <TriangleAlert size={26} />
+      </span>
+
+      <h1 className="m-0 text-3xl font-bold">Something went wrong</h1>
+      <p className="m-0 text-sm leading-relaxed text-muted">{error.message}</p>
+
+      <div className="flex flex-col gap-3 self-stretch sm:flex-row sm:self-auto">
+        <Button onClick={reset} icon={<RotateCcw size={18} />}>
+          Try again
+        </Button>
+        <LinkButton href="/" icon={<House size={18} />}>
+          Back to home
+        </LinkButton>
+      </div>
     </main>
   );
 }

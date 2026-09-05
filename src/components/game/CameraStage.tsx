@@ -1,3 +1,4 @@
+import { VideoOff } from 'lucide-react';
 import type { RefObject } from 'react';
 
 interface CameraStageProps {
@@ -16,7 +17,7 @@ interface CameraStageProps {
  */
 export function CameraStage({ videoRef, overlayRef, isCameraRunning }: CameraStageProps) {
   return (
-    <div className="absolute top-2.5 right-2.5 z-[2] aspect-4/3 w-[130px] overflow-hidden rounded-lg border border-[#2c343d] bg-black opacity-90">
+    <div className="absolute top-3 right-3 z-[2] aspect-4/3 w-[120px] overflow-hidden rounded-lg border border-white/15 bg-black shadow-lg sm:w-[150px]">
       <video
         ref={videoRef}
         playsInline
@@ -26,8 +27,9 @@ export function CameraStage({ videoRef, overlayRef, isCameraRunning }: CameraSta
       />
       <canvas ref={overlayRef} className="mirrored absolute inset-0 h-full w-full" />
       {!isCameraRunning && (
-        <div className="absolute inset-0 grid place-items-center p-2 text-center text-xs text-muted">
-          Camera off
+        <div className="absolute inset-0 grid place-content-center justify-items-center gap-1 p-2 text-center">
+          <VideoOff aria-hidden size={16} className="text-subtle" />
+          <span className="text-[11px] text-muted">Camera off</span>
         </div>
       )}
     </div>

@@ -163,7 +163,7 @@ export const CONFIG = {
 
     difficulty: {
       easy: {
-        label: 'ง่าย',
+        label: 'Easy',
         /** Longer gaps between spawn rows. */
         spawnIntervalScale: 1.35,
         /** A gentler top speed. */
@@ -175,7 +175,7 @@ export const CONFIG = {
         goalKillsScale: 0.75,
       },
       normal: {
-        label: 'ปกติ',
+        label: 'Normal',
         spawnIntervalScale: 1,
         maxSpeedScale: 1,
         rampDistanceScale: 1,
@@ -183,7 +183,7 @@ export const CONFIG = {
         goalKillsScale: 1,
       },
       hard: {
-        label: 'ยาก',
+        label: 'Hard',
         spawnIntervalScale: 0.78,
         maxSpeedScale: 1.15,
         rampDistanceScale: 0.75,

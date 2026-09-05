@@ -1,23 +1,67 @@
 @import "tailwindcss";
 
 /**
- * Design tokens carried over from the prototype's styles.css. Tailwind v4 reads
- * @theme and generates the utilities, so `bg-surface`, `text-muted`,
- * `border-accent` etc. all resolve from here. One place to restyle the app.
+ * Design tokens. Tailwind v4 reads @theme and generates the utilities, so
+ * `bg-surface`, `text-muted`, `border-line`, `bg-primary` etc. all resolve from
+ * here. One place to restyle the app.
+ *
+ * Dark-only by choice: the gameplay screen is a lit 3D scene, and dark chrome is
+ * the frame that suits it. Every pair below is checked against the surface it
+ * actually lands on, not against pure black.
  */
 @theme {
-  --color-bg: #101418;
-  --color-panel: #1b2128;
-  --color-surface: #1e252d;
-  --color-line: #36414e;
-  --color-text: #e8edf2;
-  --color-muted: #8b98a5;
-  --color-accent: #00e5ff;
-  --color-ok: #35d07f;
-  --color-off: #55606b;
-  --color-enemy: #ff3b3b;
+  /* Base surfaces, darkest to lightest. */
+  --color-bg: #0f141a;
+  --color-surface: #1a2029;
+  --color-elevated: #222b36;
+  /* `line` is a decorative divider. `line-strong` is a CONTROL boundary and
+     clears 3:1 against both bg and surface, because on an input or a select the
+     border is the only thing that says a control is there (WCAG 1.4.11). */
+  --color-line: #2a3441;
+  --color-line-strong: #5a6d85;
 
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Text, in descending emphasis. `muted` clears 4.5:1 on bg and surface. */
+  --color-text: #f1f5f9;
+  --color-muted: #94a3b8;
+  /* Still >=4.5:1 on bg, surface and elevated -- the footer's safety notice is
+     set in it, and small print that carries a warning has to be readable. */
+  --color-subtle: #8593a8;
+
+  /* Brand. Orange reads as effort and warmth against the green 3D biomes. */
+  --color-primary: #f97316;
+  --color-primary-hover: #ea6a0c;
+  --color-primary-soft: #2a1a0e;
+  --color-on-primary: #0f172a;
+  --color-ring: #f97316;
+
+  /* Semantic state. Each has a soft surface for notices and a text tint that
+     stays readable on it. */
+  --color-ok: #22c55e;
+  --color-ok-soft: #0e2a1a;
+  --color-ok-text: #86efac;
+  --color-on-ok: #052e16;
+
+  --color-warn: #f59e0b;
+  --color-warn-soft: #2c2109;
+  --color-warn-text: #fcd34d;
+
+  --color-danger: #ef4444;
+  --color-danger-soft: #2e1414;
+  --color-danger-text: #fca5a5;
+  --color-on-danger: #240404;
+
+  /* Game-world colours, used by the HUD over the canvas. */
+  --color-enemy: #ef4444;
+  --color-off: #475569;
+
+  /* next/font sets these on <html>; the fallbacks matter before it loads. */
+  --font-sans: var(--font-barlow), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-barlow), system-ui, sans-serif;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 }
 
 :root {
@@ -29,6 +73,40 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-text-size-adjust: 100%;
+}
+
+/**
+ * One focus ring for the whole app. Nothing had a visible one before, which
+ * made every screen unusable by keyboard; defining it here means a new control
+ * gets it without opting in.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/** Headings carry the condensed face; body copy does not. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/**
+ * Motion is decoration everywhere in the chrome, so it all goes. The game loop
+ * is not CSS and is unaffected -- a player who needs the game needs the game.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /**

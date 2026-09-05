@@ -38,7 +38,7 @@ export interface GameRepository {
 
   /**
    * Records a finished run. Implementations MUST treat `clientRunId` as an
-   * idempotency key -- TOR 3 requires ป้องกันการบันทึกคะแนนซ้ำจากผลการเล่นครั้งเดียวกัน,
+   * idempotency key -- TOR 3 requires that one finished run is never recorded twice,
    * and /result is reachable by reload.
    */
   submitRun(input: SubmitRunInput): Promise<RunResult>;
