@@ -8,10 +8,13 @@
  * engine, and the engine touches no React.
  */
 
-import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useGameRuntime } from '@/hooks/useGameRuntime';
-import { useSettings } from '@/lib/store/settings';
+import { getErrorMessage, repository } from '@/lib/api';
+import { useRunStore } from '@/lib/store/run';
+import { useSettings, useStageSelection } from '@/lib/store/settings';
 import { CameraStage } from '@/components/game/CameraStage';
 import { DetectorDebugPanel } from '@/components/game/DetectorDebugPanel';
 import { GameHud } from '@/components/game/GameHud';
@@ -20,6 +23,7 @@ import { ScenePickers } from '@/components/game/ScenePickers';
 import { VersionTag } from '@/components/ui/VersionTag';
 
 export default function GameCanvas() {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const gameCanvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -29,6 +33,10 @@ export default function GameCanvas() {
   const biome = useSettings((state) => state.biome);
   const setCharacter = useSettings((state) => state.setCharacter);
   const setBiome = useSettings((state) => state.setBiome);
+  // Validated on the way out of the store: persisted preferences are untrusted.
+  const stage = useStageSelection();
+
+  const setLastRun = useRunStore((state) => state.setLastRun);
 
   const { actions, snapshot } = useGameRuntime(
     {
@@ -37,8 +45,68 @@ export default function GameCanvas() {
       video: videoRef,
       overlay: overlayRef,
     },
-    { character, biome },
+    { character, biome, stage },
   );
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  /**
+   * One idempotency key per finished run, minted when the run ends and cleared
+   * when the next one starts. Reusing it across a retry is the point: TOR 3
+   * requires ป้องกันการบันทึกคะแนนซ้ำ, and this screen can submit twice --
+   * once automatically, once if the player presses "ดูสรุปผล".
+   */
+  const clientRunIdRef = useRef<string | null>(null);
+  const submittedRef = useRef(false);
+
+  const submitRun = useCallback(async () => {
+    const summary = actions.getRunSummary();
+    if (!summary) return null;
+
+    clientRunIdRef.current ??=
+      typeof crypto?.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const saved = await repository.submitRun({
+        ...summary,
+        clientRunId: clientRunIdRef.current,
+      });
+      setLastRun(saved);
+      return saved;
+    } catch (error: unknown) {
+      // A failed save must not swallow the run: the player still sees their
+      // result, and the message says the record did not stick.
+      setSubmitError(getErrorMessage(error));
+      return null;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [actions, setLastRun]);
+
+  // Record the run as soon as it ends, so a player who simply closes the tab
+  // still keeps their progress.
+  useEffect(() => {
+    if (!snapshot.isOver || submittedRef.current) return;
+    submittedRef.current = true;
+    void submitRun();
+  }, [snapshot.isOver, submitRun]);
+
+  const restart = useCallback(() => {
+    submittedRef.current = false;
+    clientRunIdRef.current = null;
+    setSubmitError(null);
+    actions.restart();
+  }, [actions]);
+
+  const seeResult = useCallback(async () => {
+    await submitRun();
+    router.push('/result');
+  }, [router, submitRun]);
 
   // R or Space restarts once the run is over. Registered here rather than in the
   // engine because it is a UI affordance, not a control input.
@@ -47,12 +115,12 @@ export default function GameCanvas() {
       if (!snapshot.isOver) return;
       if (event.key === 'r' || event.key === 'R' || event.key === ' ') {
         event.preventDefault();
-        actions.restart();
+        restart();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [actions, snapshot.isOver]);
+  }, [restart, snapshot.isOver]);
 
   return (
     <main className="mx-auto flex max-w-[720px] flex-col gap-3 p-3">
@@ -74,16 +142,27 @@ export default function GameCanvas() {
           onCharacterChange={setCharacter}
           onBiomeChange={setBiome}
         />
-        <GameOverOverlay snapshot={snapshot} onRestart={actions.restart} />
+        <GameOverOverlay
+          snapshot={snapshot}
+          onRestart={restart}
+          onSeeResult={seeResult}
+          isSubmitting={isSubmitting}
+        />
       </div>
 
       <p className="m-0 text-center text-[13px] text-muted">
-        Lean left / right to switch lane &middot; jog in place to fire. Arrow keys work too.
+        ก้าวหรือเอียงตัวซ้าย-ขวาเพื่อเปลี่ยนเลน &middot; วิ่งอยู่กับที่เพื่อยิง (ปุ่มลูกศรใช้ได้เช่นกัน)
       </p>
 
       {snapshot.error && (
         <p role="alert" className="m-0 rounded-lg bg-[#3a1c1c] px-3 py-2.5 text-sm text-[#ffb4b4]">
           {snapshot.error}
+        </p>
+      )}
+
+      {submitError && (
+        <p role="alert" className="m-0 rounded-lg bg-[#3a1c1c] px-3 py-2.5 text-sm text-[#ffb4b4]">
+          บันทึกผลไม่สำเร็จ: {submitError}
         </p>
       )}
 

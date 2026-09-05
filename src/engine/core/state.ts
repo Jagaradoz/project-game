@@ -20,10 +20,10 @@
 import { CONFIG } from '@/engine/config';
 import type {
   GameBody,
-  GameConfig,
   GameInput,
   GameState,
   KillMark,
+  RunConfig,
 } from '@/engine/types';
 
 /** Deterministic 32-bit LCG (Numerical Recipes constants). */
@@ -31,7 +31,7 @@ const LCG_MULTIPLIER = 1664525;
 const LCG_INCREMENT = 1013904223;
 const LCG_MODULUS = 2 ** 32;
 
-export function createGameState(seed = 1, config: GameConfig = CONFIG.game): GameState {
+export function createGameState(seed = 1, config: RunConfig = CONFIG.game): GameState {
   return {
     lane: centreLane(config),
     hp: config.maxHp,
@@ -53,22 +53,24 @@ export function createGameState(seed = 1, config: GameConfig = CONFIG.game): Gam
      * been filtered out of the list.
      */
     justKilled: [],
+    killCount: 0,
+    isCleared: false,
     isOver: false,
     seed: seed >>> 0,
   };
 }
 
-export function restartGame(state: GameState, config: GameConfig = CONFIG.game): GameState {
+export function restartGame(state: GameState, config: RunConfig = CONFIG.game): GameState {
   // Reuse the live seed so a retry is not a replay of the same enemy sequence.
   return createGameState(state.seed, config);
 }
 
 /** x of a lane centre. The single source of truth for lane geometry. */
-export function laneToX(lane: number, config: GameConfig = CONFIG.game): number {
+export function laneToX(lane: number, config: RunConfig = CONFIG.game): number {
   return (lane - centreLane(config)) * config.laneWidth;
 }
 
-export function clampLane(lane: number, config: GameConfig = CONFIG.game): number {
+export function clampLane(lane: number, config: RunConfig = CONFIG.game): number {
   if (!Number.isFinite(lane)) return centreLane(config);
   return Math.min(config.laneCount - 1, Math.max(0, Math.round(lane)));
 }
@@ -82,7 +84,7 @@ export function updateGame(
   state: GameState,
   input: GameInput,
   dtMs: number,
-  config: GameConfig = CONFIG.game,
+  config: RunConfig = CONFIG.game,
 ): GameState {
   if (state.isOver) {
     if (!state.justHit && state.justKilled.length === 0) return state;
@@ -127,6 +129,11 @@ export function updateGame(
   // frame; the grace window then covers the rest of the pile-up.
   const hp = Math.max(0, state.hp - (hitCount > 0 ? 1 : 0));
 
+  // The stage goal, if this run has one. `goalKills` is absent for an endless
+  // run, and a run with no goal can never be cleared -- only ended.
+  const killCount = state.killCount + shots.kills;
+  const isCleared = config.goalKills !== undefined && killCount >= config.goalKills;
+
   return {
     ...state,
     lane,
@@ -143,7 +150,11 @@ export function updateGame(
     invulnUntilMs: hitCount > 0 ? elapsedMs + config.invulnMs : state.invulnUntilMs,
     justHit: hitCount > 0,
     justKilled: shots.killed,
-    isOver: hp === 0,
+    killCount,
+    isCleared,
+    // Clearing the goal ends the run just as surely as running out of HP --
+    // one is a win and one is a loss, and /result tells them apart by isCleared.
+    isOver: hp === 0 || isCleared,
     seed: spawned.seed,
   };
 }
@@ -152,7 +163,7 @@ export function isInvulnerable(state: GameState): boolean {
   return state.elapsedMs < state.invulnUntilMs;
 }
 
-function centreLane(config: GameConfig): number {
+function centreLane(config: RunConfig): number {
   return (config.laneCount - 1) / 2;
 }
 
@@ -161,15 +172,15 @@ function advance(body: GameBody, deltaZ: number): GameBody {
 }
 
 /** 0 at the start of a run, 1 once the hardest speed and spawn rate are reached. */
-function rampProgress(distance: number, config: GameConfig): number {
+function rampProgress(distance: number, config: RunConfig): number {
   return Math.min(1, Math.max(0, distance / config.rampDistance));
 }
 
-function speedAt(progress: number, config: GameConfig): number {
+function speedAt(progress: number, config: RunConfig): number {
   return config.walkSpeed + (config.maxSpeed - config.walkSpeed) * progress;
 }
 
-function spawnIntervalAt(progress: number, config: GameConfig): number {
+function spawnIntervalAt(progress: number, config: RunConfig): number {
   return config.spawnIntervalMs + (config.minSpawnIntervalMs - config.spawnIntervalMs) * progress;
 }
 
@@ -186,7 +197,7 @@ function approach(current: number, target: number, stepMs: number, lerpMs: numbe
  * Swept test: did the enemy cross the player's band during this step? Comparing
  * only the new z would let a fast enemy tunnel straight through on a long frame.
  */
-function isHit(enemy: GameBody, lane: number, config: GameConfig): boolean {
+function isHit(enemy: GameBody, lane: number, config: RunConfig): boolean {
   if (enemy.lane !== lane) return false;
   const reach = config.playerRadius + config.enemyRadius;
   return enemy.z >= config.playerZ - reach && enemy.previousZ <= config.playerZ + reach;
@@ -200,7 +211,7 @@ function isHit(enemy: GameBody, lane: number, config: GameConfig): boolean {
 function resolveShots(
   bullets: GameBody[],
   enemies: GameBody[],
-  config: GameConfig,
+  config: RunConfig,
 ): { bullets: GameBody[]; enemies: GameBody[]; kills: number; killed: KillMark[] } {
   const reach = config.enemyRadius + config.bulletRadius;
   const deadEnemies = new Set<number>();
@@ -230,7 +241,7 @@ function resolveShots(
 function fireDue(
   { bullets, cooldownMs }: { bullets: GameBody[]; cooldownMs: number },
   { lane, isFiring, stepMs }: { lane: number; isFiring: boolean; stepMs: number },
-  config: GameConfig,
+  config: RunConfig,
 ): { bullets: GameBody[]; cooldownMs: number } {
   const remainingMs = Math.max(0, cooldownMs - stepMs);
   if (!isFiring || remainingMs > 0) return { bullets, cooldownMs: isFiring ? remainingMs : 0 };
@@ -245,7 +256,7 @@ function fireDue(
 function spawnDue(
   { enemies, seed }: { enemies: GameBody[]; seed: number },
   { elapsedMs, nextSpawnMs, progress }: { elapsedMs: number; nextSpawnMs: number; progress: number },
-  config: GameConfig,
+  config: RunConfig,
 ): { enemies: GameBody[]; seed: number; nextSpawnMs: number } {
   if (elapsedMs < nextSpawnMs) return { enemies, seed, nextSpawnMs };
 
@@ -267,7 +278,7 @@ function spawnDue(
 function pickRow(
   seed: number,
   progress: number,
-  config: GameConfig,
+  config: RunConfig,
 ): { lanes: number[]; seed: number } {
   const first = random(seed);
   const firstLane = Math.min(config.laneCount - 1, Math.floor(first.value * config.laneCount));
@@ -284,7 +295,7 @@ function pickRow(
   return { lanes: [firstLane, secondLane], seed: pick.seed };
 }
 
-function laneIndices(config: GameConfig): number[] {
+function laneIndices(config: RunConfig): number[] {
   return Array.from({ length: config.laneCount }, (_, index) => index);
 }
 

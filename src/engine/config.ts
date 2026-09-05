@@ -118,6 +118,85 @@ export const CONFIG = {
    * `laneWidth` wide, the player sits at z = playerZ, and enemies travel in +z
    * (towards the camera). Lane index 0 = left, 1 = centre, 2 = right.
    */
+  /**
+   * Pre-flight checks for /calibrate, per TOR 3 (ระบบปรับเทียบกล้อง): the player
+   * is not let into a run until the camera can actually see them.
+   *
+   * Distance is inferred from shoulder width as a fraction of the frame. It is
+   * the only distance cue a single webcam gives for free, and it is enough to
+   * separate "too far to track" from "too close to fit".
+   */
+  calibration: {
+    /** Mean luma, 0..1. Below is too dim to track; above is blown out. */
+    minLuma: 0.18,
+    maxLuma: 0.93,
+    /** Shoulder width as a fraction of frame width. */
+    minShoulderWidth: 0.1,
+    maxShoulderWidth: 0.45,
+    /** Exposure is a slow signal; sampling it every frame is wasted work. */
+    sampleIntervalMs: 400,
+    /** Downsample size for the luma sample. Small is the point: it is an average. */
+    sampleWidth: 32,
+    sampleHeight: 24,
+    /** A rehearsal step counts once the player has held the pose this long. */
+    rehearsalHoldMs: 250,
+  },
+
+  /**
+   * Stage and difficulty, per TOR 3 (ระบบ Biome และ Stage, ระบบเกมและศัตรู).
+   *
+   * These are multipliers rather than absolute values so there is still exactly
+   * one place that says how fast the runner moves or how often enemies spawn --
+   * `game` below. A stage bends those numbers; it never restates them.
+   *
+   * `goalKills` is what turns the endless runner into a stage: clear that many
+   * enemies and the stage is passed. It grows with the stage number so stage 10
+   * is a real step up from stage 1, and with the biome so a later biome is
+   * harder at the same stage number.
+   */
+  stage: {
+    /** Kills to clear stage 1 of the first biome. */
+    baseGoalKills: 12,
+    /** Added per stage within a biome, and per biome already travelled. */
+    goalKillsPerStage: 3,
+    goalKillsPerBiome: 6,
+
+    difficulty: {
+      easy: {
+        label: 'ง่าย',
+        /** Longer gaps between spawn rows. */
+        spawnIntervalScale: 1.35,
+        /** A gentler top speed. */
+        maxSpeedScale: 0.85,
+        /** Reaching the hardest settings takes longer. */
+        rampDistanceScale: 1.4,
+        /** TOR 5.1 non-punitive design: an easier run forgives more mistakes. */
+        maxHpBonus: 1,
+        goalKillsScale: 0.75,
+      },
+      normal: {
+        label: 'ปกติ',
+        spawnIntervalScale: 1,
+        maxSpeedScale: 1,
+        rampDistanceScale: 1,
+        maxHpBonus: 0,
+        goalKillsScale: 1,
+      },
+      hard: {
+        label: 'ยาก',
+        spawnIntervalScale: 0.78,
+        maxSpeedScale: 1.15,
+        rampDistanceScale: 0.75,
+        maxHpBonus: 0,
+        goalKillsScale: 1.3,
+      },
+    },
+
+    /** Per stage within a biome, compounding: stage 10 spawns noticeably faster. */
+    spawnIntervalPerStage: 0.97,
+    maxSpeedPerStage: 1.012,
+  },
+
   game: {
     laneCount: 3,
     laneWidth: 2.4,

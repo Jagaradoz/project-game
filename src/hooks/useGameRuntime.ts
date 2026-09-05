@@ -19,8 +19,9 @@ import { useSyncExternalStore } from 'react';
 
 import { CONFIG } from '@/engine/config';
 import { createGameRuntime, BIOME_AUTO } from '@/engine/runtime';
-import type { GameRuntime, HudSnapshot } from '@/engine/runtime';
+import type { GameRuntime, HudSnapshot, RuntimeMode } from '@/engine/runtime';
 import { LATERAL } from '@/engine/detectors/lateral';
+import type { RunSummary, StageSelection } from '@/engine/types';
 
 /** Stable reference, so a render before the engine exists cannot loop. */
 const IDLE_SNAPSHOT: HudSnapshot = {
@@ -29,6 +30,13 @@ const IDLE_SNAPSHOT: HudSnapshot = {
   maxHp: CONFIG.game.maxHp,
   distance: 0,
   isOver: false,
+  killCount: 0,
+  goalKills: null,
+  isCleared: false,
+  elapsedMs: 0,
+  movementCount: 0,
+  lateralChangeCount: 0,
+  movementMs: 0,
   lateralLabel: LATERAL.CENTER,
   lateralOffset: 0,
   isCalibrated: false,
@@ -37,6 +45,9 @@ const IDLE_SNAPSHOT: HudSnapshot = {
   cadenceSpm: 0,
   stepCount: 0,
   kneeDelta: 0,
+  shoulderWidth: null,
+  kneesVisible: false,
+  luma: null,
   fps: null,
   inferenceMs: null,
   delegate: null,
@@ -59,6 +70,9 @@ export interface GameRuntimeRefs {
 export interface UseGameRuntimeOptions {
   character?: string;
   biome?: string;
+  /** 'pose' skips the renderer and the reducer -- see RuntimeMode. */
+  mode?: RuntimeMode;
+  stage?: StageSelection | null;
 }
 
 /** Stable action surface, so components never depend on the runtime existing. */
@@ -67,10 +81,19 @@ export interface GameActions {
   stopCamera: () => void;
   recalibrate: () => void;
   restart: () => void;
+  /** Null when the engine is not mounted, so callers must handle its absence. */
+  getRunSummary: () => RunSummary | null;
 }
 
 export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOptions = {}) {
-  const { character, biome } = options;
+  const { character, biome, mode = 'game', stage = null } = options;
+
+  // Destructured to primitives on purpose. A caller that rebuilds the stage
+  // object every render would otherwise restart the run every render; depending
+  // on the three values instead means the effect fires only on a real change.
+  const stageBiomeId = stage?.biomeId ?? null;
+  const stageNumber = stage?.stageNumber ?? null;
+  const stageDifficulty = stage?.difficulty ?? null;
 
   const runtimeRef = useRef<GameRuntime | null>(null);
   const snapshotRef = useRef<HudSnapshot>(IDLE_SNAPSHOT);
@@ -93,7 +116,7 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
     // stops a character change from rebuilding the whole scene.
     const instance = createGameRuntime(
       { gameCanvas, video, overlay, container },
-      { seed, biome: BIOME_AUTO },
+      { seed, biome: BIOME_AUTO, mode },
     );
 
     runtimeRef.current = instance;
@@ -117,7 +140,7 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
       snapshotRef.current = IDLE_SNAPSHOT;
       for (const listener of listeners) listener();
     };
-  }, [refs.container, refs.gameCanvas, refs.overlay, refs.video]);
+  }, [mode, refs.container, refs.gameCanvas, refs.overlay, refs.video]);
 
   const subscribe = useCallback((onChange: () => void) => {
     const listeners = listenersRef.current;
@@ -141,12 +164,24 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
     if (biome) runtimeRef.current?.setBiome(biome);
   }, [biome]);
 
+  useEffect(() => {
+    if (mode !== 'game') return;
+
+    const hasStage = stageBiomeId !== null && stageNumber !== null && stageDifficulty !== null;
+    runtimeRef.current?.setStage(
+      hasStage
+        ? { biomeId: stageBiomeId, stageNumber, difficulty: stageDifficulty }
+        : null,
+    );
+  }, [mode, stageBiomeId, stageNumber, stageDifficulty]);
+
   const actions = useMemo<GameActions>(
     () => ({
       startCamera: () => void runtimeRef.current?.startCamera(),
       stopCamera: () => runtimeRef.current?.stopCamera(),
       recalibrate: () => runtimeRef.current?.recalibrate(),
       restart: () => runtimeRef.current?.restart(),
+      getRunSummary: () => runtimeRef.current?.getRunSummary() ?? null,
     }),
     [],
   );

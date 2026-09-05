@@ -411,3 +411,92 @@ test('game: justKilled is cleared on the following frame', () => {
 
   assert.equal(after.justKilled.length, 0);
 });
+
+/* ------------------------------------------------- stage goal and clear ---- */
+
+const GOAL_CONFIG = { ...GAME, goalKills: 2 };
+
+/** Places a bullet on top of an enemy so the next step resolves a kill. */
+function engagement(state: GameState, lane = 1): GameState {
+  return {
+    ...state,
+    bullets: [{ lane, z: -10, previousZ: -10 }],
+    enemies: [{ lane, z: -11, previousZ: -11 }],
+  };
+}
+
+test('game: killCount counts kills, and a miss does not count', () => {
+  const missed = updateGame(
+    { ...createGameState(1), bullets: [{ lane: 0, z: -10, previousZ: -10 }], enemies: [{ lane: 2, z: -11, previousZ: -11 }] },
+    WALKING,
+    STEP_MS,
+  );
+  assert.equal(missed.killCount, 0);
+
+  const killed = updateGame(engagement(createGameState(1)), WALKING, STEP_MS);
+  assert.equal(killed.killCount, 1);
+});
+
+test('game: a run with no goal can never be cleared', () => {
+  let state = createGameState(1);
+  for (let round = 0; round < 5; round += 1) {
+    state = updateGame(engagement(state), WALKING, STEP_MS);
+  }
+
+  assert.equal(state.killCount, 5);
+  assert.equal(state.isCleared, false);
+  assert.equal(state.isOver, false);
+});
+
+test('game: reaching the goal clears the stage and ends the run', () => {
+  let state = createGameState(1, GOAL_CONFIG);
+
+  state = updateGame(engagement(state), WALKING, STEP_MS, GOAL_CONFIG);
+  assert.equal(state.killCount, 1);
+  assert.equal(state.isCleared, false, 'cleared one kill short of the goal');
+  assert.equal(state.isOver, false);
+
+  state = updateGame(engagement(state), WALKING, STEP_MS, GOAL_CONFIG);
+  assert.equal(state.killCount, 2);
+  assert.equal(state.isCleared, true);
+  assert.equal(state.isOver, true);
+});
+
+test('game: running out of HP ends the run without clearing it', () => {
+  const doomed = { ...createGameState(1, GOAL_CONFIG), hp: 1 };
+  const state = updateGame(
+    { ...doomed, enemies: [{ lane: 1, z: 0, previousZ: -2 }] },
+    WALKING,
+    STEP_MS,
+    GOAL_CONFIG,
+  );
+
+  assert.equal(state.hp, 0);
+  assert.equal(state.isOver, true);
+  assert.equal(state.isCleared, false, 'a loss was reported as a stage clear');
+});
+
+test('game: a cleared run stays cleared and stops advancing', () => {
+  let state = createGameState(1, GOAL_CONFIG);
+  state = updateGame(engagement(state), WALKING, STEP_MS, GOAL_CONFIG);
+  state = updateGame(engagement(state), WALKING, STEP_MS, GOAL_CONFIG);
+
+  const after = updateGame(state, WALKING, STEP_MS, GOAL_CONFIG);
+  assert.equal(after.isCleared, true);
+  assert.equal(after.distance, state.distance);
+  assert.equal(after.killCount, state.killCount);
+});
+
+test('game: restarting clears the kill count and the cleared flag', () => {
+  const finished = { ...createGameState(1, GOAL_CONFIG), killCount: 9, isCleared: true, isOver: true };
+  const fresh = restartGame(finished, GOAL_CONFIG);
+
+  assert.equal(fresh.killCount, 0);
+  assert.equal(fresh.isCleared, false);
+  assert.equal(fresh.isOver, false);
+});
+
+test('game: difficulty reaches the reducer through maxHp', () => {
+  const forgiving = createGameState(1, { ...GAME, maxHp: GAME.maxHp + 1 });
+  assert.equal(forgiving.hp, GAME.maxHp + 1);
+});

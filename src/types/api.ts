@@ -10,6 +10,8 @@
  * never leaves the browser, and per-frame joint positions are never stored.
  */
 
+import type { Difficulty } from '@/engine/types';
+
 /** The envelope every endpoint responds with. */
 export interface ApiResponse<T> {
   success: boolean;
@@ -68,12 +70,28 @@ export interface RunResult {
   distanceM: number;
   movementCount: number;
   difficulty: Difficulty;
+  /**
+   * Whether the stage goal was met. This is what unlocks the next stage, so it
+   * is the run's outcome and not a derived nicety -- a run that ends on 0 HP
+   * short of the goal scores, but unlocks nothing.
+   */
+  isCleared: boolean;
   completedAt: string;
 }
 
-export type Difficulty = 'easy' | 'normal' | 'hard';
+/** Re-exported so pages have one import for contract types. Owned by the engine. */
+export type { Difficulty } from '@/engine/types';
 
-/** What the client submits. The server assigns id, userId and completedAt. */
+/**
+ * What the client submits. The server assigns id, userId and completedAt.
+ *
+ * TREAT EVERY FIELD AS ADVERSARIAL. This is a browser game: the reducer runs on
+ * the player's machine, so `score`, `enemiesKilled` and `movementCount` are
+ * whatever their client chose to send. Nothing on this side can make them
+ * trustworthy. The server should bound or re-derive them before they reach the
+ * leaderboard -- at minimum reject values outside what the stage's rules make
+ * possible, and rate-limit submissions per user.
+ */
 export type SubmitRunInput = Omit<RunResult, 'id' | 'userId' | 'completedAt'> & {
   /**
    * Idempotency key, so a retry cannot double-record one run -- TOR 3 requires

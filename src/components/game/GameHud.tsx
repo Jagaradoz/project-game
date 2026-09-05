@@ -33,6 +33,48 @@ export function GameHud({ snapshot }: GameHudProps) {
         <Stat label="Score" value={String(snapshot.score)} />
         <Stat label="Dist" value={`${Math.round(snapshot.distance)} m`} />
       </div>
+
+      <GoalBar snapshot={snapshot} />
+    </div>
+  );
+}
+
+/**
+ * The enemy health bar TOR 3 asks for at กึ่งกลางด้านบนของหน้าจอ, drained by
+ * progress towards the stage goal.
+ *
+ * It reads as the opposition's health -- it starts full and empties as enemies
+ * die -- which is what the requirement is after: ให้ผู้เล่นเห็นผลจากการโจมตี
+ * อย่างชัดเจน. There is no distinct boss entity in the engine yet; when one
+ * lands, this is the bar it drives.
+ *
+ * Absent entirely in an endless run, which has no goal to show.
+ */
+function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
+  if (snapshot.goalKills === null) return null;
+
+  const remaining = Math.max(0, snapshot.goalKills - snapshot.killCount);
+  const remainingShare = (remaining / snapshot.goalKills) * 100;
+
+  return (
+    <div className="mx-auto flex w-full max-w-[320px] flex-col gap-1 pt-1">
+      <div
+        className="h-2.5 overflow-hidden rounded-full bg-[rgba(9,18,24,0.65)] ring-1 ring-white/15"
+        role="progressbar"
+        aria-label="พลังชีวิตศัตรูที่เหลือในด่านนี้"
+        aria-valuemin={0}
+        aria-valuemax={snapshot.goalKills}
+        aria-valuenow={remaining}
+      >
+        <div
+          className="h-full rounded-full bg-enemy transition-[width] duration-200"
+          style={{ width: `${remainingShare}%` }}
+        />
+      </div>
+
+      <span className="text-center text-[11px] font-semibold tabular-nums text-[#e6eef5] [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+        {snapshot.killCount} / {snapshot.goalKills}
+      </span>
     </div>
   );
 }

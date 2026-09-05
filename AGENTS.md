@@ -22,11 +22,13 @@ This version is an internal **development and testing version** (not an official
 
 Next.js 16 (App Router) + TypeScript + Tailwind v4. Routes live in `app/`, following the TOR screen list.
 
-- `src/engine/` is **framework-free** and must stay that way — no React imports, no JSX. It owns the game reducer, the pose detectors, and the Three.js scene.
-- `src/engine/runtime.ts` is the only lifecycle owner. Anything that starts a loop, a camera or a WebGL context goes through it, and `dispose()` must release it.
+- `src/engine/` is **framework-free** and must stay that way — no React imports, no JSX, and **no imports from `src/lib/`** (the dependency runs the other way: `src/lib/api/catalog.ts` derives from the engine's `BIOMES`). It owns the game reducer, the stage rules, the pose detectors, and the Three.js scene.
+- `src/engine/runtime.ts` is the only lifecycle owner. Anything that starts a loop, a camera or a WebGL context goes through it, and `dispose()` must release it. It has two modes: `game` (full runner) and `pose` (detectors only — no WebGL, no reducer), which is what `/calibrate` and `/practice` use.
 - `src/components/game/GameCanvas.tsx` is the **only** React component that touches the engine.
+- **No page may import from `src/lib/api/mock/` or `live/`.** Everything goes through `repository` from `@/lib/api`, so swapping to the real backend is one env var.
+- A zustand selector that builds a **new object** must be wrapped in `useShallow`, or React kills the page with "getSnapshot should be cached" → infinite update loop. See `useStageSelection` in `src/lib/store/settings.ts`.
 - The 3D assets in `public/assets/` are fetched at runtime by path string; never import or bundle them.
-- Run `npm test` (Vitest, 65 tests) and `npm run typecheck` before considering a change done.
+- Run `npm test` (Vitest, 149 tests), `npm run typecheck` and `npm run lint` before considering a change done. `npx vitest run --coverage` enforces an 80% floor over the engine and the data layer.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -15,6 +15,56 @@ export type LateralConfig = AppConfig['lateral'];
 export type JogConfig = AppConfig['jog'];
 export type DrawConfig = AppConfig['draw'];
 export type GameConfig = AppConfig['game'];
+export type StageConfig = AppConfig['stage'];
+export type DifficultyPreset = StageConfig['difficulty']['normal'];
+
+/**
+ * A stage's tuned rules: the game config it runs under, plus the goal that
+ * turns an endless run into a stage that can be passed. `updateGame` already
+ * takes a GameConfig, so carrying `goalKills` on the same object is what lets
+ * the reducer decide `isCleared` without learning about stages at all.
+ */
+export type StageRules = GameConfig & { goalKills: number };
+
+/**
+ * What the reducer runs under. `goalKills` is optional on purpose: without it
+ * the runner is endless, which is both the original behaviour and what the
+ * control-group mode needs. StageRules satisfies it with the goal filled in.
+ */
+export type RunConfig = GameConfig & { goalKills?: number };
+
+/**
+ * Starting difficulty, chosen by the player -- TOR 3
+ * (ผู้เล่นสามารถเลือกระดับความยากเริ่มต้นได้ตามตัวเลือกที่ระบบกำหนด).
+ *
+ * Declared here rather than in src/types/api.ts because it is a gameplay
+ * concept first; the API contract imports it, not the other way round.
+ */
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
+/**
+ * What one finished run reports. Deliberately NOT SubmitRunInput: the engine
+ * knows nothing about the API contract, and src/types/api.ts already imports
+ * from here. The React layer adds the idempotency key and submits it.
+ */
+export interface RunSummary {
+  biomeId: string;
+  stageNumber: number;
+  difficulty: Difficulty;
+  score: number;
+  enemiesKilled: number;
+  durationMs: number;
+  distanceM: number;
+  movementCount: number;
+  isCleared: boolean;
+}
+
+/** Which stage a run is playing. Set by /stages, read by the runtime. */
+export interface StageSelection {
+  biomeId: string;
+  stageNumber: number;
+  difficulty: Difficulty;
+}
 
 export type CharacterId = keyof GameConfig['characters'];
 export type PoseModelName = 'lite' | 'full';
@@ -116,6 +166,10 @@ export interface GameState {
   invulnUntilMs: number;
   justHit: boolean;
   justKilled: KillMark[];
+  /** Enemies killed this run. Distinct from `score`, which stages may weight. */
+  killCount: number;
+  /** The stage goal was met. Always false when the run has no goal. */
+  isCleared: boolean;
   isOver: boolean;
   seed: number;
 }

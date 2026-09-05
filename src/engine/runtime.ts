@@ -16,6 +16,7 @@
 
 import { CONFIG } from '@/engine/config';
 import { createGameState, restartGame, updateGame } from '@/engine/core/state';
+import { DEFAULT_DIFFICULTY, resolveStageRules } from '@/engine/core/stage';
 import { createInput } from '@/engine/core/input';
 import { createJogState, updateJog } from '@/engine/detectors/jog';
 import {
@@ -28,7 +29,9 @@ import { describeCameraError, startCamera, stopCamera } from '@/engine/pose/came
 import { closePose, detect, getDelegate, initPose } from '@/engine/pose/pose';
 import type { PoseDelegate } from '@/engine/pose/pose';
 import { clearOverlay, drawSkeleton, resizeOverlay } from '@/engine/pose/draw';
+import { createExposureSampler } from '@/engine/pose/exposure';
 import { ema } from '@/engine/util/smooth';
+import { measureBody } from '@/engine/util/landmarks';
 import { createScene } from '@/engine/render/scene';
 import { syncScene } from '@/engine/render/sync';
 import type { SceneRefs } from '@/engine/render/sync';
@@ -40,7 +43,10 @@ import type {
   LateralState,
   PoseConnection,
   PoseLandmarks,
+  RunSummary,
   ShadowQuality,
+  StageRules,
+  StageSelection,
 } from '@/engine/types';
 
 /**
@@ -62,6 +68,17 @@ const SNAPSHOT_INTERVAL_MS = 100;
 
 export const BIOME_AUTO = 'auto';
 
+/**
+ * 'game' is the full runner. 'pose' runs the camera and the detectors and
+ * nothing else -- no WebGL context, no reducer, no keyboard.
+ *
+ * /calibrate and /practice both need pose detection with no game around it, and
+ * neither should pay for a renderer. The control-group mode in TOR 3
+ * (การประเมินแรงจูงใจ) additionally REQUIRES the absence of game elements, so
+ * this is a correctness boundary there, not only an optimisation.
+ */
+export type RuntimeMode = 'game' | 'pose';
+
 export interface RuntimeElements {
   gameCanvas: HTMLCanvasElement;
   video: HTMLVideoElement;
@@ -74,6 +91,9 @@ export interface RuntimeOptions {
   seed?: number;
   character?: string;
   biome?: string;
+  mode?: RuntimeMode;
+  /** Which stage to play. Omitted means an endless run with no goal. */
+  stage?: StageSelection;
   onError?: (message: string) => void;
 }
 
@@ -84,6 +104,23 @@ export interface HudSnapshot {
   distance: number;
   isOver: boolean;
 
+  /** Stage progress. `goalKills` is null for an endless run. */
+  killCount: number;
+  goalKills: number | null;
+  isCleared: boolean;
+  elapsedMs: number;
+
+  /**
+   * What TOR 3 calls จำนวนการเคลื่อนไหว: jog steps plus lane changes. The system
+   * detected these -- it is not a calibrated energy figure, and
+   * src/types/api.ts keeps that distinction too.
+   */
+  movementCount: number;
+  /** Lane changes so far. Monotonic, so a view can latch on it without state. */
+  lateralChangeCount: number;
+  /** Time spent actually jogging, for ความต่อเนื่องในการเคลื่อนไหว. */
+  movementMs: number;
+
   lateralLabel: LateralLabel;
   lateralOffset: number;
   isCalibrated: boolean;
@@ -92,6 +129,11 @@ export interface HudSnapshot {
   cadenceSpm: number;
   stepCount: number;
   kneeDelta: number;
+
+  /** Calibration readouts. Null until the body is confidently visible. */
+  shoulderWidth: number | null;
+  kneesVisible: boolean;
+  luma: number | null;
 
   fps: number | null;
   inferenceMs: number | null;
@@ -111,6 +153,8 @@ const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
   'score',
   'hp',
   'isOver',
+  'isCleared',
+  'killCount',
   'isCameraRunning',
   'isSceneReady',
   'status',
@@ -125,6 +169,10 @@ export interface GameRuntime {
   restart(): void;
   setCharacter(charId: string): Promise<void>;
   setBiome(choice: string): void;
+  /** Retunes the run in place. Restarts it, because difficulty cannot change mid-run. */
+  setStage(stage: StageSelection | null): void;
+  /** What /result submits. Read after the run ends. */
+  getRunSummary(): RunSummary;
   /** Stable between changes, so it is safe for useSyncExternalStore. */
   getSnapshot(): HudSnapshot;
   subscribe(onChange: () => void): () => void;
@@ -136,7 +184,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   /* ------------------------------------------------------------- state ---- */
 
-  let game: GameState = createGameState(options.seed ?? 1);
+  const mode: RuntimeMode = options.mode ?? 'game';
+  const exposure = createExposureSampler();
+
+  let stage: StageSelection | null = options.stage ?? null;
+  let rules: StageRules = rulesFor(stage);
+
+  let game: GameState = createGameState(options.seed ?? 1, rules);
   let lateral: LateralState = createLateralState();
   let jog: JogState = createJogState();
   const input = createInput();
@@ -162,8 +216,39 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let qualityFrames = 0;
   let qualityTotalMs = 0;
 
+  /**
+   * Movement tallies. Counted here rather than in the detectors because they
+   * are a property of the SESSION, not of the current pose -- a detector is
+   * stateless about how many times it has fired.
+   */
+  let lateralChangeCount = 0;
+  let lastCountedLateral: LateralLabel = LATERAL.CENTER;
+  let movementMs = 0;
+  let lastPoseMs: number | null = null;
+  let shoulderWidth: number | null = null;
+  let kneesVisible = false;
+  let luma: number | null = null;
+
   let pendingCharacter = options.character ?? CONFIG.game.defaultCharacter;
   let pendingBiome = options.biome ?? BIOME_AUTO;
+
+  /**
+   * The config this run steps under. With no stage selected the goal is absent,
+   * which is what keeps the endless runner (and /practice) working unchanged.
+   */
+  function rulesFor(selection: StageSelection | null): StageRules {
+    if (!selection) return { ...CONFIG.game, goalKills: Number.POSITIVE_INFINITY };
+
+    // BIOMES is the unlock order, and src/lib/api/catalog.ts derives from it --
+    // reading it here rather than importing the catalogue keeps the engine free
+    // of any dependency on the app layer.
+    const index = BIOMES.findIndex((entry) => entry.id === selection.biomeId);
+    return resolveStageRules(
+      Math.max(0, index),
+      selection.stageNumber,
+      selection.difficulty ?? DEFAULT_DIFFICULTY,
+    );
+  }
 
   /* ---------------------------------------------------------- snapshot ---- */
 
@@ -181,9 +266,17 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     return {
       score: game.score,
       hp: game.hp,
-      maxHp: CONFIG.game.maxHp,
+      maxHp: rules.maxHp,
       distance: game.distance,
       isOver: game.isOver,
+
+      killCount: game.killCount,
+      goalKills: Number.isFinite(rules.goalKills) ? rules.goalKills : null,
+      isCleared: game.isCleared,
+      elapsedMs: game.elapsedMs,
+      movementCount: jog.stepCount + lateralChangeCount,
+      lateralChangeCount,
+      movementMs,
 
       lateralLabel: lateral.label,
       lateralOffset: lateral.offset,
@@ -193,6 +286,10 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       cadenceSpm: jog.cadenceSpm,
       stepCount: jog.stepCount,
       kneeDelta: jog.kneeDelta,
+
+      shoulderWidth,
+      kneesVisible,
+      luma,
 
       fps: smoothedFps,
       inferenceMs: smoothedInferenceMs,
@@ -244,7 +341,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     lastGameMs = nowMs;
 
     sampleQuality(dtMs);
-    game = updateGame(game, input.read(), dtMs);
+    game = updateGame(game, input.read(), dtMs, rules);
 
     if (sceneRefs) {
       syncScene(sceneRefs, game, dtMs);
@@ -313,6 +410,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     lateral = updateLateral(lateral, landmarks, nowMs);
     jog = updateJog(jog, landmarks, nowMs);
 
+    trackCalibrationReadouts(landmarks as PoseLandmarks | null, nowMs);
+    trackMovement(nowMs);
+
     // The game reads this snapshot from its own loop; it never runs inference.
     if (!landmarks || !lateral.isCalibrated) {
       input.clearPose();
@@ -324,6 +424,31 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       clearOverlay(ctx);
       drawSkeleton(ctx, landmarks as PoseLandmarks | null, connections);
     }
+  }
+
+  /** Framing and lighting, for /calibrate. Held across frames the body is lost. */
+  function trackCalibrationReadouts(landmarks: PoseLandmarks | null, nowMs: number): void {
+    const body = measureBody(landmarks);
+    shoulderWidth = body?.shoulderWidth ?? null;
+    kneesVisible = body?.kneesVisible ?? false;
+    luma = exposure.sample(els.video, nowMs);
+  }
+
+  /**
+   * The session tallies TOR 3 reports: one movement per jog step (counted by the
+   * detector) plus one per lane change. A lane change only counts once the
+   * baseline is established, or the calibration wobble would inflate it.
+   */
+  function trackMovement(nowMs: number): void {
+    if (lateral.isCalibrated && lateral.label !== lastCountedLateral) {
+      lastCountedLateral = lateral.label;
+      lateralChangeCount += 1;
+    }
+
+    if (lastPoseMs !== null && jog.isJogging) {
+      movementMs += Math.min(nowMs - lastPoseMs, CONFIG.game.maxFrameMs);
+    }
+    lastPoseMs = nowMs;
   }
 
   function updateFps(nowMs: number): void {
@@ -391,8 +516,17 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
    * Dev hook for tools/shot.mjs. The headless harness needs to know when the
    * scene has finished loading, to jump the run forward to photograph a later
    * biome, and to read renderer.info for the draw-call budget.
+   *
+   * Development only. `warpTo` and `simulate` drive the real reducer, so in a
+   * production build this would be a one-line path to an arbitrary score right
+   * before the run is submitted. The harness is documented to run against
+   * `npm run dev`, so gating it costs nothing. Note that this is defence in
+   * depth, not a control: a determined player can forge the request anyway,
+   * which is why src/types/api.ts tells the backend to re-derive the score.
    */
   function exposeTestHook(): void {
+    if (process.env.NODE_ENV === 'production') return;
+
     (window as unknown as { __lane?: unknown }).__lane = {
       ready: true,
       warpTo(distance: number) {
@@ -444,7 +578,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   return {
     start() {
-      if (isDisposed || gameFrameId !== null) return;
+      if (isDisposed) return;
+
+      // Pose mode has no scene and no game: /calibrate and /practice want the
+      // detectors alone. startCamera() drives the pose loop from there.
+      if (mode === 'pose') {
+        setStatus('พร้อมเปิดกล้อง');
+        return;
+      }
+
+      if (gameFrameId !== null) return;
       detachKeyboard = input.attachKeyboard();
       void bootScene();
       lastGameMs = performance.now();
@@ -499,8 +642,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     restart() {
-      game = restartGame(game);
+      game = restartGame(game, rules);
       input.reset();
+      resetMovementTallies();
       sceneRefs?.player?.playAnimation('run', 0.1, true);
       publish();
     },
@@ -511,6 +655,31 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     setBiome(choice: string) {
       applyBiome(choice);
+    },
+
+    setStage(next: StageSelection | null) {
+      stage = next;
+      rules = rulesFor(next);
+      // Difficulty changes HP and spawn rate, which cannot be applied to a run
+      // already in progress without making the result meaningless.
+      game = createGameState(game.seed, rules);
+      input.reset();
+      resetMovementTallies();
+      publish();
+    },
+
+    getRunSummary(): RunSummary {
+      return {
+        biomeId: stage?.biomeId ?? BIOMES[0]!.id,
+        stageNumber: stage?.stageNumber ?? 1,
+        difficulty: stage?.difficulty ?? DEFAULT_DIFFICULTY,
+        score: game.score,
+        enemiesKilled: game.killCount,
+        durationMs: Math.round(game.elapsedMs),
+        distanceM: Math.round(game.distance),
+        movementCount: jog.stepCount + lateralChangeCount,
+        isCleared: game.isCleared,
+      };
     },
 
     getSnapshot() {
@@ -553,10 +722,19 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       sceneRefs?.renderer.dispose();
       sceneRefs = null;
 
+      exposure.dispose();
+
       listeners.clear();
       delete (window as unknown as { __lane?: unknown }).__lane;
     },
   };
+
+  function resetMovementTallies(): void {
+    lateralChangeCount = 0;
+    lastCountedLateral = LATERAL.CENTER;
+    movementMs = 0;
+    lastPoseMs = null;
+  }
 
   function cancelPoseFrame(): void {
     if (poseFrameId === null) return;

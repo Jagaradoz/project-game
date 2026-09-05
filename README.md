@@ -169,15 +169,19 @@ and say nothing about frame rate on real hardware.
 
 ```
 app/                              routes, one per TOR screen
+app/page.tsx                      home: briefing, safety, privacy, study entry
+app/(info)/how-to-play|consent    full instructions; study consent (gates /practice)
 app/(game)/play/page.tsx          the game; client-only boundary for the canvas
 app/(game)/calibrate|stages|result  camera setup, stage select, run summary
-app/(account)/login|register|profile|leaderboard
+app/(account)/login|register|profile|profile/edit|leaderboard
+app/(study)/practice              CONTROL GROUP: same detectors, zero game elements
 
 src/engine/                       framework-free; no React, no JSX
 src/engine/config.ts              every tunable value, game included
 src/engine/runtime.ts             lifecycle: both loops, camera, scene, dispose()
 src/engine/types.ts               shared shapes; config types derived from CONFIG
 src/engine/core/state.ts          pure reducer: input over time -> lanes, enemies, bullets, HP, score
+src/engine/core/stage.ts          pure: (biome, stage, difficulty) -> tuned config + goalKills
 src/engine/core/input.ts          lean + keyboard -> { lane, isFiring }
 src/engine/detectors/lateral.ts   pure reducer: landmarks -> LEFT/CENTER/RIGHT
 src/engine/detectors/jog.ts       pure reducer: landmarks over time -> jogging + cadence
@@ -185,7 +189,9 @@ src/engine/pose/camera.ts         getUserMedia, iOS quirks, readable errors
 src/engine/pose/pose.ts           PoseLandmarker load/detect, GPU -> CPU fallback
 src/engine/pose/draw.ts           skeleton overlay
 src/engine/util/landmarks.ts      visibility gating + scale-invariant body measurements
+src/engine/util/luma.ts           frame brightness + the /calibrate lighting & distance verdicts
 src/engine/util/smooth.ts         EMA, sliding window, cadence
+src/engine/pose/exposure.ts       throttled 32x24 frame sampler feeding util/luma.ts
 src/engine/render/scene.ts        Three.js scene assembly and the biome crossfade
 src/engine/render/sync.ts         one-way sync: game state -> meshes
 src/engine/render/world/          palette, biomes, sky, lighting, ground, scatter,
@@ -193,10 +199,18 @@ src/engine/render/world/          palette, biomes, sky, lighting, ground, scatte
 src/engine/render/actors/         rigged player, skeleton pool, bone-chip bursts
 
 src/components/game/GameCanvas.tsx  the ONLY React component that touches the engine
-src/components/game/               HUD, camera thumbnail, debug panel, pickers
+src/components/game/               HUD, goal bar, calibration + practice panels, pickers
+src/components/ui/                 Button, Card, Field, Notice, StatTile, PageShell
+src/components/pose/PoseStage.tsx  full-size camera + skeleton, for /calibrate and /practice
 src/hooks/useGameRuntime.ts        useSyncExternalStore bridge to the runtime
-src/lib/store/settings.ts          persisted character + biome choice
-src/lib/api/                       typed client + mock adapter
+src/hooks/useSession.ts            who is signed in
+src/hooks/useHydrated.ts           waits for a persisted store to read localStorage
+src/lib/api/repository.ts          THE data interface every page calls
+src/lib/api/mock/                  localStorage stand-in (deleted when the backend lands)
+src/lib/api/live/                  the same interface over the real API
+src/lib/api/catalog.ts             biome + stage catalogue, derived from the engine's BIOMES
+src/lib/validation/account.ts      zod schemas shared by the forms and the data layer
+src/lib/store/                     persisted settings + consent; the run handed to /result
 src/types/api.ts                   the contract shared with the backend
 
 public/assets/models/             338 CC0 .glb files, fetched at runtime
@@ -205,6 +219,32 @@ tools/cdp.mjs                     dependency-free Chrome DevTools Protocol clien
 tools/shot.mjs                    headless screenshot harness
 test/                             headless detector + game tests
 ```
+
+## Screens, and where the data comes from
+
+There is no backend yet -- TOR 5 gives it, the database and real auth to
+นายวสันต์ จันทร์ฉิม. So every page talks to `GameRepository` (`src/lib/api/repository.ts`)
+and `NEXT_PUBLIC_API_MODE` decides what is behind it:
+
+- `mock` (default) -- `src/lib/api/mock/`, backed by `localStorage`. Progress, runs and
+  the leaderboard are all **derived from stored runs**, so an unlock can never drift from
+  the run that earned it. `submitRun` is idempotent on `clientRunId`, which is what stops
+  a reloaded `/result` recording the same run twice.
+- `live` -- `src/lib/api/live/`, the same interface over `apiRequest()`. Every response is
+  validated against a zod schema at the boundary, so a backend that disagrees with
+  `src/types/api.ts` fails loudly instead of rendering `undefined`.
+
+Switching is one env var and no code change.
+
+**Accounts in mock mode are local, and the UI says so on every account screen.** Passwords
+are never stored -- only a PBKDF2-SHA256 digest with a per-account salt. It is a stand-in
+so the screens can be built and reviewed, not an authentication system.
+
+**`/practice` is the control group.** TOR 3 requires the control condition to do the same
+movements through the same detectors with no character, enemies, score or stages. The
+engine runs in `mode: 'pose'` there, which has no WebGL context and no reducer at all, and
+`PageShell` drops to a study nav -- a link reading "ตารางคะแนน" would itself be a game
+element in front of the control group.
 
 ## The two loops
 
