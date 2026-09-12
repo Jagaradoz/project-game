@@ -17,7 +17,7 @@ interface CameraStageProps {
  */
 export function CameraStage({ videoRef, overlayRef, isCameraRunning }: CameraStageProps) {
   return (
-    <div className="absolute top-3 right-3 z-[2] aspect-4/3 w-[120px] overflow-hidden rounded-lg border border-white/15 bg-black shadow-lg sm:w-[150px]">
+    <div className="absolute bottom-3 right-3 z-[2] aspect-9/16 w-[76px] overflow-hidden rounded-lg border border-white/15 bg-black shadow-lg sm:w-[88px]">
       <video
         ref={videoRef}
         playsInline
@@ -25,11 +25,11 @@ export function CameraStage({ videoRef, overlayRef, isCameraRunning }: CameraSta
         autoPlay
         className="mirrored absolute inset-0 h-full w-full object-cover"
       />
-      <canvas ref={overlayRef} className="mirrored absolute inset-0 h-full w-full" />
+      <canvas ref={overlayRef} className="mirrored absolute inset-0 h-full w-full object-cover" />
       {!isCameraRunning && (
-        <div className="absolute inset-0 grid place-content-center justify-items-center gap-1 p-2 text-center">
-          <VideoOff aria-hidden size={16} className="text-subtle" />
-          <span className="text-[11px] text-muted">Camera off</span>
+        <div className="absolute inset-0 grid place-content-center justify-items-center gap-1 p-1.5 text-center">
+          <VideoOff aria-hidden size={14} className="text-subtle" />
+          <span className="text-[10px] text-muted">Camera off</span>
         </div>
       )}
     </div>

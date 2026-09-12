@@ -154,12 +154,6 @@ export default function GameCanvas() {
             overlayRef={overlayRef}
             isCameraRunning={snapshot.isCameraRunning}
           />
-          <ScenePickers
-            character={character}
-            biome={biome}
-            onCharacterChange={setCharacter}
-            onBiomeChange={setBiome}
-          />
           <GameOverOverlay
             snapshot={snapshot}
             onRestart={restart}
@@ -167,6 +161,13 @@ export default function GameCanvas() {
             isSubmitting={isSubmitting}
           />
         </div>
+
+        <ScenePickers
+          character={character}
+          biome={biome}
+          onCharacterChange={setCharacter}
+          onBiomeChange={setBiome}
+        />
 
         <p className="m-0 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[13px] text-muted">
           <span className="flex items-center gap-1.5">

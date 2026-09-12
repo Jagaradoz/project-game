@@ -39,32 +39,38 @@ export function ScenePickers({
   const BiomeIcon = biome === BIOME_AUTO ? Shuffle : (BIOME_ICONS[biome] ?? Trees);
 
   return (
-    <div className="absolute inset-x-3 bottom-3 z-[2] flex flex-wrap items-center gap-2 rounded-lg border border-white/15 bg-[rgba(15,20,26,0.88)] px-3 py-2 shadow-lg backdrop-blur-lg">
-      <Label htmlFor="biomeSelect" icon={<BiomeIcon size={14} />}>
-        Biome
-      </Label>
-      <Select id="biomeSelect" value={biome} onChange={onBiomeChange} aria-label="Select biome">
-        <option value={BIOME_AUTO}>Auto (by distance)</option>
-        {BIOMES.map((entry) => (
-          <option key={entry.id} value={entry.id}>
-            {entry.name}
-          </option>
-        ))}
-      </Select>
+    <div className="mx-auto flex w-full max-w-[calc(80vh*3/4)] flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-3 sm:px-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="biomeSelect" icon={<BiomeIcon size={14} />}>
+            Biome
+          </Label>
+          <Select id="biomeSelect" value={biome} onChange={onBiomeChange} aria-label="Select biome">
+            <option value={BIOME_AUTO}>Auto (by distance)</option>
+            {BIOMES.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
+              </option>
+            ))}
+          </Select>
+        </div>
 
-      <Label htmlFor="charSelect">Character</Label>
-      <Select
-        id="charSelect"
-        value={character}
-        onChange={onCharacterChange}
-        aria-label="Select character model"
-      >
-        {Object.values(roster).map((entry: CharacterDef) => (
-          <option key={entry.id} value={entry.id}>
-            {entry.name}
-          </option>
-        ))}
-      </Select>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="charSelect">Character</Label>
+          <Select
+            id="charSelect"
+            value={character}
+            onChange={onCharacterChange}
+            aria-label="Select character model"
+          >
+            {Object.values(roster).map((entry: CharacterDef) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
 
       {/* A developer tool for reviewing the 3D assets, not a player-facing page. */}
       {process.env.NODE_ENV !== 'production' && (

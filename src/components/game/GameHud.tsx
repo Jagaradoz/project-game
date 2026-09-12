@@ -1,3 +1,4 @@
+import { Heart } from 'lucide-react';
 import type { HudSnapshot } from '@/engine/runtime';
 
 interface GameHudProps {
@@ -5,37 +6,53 @@ interface GameHudProps {
 }
 
 /**
- * Score, distance and health, over the canvas. The gradient behind it is not
- * decoration -- the sky is bright, so the HUD needs its own ground to sit on.
+ * Score, distance, health and stage progress, over the canvas.
+ * The gradient behind it is not decoration -- the sky is bright,
+ * so the HUD needs its own ground to sit on.
  */
 export function GameHud({ snapshot }: GameHudProps) {
   const pips = Array.from({ length: snapshot.maxHp }, (_, index) => index < snapshot.hp);
 
   return (
-    <div className="pointer-events-none absolute inset-x-3 top-3 z-[1] flex flex-col gap-2.5">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -inset-x-3 -top-3 -bottom-6 -z-10 bg-linear-to-b from-[rgba(9,14,20,0.6)] to-transparent"
-      />
+    <>
+      {/* Top HUD: Progress bar at the most center top, Heart UI centered below it */}
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-[1] flex flex-col items-center gap-2">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -inset-x-3 -top-3 -bottom-6 -z-10 bg-linear-to-b from-[rgba(9,14,20,0.6)] to-transparent"
+        />
 
-      <div className="flex gap-1.5" aria-label={`Health ${snapshot.hp} of ${snapshot.maxHp}`}>
-        {pips.map((isFull, index) => (
-          <span
-            key={index}
-            className={`h-2.5 w-6 rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.7)] ${
-              isFull ? 'bg-enemy' : 'bg-off/50'
-            }`}
-          />
-        ))}
+        <GoalBar snapshot={snapshot} />
+
+        <div
+          className="flex items-center justify-center gap-1.5"
+          aria-label={`Health ${snapshot.hp} of ${snapshot.maxHp}`}
+        >
+          {pips.map((isFull, index) => (
+            <Heart
+              key={index}
+              size={20}
+              aria-hidden
+              className={`transition-colors duration-200 ${
+                isFull
+                  ? 'fill-enemy text-enemy drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]'
+                  : 'fill-black/35 text-white/35 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]'
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="flex gap-4 font-display font-bold tabular-nums text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9),0_0_12px_rgba(0,0,0,0.5)]">
+      {/* Bottom-left HUD: Score & Distance on separate lines with smooth ambient fade */}
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[1] flex flex-col gap-0.5 font-display font-bold tabular-nums text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9),0_0_12px_rgba(0,0,0,0.6)]">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-3 -left-3 -z-10 h-28 w-44 bg-[radial-gradient(ellipse_at_bottom_left,rgba(9,14,20,0.75)_0%,rgba(9,14,20,0.3)_45%,transparent_75%)]"
+        />
         <Stat label="Score" value={String(snapshot.score)} />
-        <Stat label="Dist" value={`${Math.round(snapshot.distance)} m`} />
+        <Stat label="Distance" value={`${Math.round(snapshot.distance)} m`} />
       </div>
-
-      <GoalBar snapshot={snapshot} />
-    </div>
+    </>
   );
 }
 
@@ -81,11 +98,11 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <span className="flex items-baseline gap-1.5">
+    <div className="flex items-baseline gap-2">
       <span className="text-[11px] font-semibold tracking-[0.08em] text-white/80 uppercase">
         {label}
       </span>
-      <span className="text-lg">{value}</span>
-    </span>
+      <span className="text-lg leading-tight">{value}</span>
+    </div>
   );
 }
