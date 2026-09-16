@@ -110,6 +110,9 @@ export async function createScene(
     overrideFrom = structuredClone(blended);
     override = next;
     overrideT = 0;
+    // Restart resets game.elapsedMs to 0; without this, applyBiome thinks the
+    // last update is still in the future and never paints the new palette.
+    lastBiomeMs = -Infinity;
   }
 
   /**
@@ -117,7 +120,7 @@ export async function createScene(
    * Cheap enough to call every frame; it throttles itself.
    */
   function applyBiome(distance: number, elapsedMs: number) {
-    const sinceMs = elapsedMs - lastBiomeMs;
+    const sinceMs = elapsedMs >= lastBiomeMs ? elapsedMs - lastBiomeMs : BIOME_UPDATE_MS;
     if (sinceMs < BIOME_UPDATE_MS) return;
     lastBiomeMs = elapsedMs;
 

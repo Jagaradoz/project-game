@@ -133,6 +133,7 @@ export default function GameCanvas() {
 
       <main className={`mx-auto flex w-full ${SHELL_WIDTH.wide} flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6`}>
         <div
+          id="gameStage"
           ref={containerRef}
           /*
            * Portrait at every size. CONFIG.game.camera is framed for a tall

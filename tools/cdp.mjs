@@ -7,7 +7,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -16,10 +16,15 @@ const CHROME_CANDIDATES = [
   '/usr/bin/google-chrome',
   '/usr/bin/chromium',
   '/usr/bin/chromium-browser',
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
 ].filter(Boolean);
 
 const LAUNCH_TIMEOUT_MS = 20000;
-const CALL_TIMEOUT_MS = 30000;
+const CALL_TIMEOUT_MS = 120000;
 const POLL_INTERVAL_MS = 100;
 
 export function sleep(ms) {
@@ -67,7 +72,7 @@ async function waitForEndpoint(port, deadlineMs) {
 }
 
 export async function launchBrowser({ width = 900, height = 1200, port = 9333 } = {}) {
-  const executable = CHROME_CANDIDATES.find(Boolean);
+  const executable = CHROME_CANDIDATES.find((candidate) => candidate && existsSync(candidate));
   if (!executable) throw new Error('No Chrome binary found. Set CHROME_PATH.');
 
   const userDataDir = mkdtempSync(join(tmpdir(), 'lane-shot-'));
@@ -186,9 +191,20 @@ export async function openPage(port) {
       }
       throw new Error(`Timed out waiting for: ${label}`);
     },
-    async screenshot() {
-      const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    async screenshot(clip = null) {
+      const params = { format: 'png', captureBeyondViewport: false };
+      if (clip) params.clip = clip;
+      const { data } = await send('Page.captureScreenshot', params);
       return Buffer.from(data, 'base64');
+    },
+    /** CSS-pixel box of an element, for clipping a screenshot to the game frame. */
+    async elementClip(selector) {
+      return this.evaluate(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height, scale: 1 };
+      })()`);
     },
     async close() {
       socket.close();

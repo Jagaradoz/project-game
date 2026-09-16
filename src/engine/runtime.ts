@@ -532,6 +532,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       warpTo(distance: number) {
         game = { ...game, distance: Number(distance) || 0 };
       },
+      setBiome(choice: string) {
+        applyBiome(choice);
+      },
+      restart() {
+        game = restartGame(game, rules);
+        input.reset();
+        resetMovementTallies();
+        sceneRefs?.player?.playAnimation('run', 0.1, true);
+        publish();
+      },
       /**
        * Steps the real reducer at a fixed timestep. Software rendering is far
        * too slow to reach an interesting moment in wall-clock time, and this
@@ -566,6 +576,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           quality: sceneRefs?.quality ?? null,
           corpses: sceneRefs?.enemyPool?.corpses?.filter((c) => c.group.visible).length ?? 0,
           character: player?.characterId ?? null,
+          biome: pendingBiome,
           anim: player?.currentActionName ?? null,
           animRunning: Boolean(player?.currentAction?.isRunning?.()),
           clips: Object.keys(player?.actions ?? {}),
