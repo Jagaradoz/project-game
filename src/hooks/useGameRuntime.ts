@@ -77,7 +77,7 @@ export interface UseGameRuntimeOptions {
 
 /** Stable action surface, so components never depend on the runtime existing. */
 export interface GameActions {
-  startCamera: () => void;
+  startCamera: () => Promise<void>;
   stopCamera: () => void;
   recalibrate: () => void;
   restart: () => void;
@@ -177,7 +177,7 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
 
   const actions = useMemo<GameActions>(
     () => ({
-      startCamera: () => void runtimeRef.current?.startCamera(),
+      startCamera: () => runtimeRef.current?.startCamera() ?? Promise.resolve(),
       stopCamera: () => runtimeRef.current?.stopCamera(),
       recalibrate: () => runtimeRef.current?.recalibrate(),
       restart: () => runtimeRef.current?.restart(),

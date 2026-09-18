@@ -340,11 +340,17 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     const dtMs = nowMs - lastGameMs;
     lastGameMs = nowMs;
 
-    sampleQuality(dtMs);
-    game = updateGame(game, input.read(), dtMs, rules);
+    // The run waits for the camera. The scene still paints, so /play can show
+    // the trail behind the permission dialog and tools/shot.mjs can photograph
+    // it without ever calling getUserMedia.
+    const stepMs = isPoseRunning ? dtMs : 0;
+    if (isPoseRunning) {
+      sampleQuality(dtMs);
+      game = updateGame(game, input.read(), dtMs, rules);
+    }
 
     if (sceneRefs) {
-      syncScene(sceneRefs, game, dtMs);
+      syncScene(sceneRefs, game, stepMs);
       sceneRefs.render();
     }
 

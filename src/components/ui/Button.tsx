@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { LoaderCircle } from 'lucide-react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'navy';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
@@ -11,6 +11,7 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
     'border border-line-strong bg-surface text-text hover:border-muted hover:bg-elevated',
   ghost: 'border border-transparent bg-transparent text-muted hover:bg-surface hover:text-text',
   danger: 'border border-transparent bg-danger text-on-danger hover:brightness-110',
+  navy: 'border border-transparent bg-navy text-on-navy hover:bg-navy-hover active:bg-navy-hover',
 };
 
 /**

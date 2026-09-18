@@ -47,23 +47,29 @@
   --color-muted: #a3aa9e;
   --color-subtle: #969e96;
 
-  /* 10 -- brand. Copper dusk, not gym-app orange. `soft` is a warm chip on stone. */
-  --color-primary: #c97a3a;
-  --color-primary-hover: #d4894a;
-  --color-primary-soft: #2a1c12;
-  --color-on-primary: #1a1206;
-  --color-ring: #c97a3a;
+  /* 10 -- brand. KMITL Orange (#fe6601) and Navy Blue (#030083) color theme. */
+  --color-primary: #fe6601;
+  --color-primary-hover: #ff7719;
+  --color-primary-soft: #2e1504;
+  --color-on-primary: #0a0c0f;
+  --color-ring: #fe6601;
 
-  /* Navy Blue palette tokens -- deep controller/tech accent */
-  --color-navy: #2563eb;
-  --color-navy-hover: #3b82f6;
-  --color-navy-soft: #0e1e3b;
-  --color-navy-text: #93c5fd;
+  --color-orange: #fe6601;
+  --color-orange-hover: #ff7719;
+  --color-orange-soft: #2e1504;
 
-  --color-blue: #2563eb;
-  --color-blue-hover: #3b82f6;
-  --color-blue-soft: #0e1e3b;
-  --color-blue-text: #93c5fd;
+  /* Navy Blue palette tokens -- brightened royal/navy blue */
+  --color-navy: #142ce6;
+  --color-navy-hover: #263ff6;
+  --color-navy-soft: #0c103e;
+  --color-navy-text: #9fb0ff;
+  --color-on-navy: #ffffff;
+
+  --color-blue: #142ce6;
+  --color-blue-hover: #263ff6;
+  --color-blue-soft: #0c103e;
+  --color-blue-text: #9fb0ff;
+  --color-on-blue: #ffffff;
 
   /* Semantic state. Hues are load-bearing -- Badge, Notice, StageStrip and
      StageButton all encode meaning in them -- so they stay; only the soft

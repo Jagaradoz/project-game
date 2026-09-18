@@ -13,9 +13,11 @@ import { Footprints, MoveHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useGameRuntime } from '@/hooks/useGameRuntime';
+import { usePlayDebugTools } from '@/hooks/usePlayDebugTools';
 import { getErrorMessage, repository } from '@/lib/api';
 import { useRunStore } from '@/lib/store/run';
 import { useSettings, useStageSelection } from '@/lib/store/settings';
+import { CameraPermissionModal } from '@/components/game/CameraPermissionModal';
 import { CameraStage } from '@/components/game/CameraStage';
 import { DetectorDebugPanel } from '@/components/game/DetectorDebugPanel';
 import { GameHud } from '@/components/game/GameHud';
@@ -39,6 +41,7 @@ export default function GameCanvas() {
   const setBiome = useSettings((state) => state.setBiome);
   // Validated on the way out of the store: persisted preferences are untrusted.
   const stage = useStageSelection();
+  const showDebugTools = usePlayDebugTools();
 
   const setLastRun = useRunStore((state) => state.setLastRun);
 
@@ -163,12 +166,14 @@ export default function GameCanvas() {
           />
         </div>
 
-        <ScenePickers
-          character={character}
-          biome={biome}
-          onCharacterChange={setCharacter}
-          onBiomeChange={setBiome}
-        />
+        {showDebugTools && (
+          <ScenePickers
+            character={character}
+            biome={biome}
+            onCharacterChange={setCharacter}
+            onBiomeChange={setBiome}
+          />
+        )}
 
         <p className="m-0 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[13px] text-muted">
           <span className="flex items-center gap-1.5">
@@ -182,7 +187,9 @@ export default function GameCanvas() {
           <span className="text-subtle">Arrow keys also work</span>
         </p>
 
-        {snapshot.error && <Notice tone="error">{snapshot.error}</Notice>}
+        {snapshot.error && snapshot.isCameraRunning && (
+          <Notice tone="error">{snapshot.error}</Notice>
+        )}
 
         {submitError && (
           <Notice tone="error" title="Your result was not saved">
@@ -190,12 +197,22 @@ export default function GameCanvas() {
           </Notice>
         )}
 
-        <DetectorDebugPanel
-          snapshot={snapshot}
-          onStartCamera={actions.startCamera}
-          onStopCamera={actions.stopCamera}
-          onRecalibrate={actions.recalibrate}
-        />
+        {showDebugTools && (
+          <DetectorDebugPanel
+            snapshot={snapshot}
+            onStartCamera={actions.startCamera}
+            onStopCamera={actions.stopCamera}
+            onRecalibrate={actions.recalibrate}
+          />
+        )}
+
+        {!snapshot.isCameraRunning && (
+          <CameraPermissionModal
+            error={snapshot.error}
+            status={snapshot.status}
+            onAllow={actions.startCamera}
+          />
+        )}
       </main>
 
       <SiteFooter />

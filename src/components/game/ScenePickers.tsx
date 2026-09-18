@@ -27,8 +27,8 @@ interface ScenePickersProps {
 }
 
 /**
- * The biome list is generated from BIOMES, so adding a biome does not also mean
- * remembering to edit the markup.
+ * Developer scenery controls for /play. The biome list is generated from BIOMES,
+ * so adding a biome does not also mean remembering to edit the markup.
  */
 export function ScenePickers({
   character,

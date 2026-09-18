@@ -84,7 +84,7 @@ function roundClip(clip) {
 async function isolateGameStage(page) {
   await page.evaluate(`(() => {
     const stage = document.getElementById('gameStage');
-    document.querySelectorAll('header, footer').forEach((el) => { el.style.display = 'none'; });
+    document.querySelectorAll('header, footer, #cameraPermissionModal').forEach((el) => { el.style.display = 'none'; });
     if (!stage?.parentElement) return;
     for (const el of [...stage.parentElement.children]) {
       if (el !== stage) el.style.display = 'none';

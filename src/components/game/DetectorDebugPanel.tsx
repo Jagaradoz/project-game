@@ -7,7 +7,7 @@ import type { HudSnapshot } from '@/engine/runtime';
 
 interface DetectorDebugPanelProps {
   snapshot: HudSnapshot;
-  onStartCamera: () => void;
+  onStartCamera: () => void | Promise<void>;
   onStopCamera: () => void;
   onRecalibrate: () => void;
 }
@@ -16,7 +16,8 @@ interface DetectorDebugPanelProps {
  * The measurement surface for TOR 3.4: detector state, inference latency and
  * frame rate, which is what the technical evaluation is reported from.
  *
- * Collapsed by default -- it is an instrument, not part of playing.
+ * Collapsed by default, and only mounted from /play when debug tools are on --
+ * it is an instrument, not part of playing.
  */
 export function DetectorDebugPanel({
   snapshot,
