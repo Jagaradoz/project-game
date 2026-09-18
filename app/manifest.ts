@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Trail Runner - Webcam Exercise Game',
-    short_name: 'Trail Runner',
+    name: 'Webcam Exergame',
+    short_name: 'Webcam Exergame',
     description:
       'A webcam exercise game. Step, lean and jog in place to control the runner -- all pose detection happens in your browser.',
     start_url: '/',

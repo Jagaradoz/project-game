@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Lock, Mail, User, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
+import { GoogleOAuthButton } from '@/components/account/GoogleOAuthButton';
 import { LocalAccountNotice } from '@/components/account/LocalAccountNotice';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -60,7 +61,19 @@ export default function RegisterPage() {
       <LocalAccountNotice />
 
       <Card>
-        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
+          <GoogleOAuthButton label="Sign up with Google" />
+
+          <div className="relative flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-line" />
+            </div>
+            <span className="relative bg-surface px-3 text-xs font-medium uppercase tracking-wider text-muted">
+              or continue with email
+            </span>
+          </div>
+
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
           <Field
             label="Email"
             type="email"
@@ -98,7 +111,8 @@ export default function RegisterPage() {
           <Button type="submit" isLoading={isSubmitting} icon={<UserPlus size={18} />} isFullWidth>
             {isSubmitting ? 'Creating account…' : 'Create account'}
           </Button>
-        </form>
+          </form>
+        </div>
       </Card>
 
       <p className="m-0 text-center text-sm text-muted">

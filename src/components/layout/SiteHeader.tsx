@@ -90,7 +90,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
 
   return (
     <header className="sticky top-0 z-30 border-b border-line/80 bg-bg/80 backdrop-blur-md">
-      <div className={`mx-auto flex h-14 ${SHELL_WIDTH.wide} items-center gap-2 ${SHELL_GUTTER}`}>
+      <div className={`mx-auto flex h-16 ${SHELL_WIDTH.wide} items-center gap-2 ${SHELL_GUTTER}`}>
         <Wordmark priority />
 
         {isStudy ? (

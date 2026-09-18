@@ -21,11 +21,11 @@ const DESCRIPTION =
 
 export const metadata: Metadata = {
   title: {
-    default: 'Trail Runner - Webcam Exercise Game',
-    template: '%s | Trail Runner',
+    default: 'Webcam Exergame',
+    template: '%s | Webcam Exergame',
   },
   description: DESCRIPTION,
-  applicationName: 'Trail Runner',
+  applicationName: 'Webcam Exergame',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
@@ -38,21 +38,21 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    siteName: 'Trail Runner',
-    title: 'Trail Runner - Webcam Exercise Game',
+    siteName: 'Webcam Exergame',
+    title: 'Webcam Exergame',
     description: DESCRIPTION,
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Trail Runner - Webcam Exercise Game',
+        alt: 'Webcam Exergame',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Trail Runner - Webcam Exercise Game',
+    title: 'Webcam Exergame',
     description: DESCRIPTION,
     images: ['/og-image.png'],
   },

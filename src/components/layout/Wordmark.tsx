@@ -13,22 +13,22 @@ export function Wordmark({
   return (
     <Link
       href="/"
-      className={`flex flex-none items-center gap-2 text-[0.95rem] font-semibold tracking-tight text-text no-underline transition-opacity hover:opacity-90 ${className}`}
+      className={`flex flex-none items-center gap-2.5 text-[1.1rem] font-bold tracking-tight text-text no-underline transition-opacity hover:opacity-90 sm:text-[1.2rem] ${className}`}
     >
       <span
         aria-hidden
-        className="relative size-6 overflow-hidden rounded-md ring-1 ring-white/10"
+        className="relative size-7 overflow-hidden rounded-lg ring-1 ring-white/10 sm:size-8"
       >
         <Image
           src="/icon.png"
           alt=""
-          width={24}
-          height={24}
+          width={32}
+          height={32}
           priority={priority}
           className="size-full object-cover"
         />
       </span>
-      Trail Runner
+      Webcam <span className="text-primary">Exergame</span>
     </Link>
   );
 }

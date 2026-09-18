@@ -1,5 +1,4 @@
 import {
-  Camera,
   Footprints,
   Map,
   MonitorSmartphone,
@@ -85,29 +84,22 @@ export default function HomePage() {
         <div
           className={`relative mx-auto flex w-full flex-col items-start gap-5 py-16 sm:py-20 ${SHELL_GUTTER} ${SHELL_WIDTH.wide}`}
         >
-          <span className="eyebrow">Webcam exercise game</span>
+          <span className="eyebrow">Webcam Exergame</span>
 
           <h1 className="m-0 max-w-xl text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-            Run the trail with your whole body
+            Your movement is <span className="text-navy">the controller</span>
           </h1>
 
           <p className="m-0 max-w-lg text-base leading-relaxed text-text/85 sm:text-lg">
-            Jog in place to attack, step sideways to switch lanes. Every frame is processed in your
-            browser — no video is ever uploaded.
+            Jog in place to attack enemies, step sideways to dodge and switch lanes. Every frame is processed
+            locally in your browser with real-time pose estimation.
           </p>
 
           <div className="flex flex-col gap-3 self-stretch sm:flex-row sm:self-auto">
             <LinkButton href="/play" variant="primary" size="lg" icon={<Play size={20} />}>
               Play now
             </LinkButton>
-            <LinkButton href="/calibrate" size="lg" icon={<Camera size={20} />}>
-              Set up your camera
-            </LinkButton>
           </div>
-
-          <p className="m-0 text-sm text-subtle">
-            No installation, no account. Works in any modern desktop browser with a webcam.
-          </p>
         </div>
       </section>
 

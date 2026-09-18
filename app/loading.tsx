@@ -7,7 +7,7 @@ export default function Loading() {
       <div className="relative size-10 overflow-hidden rounded-md ring-1 ring-white/10">
         <Image
           src="/icon.png"
-          alt="Trail Runner"
+          alt="Webcam Exergame"
           width={40}
           height={40}
           priority

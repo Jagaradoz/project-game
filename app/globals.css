@@ -54,6 +54,17 @@
   --color-on-primary: #1a1206;
   --color-ring: #c97a3a;
 
+  /* Navy Blue palette tokens -- deep controller/tech accent */
+  --color-navy: #2563eb;
+  --color-navy-hover: #3b82f6;
+  --color-navy-soft: #0e1e3b;
+  --color-navy-text: #93c5fd;
+
+  --color-blue: #2563eb;
+  --color-blue-hover: #3b82f6;
+  --color-blue-soft: #0e1e3b;
+  --color-blue-text: #93c5fd;
+
   /* Semantic state. Hues are load-bearing -- Badge, Notice, StageStrip and
      StageButton all encode meaning in them -- so they stay; only the soft
      grounds shifted onto charcoal. */

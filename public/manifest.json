@@ -1,6 +1,6 @@
 {
-  "name": "Trail Runner - Webcam Exercise Game",
-  "short_name": "Trail Runner",
+  "name": "Webcam Exergame",
+  "short_name": "Webcam Exergame",
   "description": "A webcam exercise game. Step, lean and jog in place to control the runner.",
   "start_url": "/",
   "display": "standalone",
