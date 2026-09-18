@@ -33,11 +33,35 @@ export const metadata: Metadata = {
   },
   description: DESCRIPTION,
   applicationName: 'Trail Runner',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   openGraph: {
     type: 'website',
     siteName: 'Trail Runner',
     title: 'Trail Runner - Webcam Exercise Game',
     description: DESCRIPTION,
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Trail Runner - Webcam Exercise Game',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Trail Runner - Webcam Exercise Game',
+    description: DESCRIPTION,
+    images: ['/og-image.png'],
   },
 };
 

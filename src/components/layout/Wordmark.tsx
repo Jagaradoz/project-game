@@ -1,20 +1,28 @@
 import Link from 'next/link';
-import { Footprints } from 'lucide-react';
+import Image from 'next/image';
 
 /** The brand lockup, in the header and the footer. */
 export function Wordmark({ className = '' }: { className?: string }) {
   return (
     <Link
       href="/"
-      className={`flex flex-none items-center gap-2 font-display text-xl font-bold tracking-wide text-text no-underline ${className}`}
+      className={`flex flex-none items-center gap-2.5 font-display text-xl font-bold tracking-wide text-text no-underline transition-opacity hover:opacity-90 ${className}`}
     >
       <span
         aria-hidden
-        className="grid size-8 place-items-center rounded-lg bg-primary text-on-primary"
+        className="relative grid size-8 place-items-center overflow-hidden rounded-lg shadow-sm ring-1 ring-white/10"
       >
-        <Footprints size={18} />
+        <Image
+          src="/icon.png"
+          alt=""
+          width={32}
+          height={32}
+          priority
+          className="size-full object-cover"
+        />
       </span>
       Trail Runner
     </Link>
   );
 }
+

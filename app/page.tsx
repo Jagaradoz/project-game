@@ -13,6 +13,7 @@ import {
   TriangleAlert,
   Trophy,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import { Card } from '@/components/ui/Card';
 import { LinkButton } from '@/components/ui/Button';
@@ -74,36 +75,55 @@ const CAUTIONS = [
 export default function HomePage() {
   return (
     <BareShell>
-      <section className="flex flex-col gap-8 py-12 sm:py-16">
-        <div className="flex flex-col items-start gap-6">
-          <span className="eyebrow inline-flex items-center gap-2">
-            <Sparkles aria-hidden size={14} />
-            Webcam exercise game
-          </span>
+      <section className="flex flex-col gap-10 py-12 sm:py-16">
+        <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12">
+          <div className="flex flex-col items-start gap-6 lg:col-span-7">
+            <span className="eyebrow inline-flex items-center gap-2">
+              <Sparkles aria-hidden size={14} />
+              Webcam exercise game
+            </span>
 
-          <h1 className="m-0 text-5xl leading-[1.05] font-bold sm:text-6xl lg:text-7xl">
-            Run the trail
-            <span className="block text-primary">with your whole body</span>
-          </h1>
+            <h1 className="m-0 text-5xl leading-[1.05] font-bold sm:text-6xl lg:text-7xl">
+              Run the trail
+              <span className="block text-primary">with your whole body</span>
+            </h1>
 
-          <p className="m-0 max-w-xl text-lg leading-relaxed text-text/85">
-            Trail Runner turns a webcam into a motion controller. Jog in place to attack, step
-            sideways to switch lanes, and keep moving to keep going. Every frame is processed in your
-            browser — no video is ever uploaded.
-          </p>
+            <p className="m-0 max-w-xl text-lg leading-relaxed text-text/85">
+              Trail Runner turns a webcam into a motion controller. Jog in place to attack, step
+              sideways to switch lanes, and keep moving to keep going. Every frame is processed in your
+              browser — no video is ever uploaded.
+            </p>
 
-          <div className="flex flex-col gap-3 self-stretch sm:flex-row sm:self-auto">
-            <LinkButton href="/calibrate" variant="primary" size="lg" icon={<Camera size={20} />}>
-              Set up your camera
-            </LinkButton>
-            <LinkButton href="/play" size="lg" icon={<Play size={20} />}>
-              Play now
-            </LinkButton>
+            <div className="flex flex-col gap-3 self-stretch sm:flex-row sm:self-auto">
+              <LinkButton href="/calibrate" variant="primary" size="lg" icon={<Camera size={20} />}>
+                Set up your camera
+              </LinkButton>
+              <LinkButton href="/play" size="lg" icon={<Play size={20} />}>
+                Play now
+              </LinkButton>
+            </div>
+
+            <p className="m-0 text-sm text-subtle">
+              No installation, no account. Works in any modern desktop browser with a webcam.
+            </p>
           </div>
 
-          <p className="m-0 text-sm text-subtle">
-            No installation, no account. Works in any modern desktop browser with a webcam.
-          </p>
+          <div className="relative mx-auto flex w-full max-w-sm flex-col items-center justify-center lg:col-span-5">
+            <div
+              aria-hidden
+              className="absolute -inset-4 rounded-3xl bg-primary/10 blur-2xl filter"
+            />
+            <div className="relative aspect-square w-full max-w-[300px] overflow-hidden rounded-3xl border border-line bg-surface p-3 shadow-2xl shadow-black/60 ring-1 ring-white/10 sm:max-w-[340px]">
+              <Image
+                src="/icon.png"
+                alt="Trail Runner Game Icon"
+                width={512}
+                height={512}
+                priority
+                className="size-full rounded-2xl object-cover"
+              />
+            </div>
+          </div>
         </div>
 
         <ol className="m-0 flex list-none flex-col gap-3 rounded-xl border border-line bg-surface p-5 sm:p-6">

@@ -1,12 +1,25 @@
+import Image from 'next/image';
 import { LoaderCircle } from 'lucide-react';
 
 export default function Loading() {
   return (
-    <main className="mx-auto grid min-h-dvh place-content-center justify-items-center gap-3 px-4">
-      <LoaderCircle aria-hidden size={28} className="animate-spin text-primary" />
-      <p role="status" className="m-0 text-sm text-muted">
-        Loading…
-      </p>
+    <main className="mx-auto grid min-h-dvh place-content-center justify-items-center gap-4 px-4 text-center">
+      <div className="relative size-16 overflow-hidden rounded-2xl shadow-xl ring-1 ring-white/15">
+        <Image
+          src="/icon.png"
+          alt="Trail Runner"
+          width={64}
+          height={64}
+          priority
+          className="size-full object-cover"
+        />
+      </div>
+      <div className="flex items-center gap-2 text-muted">
+        <LoaderCircle aria-hidden size={20} className="animate-spin text-primary" />
+        <p role="status" className="m-0 text-sm font-medium">
+          Loading…
+        </p>
+      </div>
     </main>
   );
 }
