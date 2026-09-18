@@ -198,7 +198,7 @@ export default function GameCanvas() {
         />
       </main>
 
-      <SiteFooter compact />
+      <SiteFooter />
     </div>
   );
 }

@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Play, X } from 'lucide-react';
+import { Menu, Play, User, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { LinkButton } from '@/components/ui/Button';
 import { SHELL_GUTTER, SHELL_WIDTH } from '@/components/layout/container';
 import { Wordmark } from '@/components/layout/Wordmark';
-import { GAME_NAV, STUDY_NAV, type NavLink, type NavVariant } from '@/components/layout/nav';
+import { STUDY_NAV, type NavLink, type NavVariant } from '@/components/layout/nav';
+import { useSession } from '@/hooks/useSession';
 
 interface SiteHeaderProps {
   /** 'study' strips every game affordance from the chrome. See nav.ts. */
@@ -23,9 +24,13 @@ interface SiteHeaderProps {
  * server page hands over the variant name, and this file looks the rest up.
  */
 export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: SiteHeaderProps) {
-  const links = variant === 'study' ? STUDY_NAV : GAME_NAV;
+  const isStudy = variant === 'study';
+  const links = isStudy ? STUDY_NAV : [];
 
   const pathname = usePathname();
+  const { session, isLoading } = useSession();
+  const isGuest = !isLoading && session === null;
+  const isSignedIn = !isLoading && session !== null;
 
   /**
    * The route the drawer was opened on, rather than a boolean.
@@ -81,45 +86,77 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
     };
   }, [isMenuOpen]);
 
+  const profileIsActive = pathname.startsWith('/profile') || pathname.startsWith('/leaderboard');
+
   return (
     <header className="sticky top-0 z-30 border-b border-line/80 bg-bg/80 backdrop-blur-md">
-      <div className={`mx-auto flex h-14 ${SHELL_WIDTH.wide} items-center gap-3 ${SHELL_GUTTER}`}>
+      <div className={`mx-auto flex h-14 ${SHELL_WIDTH.wide} items-center gap-2 ${SHELL_GUTTER}`}>
         <Wordmark priority />
 
-        <nav aria-label="Main" className="ml-auto hidden items-center gap-0.5 lg:flex">
-          {links.map((link) => (
-            <NavItem key={link.href} link={link} pathname={pathname} />
-          ))}
-        </nav>
+        {isStudy ? (
+          <nav aria-label="Main" className="ml-auto hidden items-center gap-0.5 lg:flex">
+            {links.map((link) => (
+              <NavItem key={link.href} link={link} pathname={pathname} />
+            ))}
+          </nav>
+        ) : (
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            {isLoading && <div aria-hidden className="h-9 w-36" />}
 
-        {hasCta && (
-          <LinkButton
-            href="/play"
-            variant="primary"
-            size="sm"
-            icon={<Play size={15} />}
-            className="ml-auto lg:ml-2"
-          >
-            Play
-          </LinkButton>
+            {isGuest && (
+              <>
+                <Link
+                  href="/register"
+                  className="inline-flex min-h-9 items-center px-2.5 text-sm font-semibold text-muted no-underline transition-colors hover:text-text"
+                >
+                  Sign up
+                </Link>
+                <LinkButton href="/login" variant="primary" size="sm">
+                  Login
+                </LinkButton>
+              </>
+            )}
+
+            {isSignedIn && (
+              <>
+                <Link
+                  href="/profile"
+                  aria-label="Profile"
+                  aria-current={profileIsActive ? 'page' : undefined}
+                  className={`grid size-9 place-items-center rounded-md transition-colors ${
+                    profileIsActive
+                      ? 'bg-elevated text-text'
+                      : 'text-muted hover:bg-surface hover:text-text'
+                  }`}
+                >
+                  <User aria-hidden size={18} />
+                </Link>
+                {hasCta && (
+                  <LinkButton href="/play" variant="primary" size="sm" icon={<Play size={15} />}>
+                    Play
+                  </LinkButton>
+                )}
+              </>
+            )}
+          </div>
         )}
 
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={() => setOpenedAtPath((current) => (current === pathname ? null : pathname))}
-          aria-expanded={isMenuOpen}
-          aria-controls="mobile-nav"
-          aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-          className={`grid size-11 cursor-pointer place-items-center rounded-md border border-line-strong text-text transition-colors hover:bg-surface lg:hidden ${
-            hasCta ? '' : 'ml-auto'
-          }`}
-        >
-          {isMenuOpen ? <X aria-hidden size={20} /> : <Menu aria-hidden size={20} />}
-        </button>
+        {isStudy && (
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={() => setOpenedAtPath((current) => (current === pathname ? null : pathname))}
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-nav"
+            aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+            className="ml-auto grid size-11 cursor-pointer place-items-center rounded-md border border-line-strong text-text transition-colors hover:bg-surface lg:hidden"
+          >
+            {isMenuOpen ? <X aria-hidden size={20} /> : <Menu aria-hidden size={20} />}
+          </button>
+        )}
       </div>
 
-      {isMenuOpen && (
+      {isStudy && isMenuOpen && (
         <div
           id="mobile-nav"
           ref={panelRef}

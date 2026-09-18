@@ -28,8 +28,6 @@ export function PageShell({
   actions,
   children,
 }: PageShellProps) {
-  const isStudy = nav === 'study';
-
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader variant={nav} />
@@ -49,7 +47,7 @@ export function PageShell({
         {children}
       </main>
 
-      <SiteFooter hasLinks={!isStudy} />
+      <SiteFooter />
     </div>
   );
 }

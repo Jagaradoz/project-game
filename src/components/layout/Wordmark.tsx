@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
-/** The brand lockup, in the header and the footer. */
+/** The brand lockup in the header. */
 export function Wordmark({
   className = '',
   priority = false,

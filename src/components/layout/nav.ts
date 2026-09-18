@@ -1,4 +1,4 @@
-import { BookOpen, Map, ShieldCheck, User, type LucideIcon } from 'lucide-react';
+import { ShieldCheck, type LucideIcon } from 'lucide-react';
 
 export type NavVariant = 'game' | 'study';
 
@@ -9,22 +9,16 @@ export interface NavLink {
 }
 
 /**
- * The three destinations a player navigates to deliberately. Everything else
- * reached the header by being a route rather than by being a destination:
+ * Game chrome has no destination list. Home is the wordmark, Play and Profile
+ * are session-aware controls in the header, and everything else is reached
+ * from a flow rather than from a nav item:
  *
- *   Home        -- the Wordmark is already the link home.
- *   Play        -- the header's CTA is the Play link; two of them is one too many.
- *   Calibrate   -- a step inside a flow, not a place. Linked from the landing
- *                  page, /how-to-play, /stages and the footer.
- *   Leaderboard -- a view of /profile, and reached by AccountTabs there. It has
- *                  no other inbound link, so that tab strip is load-bearing:
- *                  drop it and the route is orphaned.
+ *   Stages      -- picked from /play and /calibrate, not the header.
+ *   Calibrate   -- a step inside a flow. Linked from the landing page.
+ *   How to play -- a section on the landing page (`/#how-to-play`).
+ *   Leaderboard -- a view of /profile, reached by AccountTabs there. That tab
+ *                  strip is load-bearing: drop it and the route is orphaned.
  */
-export const GAME_NAV: readonly NavLink[] = [
-  { href: '/how-to-play', label: 'How to Play', icon: BookOpen },
-  { href: '/stages', label: 'Stages', icon: Map },
-  { href: '/profile', label: 'Profile', icon: User },
-];
 
 /**
  * The control group's nav.

@@ -13,8 +13,8 @@ const TABS = [
  * Profile and Leaderboard are two views of the same thing -- your standing --
  * so they share a tab strip instead of two header slots.
  *
- * This is the ONLY inbound link to /leaderboard now that the header carries
- * three items. Removing it orphans the route.
+ * This is the ONLY inbound link to /leaderboard now that the header no longer
+ * carries a labelled Profile item. Removing it orphans the route.
  */
 export function AccountTabs() {
   const pathname = usePathname();

@@ -138,8 +138,8 @@ export default function CalibrationPanel() {
             >
               Choose a stage
             </LinkButton>
-            <LinkButton href="/how-to-play" icon={<BookOpen size={18} />} className="flex-1">
-              Read the guide
+            <LinkButton href="/#how-to-play" icon={<BookOpen size={18} />} className="flex-1">
+              How to play
             </LinkButton>
           </div>
         </div>

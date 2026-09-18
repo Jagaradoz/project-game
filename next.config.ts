@@ -8,6 +8,9 @@ import type { NextConfig } from 'next';
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [{ source: '/how-to-play', destination: '/#how-to-play', permanent: true }];
+  },
 };
 
 export default nextConfig;
