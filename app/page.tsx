@@ -72,7 +72,7 @@ const CAUTIONS = [
 export default function HomePage() {
   return (
     <BareShell bleed>
-      <section className="relative isolate flex min-h-[min(100dvh,52rem)] flex-col justify-end overflow-hidden">
+      <section className="relative isolate flex min-h-[min(100dvh,52rem)] flex-col justify-center overflow-hidden">
         <TrailStill
           src={HERO_STILL}
           alt="Silhouette walking a mountain trail at sunset"
@@ -95,7 +95,7 @@ export default function HomePage() {
         />
 
         <div
-          className={`relative mx-auto flex w-full flex-col items-start gap-5 pb-16 pt-28 sm:pb-20 ${SHELL_GUTTER} ${SHELL_WIDTH.wide}`}
+          className={`relative mx-auto flex w-full flex-col items-start gap-5 py-16 sm:py-20 ${SHELL_GUTTER} ${SHELL_WIDTH.wide}`}
         >
           <span className="eyebrow">Webcam exercise game</span>
 
