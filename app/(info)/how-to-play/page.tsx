@@ -71,6 +71,7 @@ const SETUP = [
 export default function HowToPlayPage() {
   return (
     <PageShell
+      eyebrow="Guide"
       title="How to Play"
       subtitle="Everything you need before your first run: the controls, how to set up your space, and how progression works."
       width="wide"
@@ -89,10 +90,10 @@ export default function HowToPlayPage() {
         <Card title="Controls" icon={<Footprints size={20} />}>
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {CONTROLS.map((control) => (
-              <li key={control.move} className="flex gap-3.5 rounded-lg bg-elevated p-3.5">
+              <li key={control.move} className="flex gap-3.5 rounded-md bg-elevated p-3.5">
                 <span
                   aria-hidden
-                  className="grid size-10 flex-none place-items-center rounded-lg bg-accent-soft text-accent"
+                  className="grid size-10 flex-none place-items-center rounded-md bg-accent-soft text-accent"
                 >
                   <control.icon size={20} />
                 </span>

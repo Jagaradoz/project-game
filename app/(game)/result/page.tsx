@@ -60,6 +60,7 @@ export default function ResultPage() {
 
   return (
     <PageShell
+      eyebrow="After the run"
       title="Run Summary"
       subtitle="How this run went, and how it compares with your own history."
       width="wide"

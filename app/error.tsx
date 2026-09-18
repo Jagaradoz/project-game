@@ -20,12 +20,12 @@ export default function GlobalError({
     <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-5 px-4 text-center">
       <span
         aria-hidden
-        className="grid size-14 place-items-center rounded-full bg-danger-soft text-danger"
+        className="grid size-12 place-items-center rounded-full bg-danger-soft text-danger"
       >
-        <TriangleAlert size={26} />
+        <TriangleAlert size={22} />
       </span>
 
-      <h1 className="m-0 text-3xl font-bold">Something went wrong</h1>
+      <h1 className="m-0 text-2xl font-semibold tracking-tight">Something went wrong</h1>
       <p className="m-0 text-sm leading-relaxed text-muted">{error.message}</p>
 
       <div className="flex flex-col gap-3 self-stretch sm:flex-row sm:self-auto">

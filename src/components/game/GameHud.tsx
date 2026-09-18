@@ -15,42 +15,40 @@ export function GameHud({ snapshot }: GameHudProps) {
 
   return (
     <>
-      {/* Top HUD: Progress bar at the most center top, Heart UI centered below it */}
       <div className="pointer-events-none absolute inset-x-3 top-3 z-[1] flex flex-col items-center gap-2">
         <div
           aria-hidden
-          className="pointer-events-none absolute -inset-x-3 -top-3 -bottom-6 -z-10 bg-linear-to-b from-[rgba(9,14,20,0.6)] to-transparent"
+          className="pointer-events-none absolute -inset-x-3 -top-3 -bottom-6 -z-10 bg-linear-to-b from-[rgba(10,12,15,0.65)] to-transparent"
         />
 
         <GoalBar snapshot={snapshot} />
 
         <div
-          className="flex items-center justify-center gap-1.5"
+          className="flex items-center justify-center gap-1"
           aria-label={`Health ${snapshot.hp} of ${snapshot.maxHp}`}
         >
           {pips.map((isFull, index) => (
             <Heart
               key={index}
-              size={20}
+              size={16}
               aria-hidden
               className={`transition-colors duration-200 ${
                 isFull
                   ? 'fill-enemy text-enemy drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]'
-                  : 'fill-black/35 text-white/35 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]'
+                  : 'fill-black/35 text-white/30 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]'
               }`}
             />
           ))}
         </div>
       </div>
 
-      {/* Bottom-left HUD: Score & Distance on separate lines with smooth ambient fade */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-[1] flex flex-col gap-0.5 font-display font-bold tabular-nums text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9),0_0_12px_rgba(0,0,0,0.6)]">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-3 -left-3 -z-10 h-28 w-44 bg-[radial-gradient(ellipse_at_bottom_left,rgba(9,14,20,0.75)_0%,rgba(9,14,20,0.3)_45%,transparent_75%)]"
-        />
-        <Stat label="Score" value={String(snapshot.score)} />
-        <Stat label="Distance" value={`${Math.round(snapshot.distance)} m`} />
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[1]">
+        <div className="rounded-md bg-[rgba(10,12,15,0.62)] px-3 py-2 ring-1 ring-white/10 backdrop-blur-[2px]">
+          <div className="flex flex-col gap-0.5 font-semibold tabular-nums text-white">
+            <Stat label="Score" value={String(snapshot.score)} />
+            <Stat label="Distance" value={`${Math.round(snapshot.distance)} m`} />
+          </div>
+        </div>
       </div>
     </>
   );
@@ -74,9 +72,9 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
   const remainingShare = (remaining / snapshot.goalKills) * 100;
 
   return (
-    <div className="mx-auto flex w-full max-w-[340px] flex-col gap-1 pt-1">
+    <div className="mx-auto flex w-full max-w-[280px] flex-col gap-1 pt-1">
       <div
-        className="h-2.5 overflow-hidden rounded-full bg-[rgba(9,14,20,0.7)] ring-1 ring-white/20"
+        className="h-1.5 overflow-hidden rounded-full bg-[rgba(10,12,15,0.7)] ring-1 ring-white/15"
         role="progressbar"
         aria-label="Enemy health remaining in this stage"
         aria-valuemin={0}
@@ -89,7 +87,7 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
         />
       </div>
 
-      <span className="text-center text-[11px] font-semibold tabular-nums text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+      <span className="text-center text-[10px] font-semibold tracking-wide tabular-nums text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
         {snapshot.killCount} / {snapshot.goalKills}
       </span>
     </div>
@@ -99,10 +97,10 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-[11px] font-semibold tracking-[0.08em] text-white/80 uppercase">
+      <span className="text-[10px] font-semibold tracking-[0.1em] text-white/70 uppercase">
         {label}
       </span>
-      <span className="text-lg leading-tight">{value}</span>
+      <span className="text-base leading-tight tracking-tight">{value}</span>
     </div>
   );
 }

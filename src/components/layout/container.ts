@@ -9,6 +9,8 @@
  * The column is deliberately narrow. This is a portrait game -- the 3D camera is
  * framed for a tall viewport (see CONFIG.game.camera) -- and a 1152px marketing
  * column around a portrait canvas is what made the site read as horizontal.
+ *
+ * Landing heroes break out with BareShell `bleed`; inner copy still uses `wide`.
  */
 export const SHELL_WIDTH = {
   /** Forms with a single column of fields: login, register, edit profile. */
@@ -20,3 +22,5 @@ export const SHELL_WIDTH = {
 } as const;
 
 export type ShellWidth = keyof typeof SHELL_WIDTH;
+
+export const SHELL_GUTTER = 'px-4 sm:px-6 lg:px-8';

@@ -17,7 +17,7 @@ interface CameraStageProps {
  */
 export function CameraStage({ videoRef, overlayRef, isCameraRunning }: CameraStageProps) {
   return (
-    <div className="absolute bottom-3 right-3 z-[2] aspect-9/16 w-[76px] overflow-hidden rounded-lg border border-white/15 bg-black shadow-lg sm:w-[88px]">
+    <div className="absolute bottom-3 right-3 z-[2] aspect-9/16 w-[72px] overflow-hidden rounded-md border border-white/12 bg-black sm:w-[84px]">
       <video
         ref={videoRef}
         playsInline

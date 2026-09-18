@@ -64,6 +64,7 @@ export default function ProfilePage() {
 
   return (
     <PageShell
+      eyebrow="Account"
       title="Profile"
       subtitle="Your accumulated statistics, biome progress and recent runs."
       width="wide"
@@ -81,12 +82,12 @@ export default function ProfilePage() {
               <div className="flex items-center gap-4">
                 <span
                   aria-hidden
-                  className="grid size-12 place-items-center rounded-full bg-accent-soft font-display text-xl font-bold text-accent-text"
+                  className="grid size-12 place-items-center rounded-full bg-accent-soft text-xl font-semibold text-accent-text"
                 >
                   {profile.user.displayName.slice(0, 1).toUpperCase()}
                 </span>
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-display text-xl font-bold">{profile.user.displayName}</span>
+                  <span className="text-xl font-semibold tracking-tight">{profile.user.displayName}</span>
                   <span className="text-sm text-muted">
                     {profile.user.email || 'Playing as a guest'}
                   </span>

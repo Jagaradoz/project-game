@@ -6,7 +6,7 @@ import { Menu, Play, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { LinkButton } from '@/components/ui/Button';
-import { SHELL_WIDTH } from '@/components/layout/container';
+import { SHELL_GUTTER, SHELL_WIDTH } from '@/components/layout/container';
 import { Wordmark } from '@/components/layout/Wordmark';
 import { GAME_NAV, STUDY_NAV, type NavLink, type NavVariant } from '@/components/layout/nav';
 
@@ -82,11 +82,11 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
   }, [isMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-md">
-      <div className={`mx-auto flex h-16 ${SHELL_WIDTH.wide} items-center gap-4 px-4 sm:px-6 lg:px-8`}>
-        <Wordmark />
+    <header className="sticky top-0 z-30 border-b border-line/80 bg-bg/80 backdrop-blur-md">
+      <div className={`mx-auto flex h-14 ${SHELL_WIDTH.wide} items-center gap-3 ${SHELL_GUTTER}`}>
+        <Wordmark priority />
 
-        <nav aria-label="Main" className="ml-auto hidden items-center gap-1 lg:flex">
+        <nav aria-label="Main" className="ml-auto hidden items-center gap-0.5 lg:flex">
           {links.map((link) => (
             <NavItem key={link.href} link={link} pathname={pathname} />
           ))}
@@ -97,7 +97,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
             href="/play"
             variant="primary"
             size="sm"
-            icon={<Play size={16} />}
+            icon={<Play size={15} />}
             className="ml-auto lg:ml-2"
           >
             Play
@@ -111,7 +111,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
           aria-expanded={isMenuOpen}
           aria-controls="mobile-nav"
           aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-          className={`grid size-11 cursor-pointer place-items-center rounded-lg border border-line-strong text-text transition-colors hover:bg-surface lg:hidden ${
+          className={`grid size-11 cursor-pointer place-items-center rounded-md border border-line-strong text-text transition-colors hover:bg-surface lg:hidden ${
             hasCta ? '' : 'ml-auto'
           }`}
         >
@@ -153,11 +153,11 @@ function NavItem({
     <Link
       href={link.href}
       aria-current={isActive ? 'page' : undefined}
-      className={`flex items-center gap-2 rounded-lg font-medium transition-colors ${
-        isStacked ? 'min-h-12 px-3 py-3 text-base' : 'px-3 py-2 text-sm'
-      } ${isActive ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface hover:text-text'}`}
+      className={`flex items-center gap-2 rounded-md font-medium transition-colors duration-200 ${
+        isStacked ? 'min-h-12 px-3 py-3 text-base' : 'px-3 py-1.5 text-sm'
+      } ${isActive ? 'bg-elevated text-text' : 'text-muted hover:bg-surface hover:text-text'}`}
     >
-      <Icon aria-hidden size={isStacked ? 18 : 16} />
+      <Icon aria-hidden size={isStacked ? 18 : 15} />
       {link.label}
     </Link>
   );

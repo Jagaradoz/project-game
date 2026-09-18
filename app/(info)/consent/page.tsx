@@ -46,6 +46,7 @@ export default function ConsentPage() {
 
   return (
     <PageShell
+      eyebrow="Study"
       title="Information & Consent"
       subtitle="What this study collects, what it does not, and what agreeing to take part means."
       width="wide"

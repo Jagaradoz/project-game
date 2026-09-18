@@ -1,4 +1,4 @@
-import { ChartColumn, RotateCcw, Trophy } from 'lucide-react';
+import { ChartColumn, RotateCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import type { HudSnapshot } from '@/engine/runtime';
@@ -25,50 +25,45 @@ export function GameOverOverlay({
   if (!snapshot.isOver) return null;
 
   return (
-    <div className="absolute inset-0 z-[3] grid content-center justify-items-center gap-3 bg-[rgba(15,20,26,0.9)] p-6 text-center backdrop-blur-sm">
-      <span
-        aria-hidden
-        className={`grid size-14 place-items-center rounded-full ${
-          snapshot.isCleared ? 'bg-ok-soft text-ok' : 'bg-elevated text-muted'
-        }`}
-      >
-        {snapshot.isCleared ? <Trophy size={26} /> : <RotateCcw size={26} />}
-      </span>
+    <div className="absolute inset-0 z-[3] grid content-end justify-items-stretch bg-[rgba(10,12,15,0.78)] p-6 pb-8 text-left backdrop-blur-[2px] sm:content-center sm:justify-items-center sm:text-center">
+      <div className="flex max-w-sm flex-col gap-3 sm:items-center">
+        <span className="eyebrow">{snapshot.isCleared ? 'Cleared' : 'Complete'}</span>
 
-      <h2 className="m-0 text-3xl font-bold">
-        {snapshot.isCleared ? 'Stage cleared' : 'Run complete'}
-      </h2>
+        <h2 className="m-0 text-3xl font-semibold tracking-tight sm:text-4xl">
+          {snapshot.isCleared ? 'Stage cleared' : 'Run complete'}
+        </h2>
 
-      <p className="m-0 tabular-nums text-muted">
-        {snapshot.score} points &middot; {Math.round(snapshot.distance)} m
-        {snapshot.goalKills !== null && (
-          <> &middot; {snapshot.killCount}/{snapshot.goalKills} defeated</>
-        )}
-      </p>
-
-      {!snapshot.isCleared && snapshot.goalKills !== null && (
-        <p className="m-0 max-w-xs text-sm leading-relaxed text-muted">
-          You did not reach this stage&rsquo;s target. Go again straight away, or pick a difficulty
-          that suits you better.
+        <p className="m-0 text-sm tabular-nums text-muted">
+          {snapshot.score} points &middot; {Math.round(snapshot.distance)} m
+          {snapshot.goalKills !== null && (
+            <> &middot; {snapshot.killCount}/{snapshot.goalKills} defeated</>
+          )}
         </p>
-      )}
 
-      <div className="flex flex-wrap justify-center gap-3 pt-2">
-        <Button onClick={onRestart} icon={<RotateCcw size={18} />} className="min-w-[160px]">
-          Play again
-        </Button>
-
-        {onSeeResult && (
-          <Button
-            variant="secondary"
-            onClick={onSeeResult}
-            isLoading={isSubmitting}
-            icon={<ChartColumn size={18} />}
-            className="min-w-[160px]"
-          >
-            {isSubmitting ? 'Saving…' : 'See summary'}
-          </Button>
+        {!snapshot.isCleared && snapshot.goalKills !== null && (
+          <p className="m-0 max-w-xs text-sm leading-relaxed text-muted">
+            You did not reach this stage&rsquo;s target. Go again straight away, or pick a difficulty
+            that suits you better.
+          </p>
         )}
+
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-center">
+          <Button onClick={onRestart} icon={<RotateCcw size={18} />} className="min-w-[160px]">
+            Play again
+          </Button>
+
+          {onSeeResult && (
+            <Button
+              variant="secondary"
+              onClick={onSeeResult}
+              isLoading={isSubmitting}
+              icon={<ChartColumn size={18} />}
+              className="min-w-[160px]"
+            >
+              {isSubmitting ? 'Saving…' : 'See summary'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

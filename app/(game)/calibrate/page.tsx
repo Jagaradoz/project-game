@@ -27,6 +27,7 @@ const CalibrationPanel = dynamic(() => import('@/components/game/CalibrationPane
 export default function CalibratePage() {
   return (
     <PageShell
+      eyebrow="Studio"
       title="Camera Setup"
       subtitle="A one-minute check that the camera can see you clearly enough to control the game. Everything is processed on your device."
       width="wide"

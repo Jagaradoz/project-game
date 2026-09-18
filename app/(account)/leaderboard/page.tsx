@@ -45,6 +45,7 @@ export default function LeaderboardPage() {
 
   return (
     <PageShell
+      eyebrow="Account"
       title="Leaderboard"
       subtitle="The highest scores recorded, by display name."
       width="wide"

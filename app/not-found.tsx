@@ -7,12 +7,12 @@ export default function NotFound() {
     <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-5 px-4 text-center">
       <span
         aria-hidden
-        className="grid size-14 place-items-center rounded-full bg-primary-soft text-primary"
+        className="grid size-12 place-items-center rounded-full bg-primary-soft text-primary"
       >
-        <Compass size={26} />
+        <Compass size={22} />
       </span>
 
-      <h1 className="m-0 text-3xl font-bold">This trail doesn&rsquo;t exist</h1>
+      <h1 className="m-0 text-2xl font-semibold tracking-tight">This trail doesn&rsquo;t exist</h1>
       <p className="m-0 text-sm leading-relaxed text-muted">
         The page you were looking for isn&rsquo;t here. It may have moved, or the link may be wrong.
       </p>

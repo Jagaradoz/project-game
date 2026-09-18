@@ -10,7 +10,7 @@ interface EmptyStateProps {
 /** Says why a list is empty and what to do about it, rather than showing nothing. */
 export function EmptyState({ title, icon, action, children }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line px-4 py-10 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line px-4 py-10 text-center">
       {icon && (
         <span aria-hidden className="grid size-11 place-items-center rounded-full bg-accent-soft text-accent">
           {icon}

@@ -51,6 +51,7 @@ export default function LoginPage() {
 
   return (
     <PageShell
+      eyebrow="Account"
       title="Sign In"
       subtitle="Sign in to keep your statistics across sessions."
       width="narrow"

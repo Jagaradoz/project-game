@@ -18,19 +18,19 @@ const GameCanvas = dynamic(() => import('@/components/game/GameCanvas'), {
   ssr: false,
   loading: () => (
     <main className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6`}>
-      <div className="mx-auto grid aspect-3/4 max-h-[78vh] w-full place-content-center justify-items-center gap-4 rounded-xl border border-line bg-surface text-muted sm:aspect-4/5 lg:aspect-16/10">
-        <div className="relative size-16 overflow-hidden rounded-2xl shadow-xl ring-1 ring-white/15">
+      <div className="mx-auto grid aspect-3/4 w-full max-w-[calc(80vh*3/4)] place-content-center justify-items-center gap-4 rounded-lg border border-line bg-surface text-muted">
+        <div className="relative size-10 overflow-hidden rounded-md ring-1 ring-white/10">
           <Image
             src="/icon.png"
             alt="Trail Runner"
-            width={64}
-            height={64}
+            width={40}
+            height={40}
             priority
             className="size-full object-cover"
           />
         </div>
         <div className="flex items-center gap-2">
-          <LoaderCircle aria-hidden size={20} className="animate-spin text-primary" />
+          <LoaderCircle aria-hidden size={18} className="animate-spin text-primary" />
           <p className="m-0 text-sm font-medium text-text/85">Loading the trail…</p>
         </div>
       </div>

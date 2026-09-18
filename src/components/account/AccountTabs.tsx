@@ -20,7 +20,7 @@ export function AccountTabs() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Account views" className="flex gap-1 rounded-lg border border-line bg-surface p-1">
+    <nav aria-label="Account views" className="flex gap-1 rounded-md border border-line bg-surface p-1">
       {TABS.map((tab) => {
         // /profile/edit is still the Profile tab, so this is a prefix match.
         const isActive = pathname.startsWith(tab.href);

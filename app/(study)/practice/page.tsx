@@ -33,6 +33,7 @@ export default function PracticePage() {
 
   return (
     <PageShell
+      eyebrow="Study"
       title="Movement Mode"
       subtitle="The same movement activity, recorded through the same detection system, with no game elements."
       width="wide"

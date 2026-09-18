@@ -39,7 +39,7 @@ export function ScenePickers({
   const BiomeIcon = biome === BIOME_AUTO ? Shuffle : (BIOME_ICONS[biome] ?? Trees);
 
   return (
-    <div className="mx-auto flex w-full max-w-[calc(80vh*3/4)] flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-3 sm:px-4">
+    <div className="mx-auto flex w-full max-w-[calc(80vh*3/4)] flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-surface px-3 py-2 sm:px-3.5">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <Label htmlFor="biomeSelect" icon={<BiomeIcon size={14} />}>

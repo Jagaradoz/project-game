@@ -145,7 +145,7 @@ export default function GameCanvas() {
            * window squash the box back to landscape, which is the bug this
            * screen started with.
            */
-          className="relative mx-auto aspect-3/4 w-full max-w-[calc(80vh*3/4)] touch-manipulation overflow-hidden rounded-xl border border-line bg-bg"
+          className="relative mx-auto aspect-3/4 w-full max-w-[calc(80vh*3/4)] touch-manipulation overflow-hidden rounded-lg border border-line bg-bg"
         >
           <canvas ref={gameCanvasRef} className="block h-full w-full" />
 
@@ -198,7 +198,7 @@ export default function GameCanvas() {
         />
       </main>
 
-      <SiteFooter />
+      <SiteFooter compact />
     </div>
   );
 }

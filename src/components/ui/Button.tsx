@@ -25,7 +25,7 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
 };
 
 const BASE =
-  'inline-flex cursor-pointer items-center justify-center rounded-lg text-center font-semibold ' +
+  'inline-flex cursor-pointer items-center justify-center rounded-md text-center font-semibold ' +
   'no-underline transition-colors duration-200 ' +
   // Recessed rather than filled: a solid grey block reads as a button that
   // still does something, which is exactly what a disabled control is not.

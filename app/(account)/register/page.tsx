@@ -52,6 +52,7 @@ export default function RegisterPage() {
 
   return (
     <PageShell
+      eyebrow="Account"
       title="Create an Account"
       subtitle="An account keeps your progress and puts your display name on the leaderboard."
       width="narrow"

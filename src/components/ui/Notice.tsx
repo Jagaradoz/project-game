@@ -29,7 +29,7 @@ export function Notice({ tone = 'info', title, children }: NoticeProps) {
     <div
       // Errors interrupt; the rest are announced only when the reader arrives.
       role={tone === 'error' ? 'alert' : 'note'}
-      className={`flex items-start gap-3 rounded-lg border px-3.5 py-3 text-sm ${TONE_CLASS[tone]}`}
+      className={`flex items-start gap-3 rounded-md border px-3.5 py-3 text-sm ${TONE_CLASS[tone]}`}
     >
       {/* Decorative: the tone is already carried by the title and the copy. */}
       <Glyph aria-hidden size={18} className="mt-0.5 flex-none" />

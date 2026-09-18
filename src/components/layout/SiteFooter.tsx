@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { VersionTag } from '@/components/ui/VersionTag';
-import { SHELL_WIDTH } from '@/components/layout/container';
+import { SHELL_GUTTER, SHELL_WIDTH } from '@/components/layout/container';
 import { Wordmark } from '@/components/layout/Wordmark';
 
 const FOOTER_LINKS = [
@@ -13,12 +13,29 @@ const FOOTER_LINKS = [
 interface SiteFooterProps {
   /** The control group's chrome carries no links to game screens. See nav.ts. */
   hasLinks?: boolean;
+  /** Play already fills the viewport; a short strip is enough. */
+  compact?: boolean;
 }
 
-export function SiteFooter({ hasLinks = true }: SiteFooterProps) {
+export function SiteFooter({ hasLinks = true, compact = false }: SiteFooterProps) {
+  if (compact) {
+    return (
+      <footer className="mt-auto border-t border-line bg-bg">
+        <div
+          className={`mx-auto flex ${SHELL_WIDTH.wide} flex-wrap items-center justify-between gap-3 py-4 ${SHELL_GUTTER}`}
+        >
+          <p className="m-0 text-xs text-subtle">
+            Pose detection stays in this browser. Stop if you feel unwell.
+          </p>
+          <VersionTag />
+        </div>
+      </footer>
+    );
+  }
+
   return (
     <footer className="mt-auto border-t border-line bg-surface">
-      <div className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8`}>
+      <div className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col gap-6 py-8 ${SHELL_GUTTER}`}>
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="flex max-w-sm flex-col gap-2">
             <Wordmark />

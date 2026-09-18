@@ -25,7 +25,7 @@ export function PoseStage({
   idleLabel = 'The camera is not on',
 }: PoseStageProps) {
   return (
-    <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl border border-line bg-black">
+    <div className="relative aspect-4/3 w-full overflow-hidden rounded-lg border border-line bg-black">
       <video
         ref={videoRef}
         playsInline

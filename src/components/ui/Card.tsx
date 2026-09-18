@@ -1,7 +1,7 @@
 /**
- * `primary` keeps the orange chip. It is the 10% of the palette, so at most one
+ * `primary` keeps the copper chip. It is the 10% of the palette, so at most one
  * card on a screen should ask for it -- the one that leads. Everything else
- * takes `default`, where the glyph sits inline in the accent indigo.
+ * takes `default`, where the glyph sits inline in the sage accent.
  *
  * The chip used to be unconditional, which is how twelve identical
  * orange-square-plus-title-plus-grey-paragraph blocks ended up across the app.
@@ -19,6 +19,8 @@ interface CardProps {
   actions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /** Drop the default padding so a media header can run edge to edge. */
+  padded?: boolean;
 }
 
 export function Card({
@@ -29,10 +31,13 @@ export function Card({
   actions,
   children,
   className = '',
+  padded = true,
 }: CardProps) {
   return (
     <section
-      className={`flex flex-col gap-4 rounded-xl border border-line bg-surface p-4 sm:p-5 ${className}`}
+      className={`flex flex-col rounded-lg border border-line bg-surface ${
+        padded ? 'gap-4 p-4 sm:p-5' : ''
+      } ${className}`}
     >
       {(title || actions) && (
         <header className="flex flex-wrap items-start justify-between gap-3">
@@ -41,7 +46,7 @@ export function Card({
               (tone === 'primary' ? (
                 <span
                   aria-hidden
-                  className="mt-0.5 grid size-9 flex-none place-items-center rounded-lg bg-primary-soft text-primary"
+                  className="mt-0.5 grid size-9 flex-none place-items-center rounded-md bg-primary-soft text-primary"
                 >
                   {icon}
                 </span>

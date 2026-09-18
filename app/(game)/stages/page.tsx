@@ -11,11 +11,13 @@ import { Card } from '@/components/ui/Card';
 import { LinkButton } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { PageShell } from '@/components/ui/PageShell';
+import { TrailStill } from '@/components/ui/TrailStill';
 import { DIFFICULTIES, difficultyLabel, stageGoalKills } from '@/engine/core/stage';
 import type { Difficulty } from '@/engine/types';
 import { getErrorMessage, repository } from '@/lib/api';
 import { biomeIndex } from '@/lib/api/catalog';
 import { formatNumber } from '@/lib/format';
+import { biomeStillSrc } from '@/lib/media/stills';
 import { useSettings } from '@/lib/store/settings';
 import type { BiomeProgress, StageProgress } from '@/types/api';
 
@@ -55,6 +57,7 @@ export default function StagesPage() {
 
   return (
     <PageShell
+      eyebrow="The trail"
       title="Stages"
       subtitle="Ten stages per biome, cleared in order. Clear a biome to unlock the next one."
       width="wide"
@@ -136,25 +139,47 @@ function BiomeCard({
 
   return (
     <Card
-      title={biome.name}
-      icon={biome.isUnlocked ? <Play size={20} /> : <Lock size={20} />}
-      note={
-        biome.isUnlocked
-          ? `${cleared} of ${biome.stages.length} stages cleared`
-          : 'Unlocks when every stage of the previous biome is cleared'
-      }
-      actions={
-        biome.isUnlocked ? (
-          <Badge tone={cleared === biome.stages.length ? 'ok' : 'primary'}>
-            {cleared === biome.stages.length ? 'Complete' : 'Unlocked'}
-          </Badge>
-        ) : (
-          <Badge icon={<Lock size={12} />}>Locked</Badge>
-        )
-      }
-      className={biome.isUnlocked ? '' : 'opacity-70'}
+      padded={false}
+      className={biome.isUnlocked ? 'overflow-hidden' : 'overflow-hidden opacity-70'}
     >
-      <div className="grid grid-cols-5 gap-2">
+      <div className="relative h-32 overflow-hidden sm:h-40">
+        <TrailStill
+          src={biomeStillSrc(biome.biomeId)}
+          alt=""
+          fill
+          sizes="(max-width: 832px) 100vw, 52rem"
+          className="object-cover object-[center_32%]"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-linear-to-t from-surface via-surface/50 to-black/10"
+        />
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-3 sm:px-5">
+          <div className="flex flex-col gap-0.5">
+            <h2 className="m-0 flex items-center gap-2 text-lg font-semibold tracking-tight text-text">
+              {biome.isUnlocked ? (
+                <Play aria-hidden size={16} className="text-accent" />
+              ) : (
+                <Lock aria-hidden size={16} className="text-muted" />
+              )}
+              {biome.name}
+            </h2>
+            <p className="m-0 text-xs text-muted">
+              {biome.isUnlocked
+                ? `${cleared} of ${biome.stages.length} stages cleared`
+                : 'Unlocks when every stage of the previous biome is cleared'}
+            </p>
+          </div>
+          {biome.isUnlocked ? (
+            <Badge tone={cleared === biome.stages.length ? 'ok' : 'primary'}>
+              {cleared === biome.stages.length ? 'Complete' : 'Unlocked'}
+            </Badge>
+          ) : (
+            <Badge icon={<Lock size={12} />}>Locked</Badge>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-5 gap-2 p-4 sm:p-5">
         {biome.stages.map((stage) => (
           <StageButton
             key={stage.stageNumber}
@@ -198,7 +223,7 @@ function StageButton({ stage, goalKills, isSelected, onPlay }: StageButtonProps)
             : 'border-line-strong bg-elevated text-text hover:border-muted'
       }`}
     >
-      <span className="font-display text-xl leading-none tabular-nums">{stage.stageNumber}</span>
+      <span className="text-xl leading-none font-semibold tabular-nums">{stage.stageNumber}</span>
       <span
         aria-hidden
         className="flex items-center gap-0.5 text-[10px] leading-none font-normal opacity-90"

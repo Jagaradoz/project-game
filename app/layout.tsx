@@ -1,24 +1,17 @@
 import type { Metadata, Viewport } from 'next';
-import { Barlow, Barlow_Condensed } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 
 import './globals.css';
 
 /**
  * Self-hosted by next/font, so there is no render-blocking request to Google and
- * no layout shift when the face swaps in. Barlow Condensed carries headings,
- * Barlow carries body copy -- the pairing the design system calls for.
+ * no layout shift when the face swaps in. One geometric sans for chrome and
+ * headlines -- weight does the hierarchy, not a second sports face.
  */
-const barlow = Barlow({
+const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-barlow',
-  display: 'swap',
-});
-
-const barlowCondensed = Barlow_Condensed({
-  subsets: ['latin'],
-  weight: ['500', '600', '700'],
-  variable: '--font-barlow-condensed',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-plus-jakarta',
   display: 'swap',
 });
 
@@ -69,14 +62,14 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#0f141a',
+  themeColor: '#0a0c0f',
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${barlow.variable} ${barlowCondensed.variable}`}>
+    <html lang="en" className={plusJakarta.variable}>
       <body className="m-0 min-h-dvh antialiased">{children}</body>
     </html>
   );

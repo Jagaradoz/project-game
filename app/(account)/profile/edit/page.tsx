@@ -64,7 +64,7 @@ export default function ProfileEditPage() {
 
   if (isLoading) {
     return (
-      <PageShell title="Edit Profile" subtitle={SUBTITLE} width="narrow">
+      <PageShell eyebrow="Account" title="Edit Profile" subtitle={SUBTITLE} width="narrow">
         <p className="m-0 text-sm text-muted">Loading…</p>
       </PageShell>
     );
@@ -72,7 +72,7 @@ export default function ProfileEditPage() {
 
   if (!session) {
     return (
-      <PageShell title="Edit Profile" subtitle={SUBTITLE} width="narrow">
+      <PageShell eyebrow="Account" title="Edit Profile" subtitle={SUBTITLE} width="narrow">
         <Notice tone="info" title="Sign in first">
           This page edits your account details. Please sign in or create an account to continue.
         </Notice>
@@ -94,7 +94,7 @@ export default function ProfileEditPage() {
   }
 
   return (
-    <PageShell title="Edit Profile" subtitle={SUBTITLE} width="narrow">
+    <PageShell eyebrow="Account" title="Edit Profile" subtitle={SUBTITLE} width="narrow">
       <>
         <LocalAccountNotice />
 

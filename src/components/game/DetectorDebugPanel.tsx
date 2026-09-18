@@ -31,7 +31,7 @@ export function DetectorDebugPanel({
       : snapshot.lateralLabel;
 
   return (
-    <details className="rounded-xl border border-line bg-surface px-4 py-3">
+    <details className="rounded-lg border border-line bg-surface px-4 py-3">
       <summary className="cursor-pointer text-[13px] font-semibold tracking-[0.04em] text-muted uppercase">
         Camera &amp; detector diagnostics
       </summary>

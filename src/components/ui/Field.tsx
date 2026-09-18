@@ -47,7 +47,7 @@ export function Field({ label, error, hint, icon, className = '', type, ...rest 
           type={resolvedType}
           aria-invalid={error ? true : undefined}
           aria-describedby={error || hint ? messageId : undefined}
-          className={`min-h-12 w-full rounded-lg border bg-bg py-2.5 text-base text-text transition-colors placeholder:text-subtle hover:border-muted focus:border-primary disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted ${
+          className={`min-h-12 w-full rounded-md border bg-bg py-2.5 text-base text-text transition-colors placeholder:text-subtle hover:border-muted focus:border-primary disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted ${
             icon ? 'pl-10' : 'pl-3'
           } ${isPassword ? 'pr-12' : 'pr-3'} ${error ? 'border-danger' : 'border-line-strong'} ${className}`}
           {...rest}

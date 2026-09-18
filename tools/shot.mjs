@@ -95,6 +95,10 @@ async function isolateGameStage(page) {
       main.style.minHeight = '100dvh';
       main.style.justifyContent = 'center';
     }
+    // Marketing stills want the trail, not the HUD / camera pip sitting on it.
+    stage.querySelectorAll(':scope > :not(canvas)').forEach((el) => {
+      el.style.display = 'none';
+    });
   })()`);
 }
 

@@ -67,8 +67,8 @@ export default function CalibrationPanel() {
           never drawn to, so it is kept out of the layout and out of the a11y tree. */}
       <canvas ref={gameCanvasRef} hidden aria-hidden />
 
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4">
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+        <div className="flex flex-col gap-4 lg:col-span-7">
           <PoseStage
             videoRef={videoRef}
             overlayRef={overlayRef}
@@ -110,7 +110,7 @@ export default function CalibrationPanel() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:col-span-5">
           <Card title="Pre-flight checklist" icon={<ListChecks size={20} />}>
             <CalibrationChecklist checks={checks} />
           </Card>
