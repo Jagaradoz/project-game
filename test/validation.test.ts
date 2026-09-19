@@ -8,8 +8,10 @@ import {
   DISPLAY_NAME_MIN,
   PASSWORD_MIN,
   displayNameSchema,
+  avatarSeedSchema,
   fieldErrors,
   loginSchema,
+  profileEditSchema,
   registerSchema,
 } from '@/lib/validation/account';
 
@@ -68,6 +70,21 @@ test('login only requires a non-empty password, not a strong one', () => {
   // out an account created before the rule changed.
   assert.equal(loginSchema.safeParse({ email: 'a@b.co', password: 'x' }).success, true);
   assert.equal(loginSchema.safeParse({ email: 'a@b.co', password: '' }).success, false);
+});
+
+test('profile edits require a display name and an avatar seed', () => {
+  const parsed = profileEditSchema.safeParse({
+    displayName: 'Runner',
+    avatarSeed: 'critter-1',
+  });
+  assert.equal(parsed.success, true);
+
+  assert.equal(avatarSeedSchema.safeParse('').success, false);
+  assert.equal(avatarSeedSchema.safeParse('x'.repeat(65)).success, false);
+  assert.equal(
+    profileEditSchema.safeParse({ displayName: 'Runner' }).success,
+    false,
+  );
 });
 
 test('fieldErrors keeps one message per field', () => {

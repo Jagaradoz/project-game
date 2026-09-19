@@ -16,6 +16,7 @@ import type {
   BiomeProgress,
   LeaderboardEntry,
   LoginInput,
+  ProfileEditInput,
   ProfileSummary,
   RegisterInput,
   RunResult,
@@ -30,8 +31,9 @@ export interface GameRepository {
   login(input: LoginInput): Promise<AuthSession>;
   logout(): Promise<void>;
 
-  /** The email is fixed at registration, so only the display name can change. */
+  /** The email is fixed at registration; the display name and avatar seed can change. */
   updateDisplayName(displayName: string): Promise<User>;
+  updateProfile(input: ProfileEditInput): Promise<User>;
 
   getProfile(): Promise<ProfileSummary>;
   getBiomes(): Promise<BiomeProgress[]>;

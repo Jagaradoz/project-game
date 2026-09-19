@@ -1,12 +1,13 @@
 'use client';
 
-/* TOR 3: ระบบสมาชิกและเข้าสู่ระบบ -- editing the account's display name. */
+/* TOR 3: ระบบสมาชิกและเข้าสู่ระบบ -- editing the account's display name and avatar. */
 
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, LogIn, Mail, Save, User, UserPlus } from 'lucide-react';
+import { ArrowLeft, LogIn, Mail, Save, Shuffle, User, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 import { LocalAccountNotice } from '@/components/account/LocalAccountNotice';
+import { PlayerAvatar } from '@/components/account/PlayerAvatar';
 import { Button, LinkButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
@@ -14,9 +15,10 @@ import { Notice } from '@/components/ui/Notice';
 import { PageShell } from '@/components/ui/PageShell';
 import { useSession } from '@/hooks/useSession';
 import { getErrorMessage, repository } from '@/lib/api';
+import { avatarCandidates, avatarSeedFor } from '@/lib/avatar';
 import { fieldErrors, profileEditSchema } from '@/lib/validation/account';
 
-const SUBTITLE = 'Change the name other players see on the leaderboard.';
+const SUBTITLE = 'Change the name and avatar other players see.';
 
 export default function ProfileEditPage() {
   const router = useRouter();
@@ -30,17 +32,29 @@ export default function ProfileEditPage() {
   const [draft, setDraft] = useState<string | null>(null);
   const displayName = draft ?? session?.user.displayName ?? '';
 
+  const storedSeed = session ? avatarSeedFor(session.user) : '';
+  const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
+  const avatarSeed = avatarDraft ?? storedSeed;
+  const [candidates, setCandidates] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (storedSeed && candidates.length === 0) {
+    setCandidates(avatarCandidates(storedSeed));
+  }
+
+  function shuffleCandidates() {
+    setCandidates(avatarCandidates(avatarSeed));
+  }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setFormError(null);
     setIsSaved(false);
 
-    const parsed = profileEditSchema.safeParse({ displayName });
+    const parsed = profileEditSchema.safeParse({ displayName, avatarSeed });
     if (!parsed.success) {
       setErrors(fieldErrors(parsed.error));
       return;
@@ -49,11 +63,12 @@ export default function ProfileEditPage() {
     setErrors({});
     setIsSubmitting(true);
     try {
-      await repository.updateDisplayName(parsed.data.displayName);
+      await repository.updateProfile(parsed.data);
       await refresh();
-      // Drop the draft so the field falls back to the refreshed session value,
-      // which is the trimmed name the repository actually stored.
+      // Drop the drafts so the fields fall back to the refreshed session values.
       setDraft(null);
+      setAvatarDraft(null);
+      setCandidates(avatarCandidates(parsed.data.avatarSeed));
       setIsSaved(true);
     } catch (error: unknown) {
       setFormError(getErrorMessage(error));
@@ -122,6 +137,50 @@ export default function ProfileEditPage() {
               error={errors.displayName}
               hint="This is what appears on the leaderboard instead of your email."
             />
+
+            <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
+              <legend className="mb-0 text-sm font-semibold text-text">Avatar</legend>
+              <p className="m-0 text-xs text-muted">
+                Pick a Critter, or shuffle for a new set. Saved with your profile — not a photo.
+              </p>
+
+              <div className="grid grid-cols-4 gap-2">
+                {candidates.map((seed) => {
+                  const isSelected = seed === avatarSeed;
+                  return (
+                    <button
+                      key={seed}
+                      type="button"
+                      onClick={() => setAvatarDraft(seed)}
+                      aria-pressed={isSelected}
+                      aria-label={isSelected ? 'Selected avatar' : 'Select this avatar'}
+                      className={`cursor-pointer rounded-full p-0.5 transition-shadow ${
+                        isSelected
+                          ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface'
+                          : 'hover:ring-2 hover:ring-line-strong hover:ring-offset-2 hover:ring-offset-surface'
+                      }`}
+                    >
+                      <PlayerAvatar seed={seed} name={displayName || 'Player'} size="md" decorative />
+                    </button>
+                  );
+                })}
+              </div>
+
+              {errors.avatarSeed && (
+                <p className="m-0 text-sm text-danger-text">{errors.avatarSeed}</p>
+              )}
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon={<Shuffle size={16} />}
+                onClick={shuffleCandidates}
+                className="self-start"
+              >
+                Shuffle
+              </Button>
+            </fieldset>
 
             {formError && <Notice tone="error">{formError}</Notice>}
             {isSaved && <Notice tone="ok">Your changes have been saved.</Notice>}

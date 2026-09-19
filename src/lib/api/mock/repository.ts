@@ -25,13 +25,15 @@ import { createSalt, derivePasswordDigest, digestsMatch } from '@/lib/api/mock/c
 import { readDb, writeDb } from '@/lib/api/mock/storage';
 import type { MockAccount, MockDb, StoredRun } from '@/lib/api/mock/storage';
 import type { GameRepository } from '@/lib/api/repository';
-import { displayNameSchema, loginSchema, registerSchema } from '@/lib/validation/account';
+import { avatarSeedFor } from '@/lib/avatar';
+import { displayNameSchema, loginSchema, profileEditSchema, registerSchema } from '@/lib/validation/account';
 import type {
   AuthSession,
   BiomeProgress,
   LeaderboardEntry,
   LoginInput,
   PlayerStats,
+  ProfileEditInput,
   ProfileSummary,
   RegisterInput,
   RunResult,
@@ -49,6 +51,7 @@ export const GUEST_USER: User = {
   id: 'guest-local',
   email: '',
   displayName: 'Guest Runner',
+  avatarSeed: 'guest-local',
   createdAt: '1970-01-01T00:00:00.000Z',
 };
 
@@ -71,8 +74,35 @@ function toUser(account: MockAccount): User {
     id: account.id,
     email: account.email,
     displayName: account.displayName,
+    avatarSeed: avatarSeedFor(account),
     createdAt: account.createdAt,
   };
+}
+
+function patchAccount(patch: { displayName?: string; avatarSeed?: string }): User {
+  if (patch.displayName !== undefined) {
+    const parsed = displayNameSchema.safeParse(patch.displayName);
+    if (!parsed.success) {
+      throw new ApiError(parsed.error.issues[0]?.message ?? 'That name is not valid', 400);
+    }
+    patch = { ...patch, displayName: parsed.data };
+  }
+
+  const db = readDb();
+  const account = findAccount(db, db.sessionUserId);
+  if (!account) throw new ApiError('Sign in before editing your profile', 401);
+
+  const updated: MockAccount = {
+    ...account,
+    ...(patch.displayName !== undefined ? { displayName: patch.displayName } : {}),
+    ...(patch.avatarSeed !== undefined ? { avatarSeed: patch.avatarSeed } : {}),
+  };
+  writeDb({
+    ...db,
+    accounts: db.accounts.map((entry) => (entry.id === account.id ? updated : entry)),
+  });
+
+  return toUser(updated);
 }
 
 function sessionFor(user: User): AuthSession {
@@ -175,10 +205,12 @@ export function createMockRepository(): GameRepository {
       }
 
       const passwordSalt = createSalt();
+      const id = newId('user');
       const account: MockAccount = {
-        id: newId('user'),
+        id,
         email,
         displayName,
+        avatarSeed: id,
         passwordSalt,
         passwordDigest: await derivePasswordDigest(password, passwordSalt),
         createdAt: new Date().toISOString(),
@@ -225,22 +257,16 @@ export function createMockRepository(): GameRepository {
     },
 
     async updateDisplayName(displayName: string): Promise<User> {
-      const parsed = displayNameSchema.safeParse(displayName);
+      return patchAccount({ displayName });
+    },
+
+    async updateProfile(input: ProfileEditInput): Promise<User> {
+      const parsed = profileEditSchema.safeParse(input);
       if (!parsed.success) {
-        throw new ApiError(parsed.error.issues[0]?.message ?? 'That name is not valid', 400);
+        throw new ApiError(parsed.error.issues[0]?.message ?? 'Those details are not valid', 400);
       }
 
-      const db = readDb();
-      const account = findAccount(db, db.sessionUserId);
-      if (!account) throw new ApiError('Sign in before editing your profile', 401);
-
-      const updated: MockAccount = { ...account, displayName: parsed.data };
-      writeDb({
-        ...db,
-        accounts: db.accounts.map((entry) => (entry.id === account.id ? updated : entry)),
-      });
-
-      return toUser(updated);
+      return patchAccount(parsed.data);
     },
 
     async getProfile(): Promise<ProfileSummary> {

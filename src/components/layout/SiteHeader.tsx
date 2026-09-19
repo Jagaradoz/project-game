@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Play, User, X } from 'lucide-react';
+import { Menu, Play, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { PlayerAvatar } from '@/components/account/PlayerAvatar';
 import { LinkButton } from '@/components/ui/Button';
 import { SHELL_GUTTER, SHELL_WIDTH } from '@/components/layout/container';
 import { Wordmark } from '@/components/layout/Wordmark';
 import { STUDY_NAV, type NavLink, type NavVariant } from '@/components/layout/nav';
 import { useSession } from '@/hooks/useSession';
+import { avatarSeedFor } from '@/lib/avatar';
 
 interface SiteHeaderProps {
   /** 'study' strips every game affordance from the chrome. See nav.ts. */
@@ -30,7 +32,6 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
   const pathname = usePathname();
   const { session, isLoading } = useSession();
   const isGuest = !isLoading && session === null;
-  const isSignedIn = !isLoading && session !== null;
 
   /**
    * The route the drawer was opened on, rather than a boolean.
@@ -117,19 +118,22 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
               </>
             )}
 
-            {isSignedIn && (
+            {session && (
               <>
                 <Link
                   href="/profile"
                   aria-label="Profile"
                   aria-current={profileIsActive ? 'page' : undefined}
-                  className={`grid size-9 place-items-center rounded-md transition-colors ${
-                    profileIsActive
-                      ? 'bg-elevated text-text'
-                      : 'text-muted hover:bg-surface hover:text-text'
+                  className={`overflow-hidden rounded-full transition-opacity ${
+                    profileIsActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-bg' : 'hover:opacity-80'
                   }`}
                 >
-                  <User aria-hidden size={18} />
+                  <PlayerAvatar
+                    seed={avatarSeedFor(session.user)}
+                    name={session.user.displayName}
+                    size="sm"
+                    decorative
+                  />
                 </Link>
                 {hasCta && (
                   <LinkButton href="/play" variant="primary" size="sm" icon={<Play size={15} />}>

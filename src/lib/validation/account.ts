@@ -10,6 +10,7 @@
  * appears on the leaderboard -- never the email.
  */
 
+import { AVATAR_SEED_MAX, AVATAR_SEED_MIN } from '@/lib/avatar';
 import { z } from 'zod';
 
 export const DISPLAY_NAME_MIN = 2;
@@ -53,8 +54,15 @@ export const loginSchema = z.object({
   password: z.string().min(1, { message: 'Enter your password' }),
 });
 
+export const avatarSeedSchema = z
+  .string()
+  .trim()
+  .min(AVATAR_SEED_MIN, { message: 'Choose an avatar' })
+  .max(AVATAR_SEED_MAX, { message: 'That avatar pick is not valid' });
+
 export const profileEditSchema = z.object({
   displayName: displayNameSchema,
+  avatarSeed: avatarSeedSchema,
 });
 
 export type RegisterForm = z.infer<typeof registerSchema>;

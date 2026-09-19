@@ -12,12 +12,14 @@
  */
 
 import { apiRequest } from '@/lib/api/client';
+import { avatarSeedFor } from '@/lib/avatar';
 import type { GameRepository } from '@/lib/api/repository';
 import type {
   AuthSession,
   BiomeProgress,
   LeaderboardEntry,
   LoginInput,
+  ProfileEditInput,
   ProfileSummary,
   RegisterInput,
   RunResult,
@@ -26,12 +28,18 @@ import type {
 } from '@/types/api';
 import { z } from 'zod';
 
-const userSchema = z.object({
-  id: z.string(),
-  email: z.string(),
-  displayName: z.string(),
-  createdAt: z.string(),
-});
+const userSchema = z
+  .object({
+    id: z.string(),
+    email: z.string(),
+    displayName: z.string(),
+    createdAt: z.string(),
+    avatarSeed: z.string().optional(),
+  })
+  .transform((user) => ({
+    ...user,
+    avatarSeed: avatarSeedFor(user),
+  }));
 
 const sessionSchema = z.object({
   user: userSchema,
@@ -129,6 +137,15 @@ export function createLiveRepository(): GameRepository {
       const response = await apiRequest('/me', {
         method: 'PATCH',
         body: { displayName },
+        schema: userSchema,
+      });
+      return required(response.data);
+    },
+
+    async updateProfile(input: ProfileEditInput): Promise<User> {
+      const response = await apiRequest('/me', {
+        method: 'PATCH',
+        body: input,
         schema: userSchema,
       });
       return required(response.data);

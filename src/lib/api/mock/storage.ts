@@ -23,6 +23,8 @@ export interface MockAccount {
   id: string;
   email: string;
   displayName: string;
+  /** Missing on accounts written before avatars existed; `toUser` falls back to id. */
+  avatarSeed?: string;
   passwordSalt: string;
   passwordDigest: string;
   createdAt: string;

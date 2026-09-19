@@ -8,7 +8,6 @@ import { LogIn, Lock, Mail } from 'lucide-react';
 import { useState } from 'react';
 
 import { GoogleOAuthButton } from '@/components/account/GoogleOAuthButton';
-import { LocalAccountNotice } from '@/components/account/LocalAccountNotice';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
@@ -57,48 +56,46 @@ export default function LoginPage() {
       subtitle="Sign in to keep your statistics across sessions."
       width="narrow"
     >
-      <LocalAccountNotice />
-
       <Card>
         <div className="flex flex-col gap-4">
-          <GoogleOAuthButton label="Sign in with Google" />
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+            <Field
+              label="Email"
+              type="email"
+              autoComplete="email"
+              icon={<Mail size={18} />}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              error={errors.email}
+            />
+
+            <Field
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              icon={<Lock size={18} />}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              error={errors.password}
+            />
+
+            {formError && <Notice tone="error">{formError}</Notice>}
+
+            <Button type="submit" isLoading={isSubmitting} icon={<LogIn size={18} />} isFullWidth>
+              {isSubmitting ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </form>
 
           <div className="relative flex items-center justify-center">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-line" />
             </div>
             <span className="relative bg-surface px-3 text-xs font-medium uppercase tracking-wider text-muted">
-              or continue with email
+              or continue with Google
             </span>
           </div>
 
-          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-          <Field
-            label="Email"
-            type="email"
-            autoComplete="email"
-            icon={<Mail size={18} />}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            error={errors.email}
-          />
-
-          <Field
-            label="Password"
-            type="password"
-            autoComplete="current-password"
-            icon={<Lock size={18} />}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            error={errors.password}
-          />
-
-          {formError && <Notice tone="error">{formError}</Notice>}
-
-          <Button type="submit" isLoading={isSubmitting} icon={<LogIn size={18} />} isFullWidth>
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
-          </Button>
-          </form>
+          <GoogleOAuthButton label="Sign in with Google" />
         </div>
       </Card>
 

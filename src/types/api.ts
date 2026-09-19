@@ -33,6 +33,11 @@ export interface User {
   /** Set at registration and never editable, per TOR 3 (ระบบสมาชิก). */
   email: string;
   displayName: string;
+  /**
+   * DiceBear Critters seed. The image is generated from this string, so the
+   * backend never stores a photo. Empty/missing falls back to `id`.
+   */
+  avatarSeed: string;
   createdAt: string;
 }
 
@@ -45,6 +50,11 @@ export interface RegisterInput {
   email: string;
   password: string;
   displayName: string;
+}
+
+export interface ProfileEditInput {
+  displayName: string;
+  avatarSeed: string;
 }
 
 export interface LoginInput {

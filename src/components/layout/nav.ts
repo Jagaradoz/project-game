@@ -16,8 +16,9 @@ export interface NavLink {
  *   Stages      -- picked from /play and /calibrate, not the header.
  *   Calibrate   -- a step inside a flow. Linked from the landing page.
  *   How to play -- a section on the landing page (`/#how-to-play`).
- *   Leaderboard -- a view of /profile, reached by AccountTabs there. That tab
- *                  strip is load-bearing: drop it and the route is orphaned.
+ *   Leaderboard -- a view of /profile, reached by AccountTabs there (Runs /
+ *                  Progress / Leaderboard). That tab strip is load-bearing:
+ *                  drop it and the route is orphaned.
  */
 
 /**

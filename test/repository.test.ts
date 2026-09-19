@@ -138,13 +138,30 @@ test('login gives the same message for an unknown email as for a bad password', 
 
 test('the email is fixed at registration; only the display name changes', async () => {
   const repo = createMockRepository();
-  await repo.register(credentials);
+  const session = await repo.register(credentials);
+
+  assert.equal(session.user.avatarSeed, session.user.id);
 
   const updated = await repo.updateDisplayName('  New Name  ');
   assert.equal(updated.displayName, 'New Name');
   assert.equal(updated.email, credentials.email);
+  assert.equal(updated.avatarSeed, session.user.id);
 
   await assert.rejects(() => repo.updateDisplayName('x'));
+});
+
+test('the avatar seed can be changed without touching the email', async () => {
+  const repo = createMockRepository();
+  const session = await repo.register(credentials);
+
+  const updated = await repo.updateProfile({
+    displayName: session.user.displayName,
+    avatarSeed: 'critter-pick-1',
+  });
+
+  assert.equal(updated.avatarSeed, 'critter-pick-1');
+  assert.equal(updated.displayName, 'Runner');
+  assert.equal(updated.email, credentials.email);
 });
 
 test('editing the display name requires a session', async () => {
