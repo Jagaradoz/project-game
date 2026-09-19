@@ -231,6 +231,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   let pendingCharacter = options.character ?? CONFIG.game.defaultCharacter;
   let pendingBiome = options.biome ?? BIOME_AUTO;
+  let actorsVisible = true;
 
   /**
    * The config this run steps under. With no stage selected the goal is absent,
@@ -350,7 +351,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     }
 
     if (sceneRefs) {
-      syncScene(sceneRefs, game, stepMs);
+      syncScene(sceneRefs, game, stepMs, rules, actorsVisible);
       sceneRefs.render();
     }
 
@@ -546,7 +547,26 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         input.reset();
         resetMovementTallies();
         sceneRefs?.player?.playAnimation('run', 0.1, true);
+        if (!actorsVisible && sceneRefs?.player) {
+          sceneRefs.player.group.visible = false;
+        }
         publish();
+      },
+      setActorsVisible(visible: boolean) {
+        actorsVisible = Boolean(visible);
+        if (!actorsVisible) {
+          game = { ...game, enemies: [], bullets: [] };
+          if (sceneRefs?.player) sceneRefs.player.group.visible = false;
+          if (sceneRefs?.enemyPool) {
+            for (const item of sceneRefs.enemyPool.items) item.group.visible = false;
+            for (const corpse of sceneRefs.enemyPool.corpses) corpse.group.visible = false;
+          }
+          if (sceneRefs?.bulletPool) {
+            for (const b of sceneRefs.bulletPool.items) b.mesh.visible = false;
+          }
+        } else {
+          if (sceneRefs?.player) sceneRefs.player.group.visible = true;
+        }
       },
       /**
        * Steps the real reducer at a fixed timestep. Software rendering is far
@@ -567,7 +587,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           // once -- deaths, hit bursts -- are stepped straight past. Only for
           // the tail: syncScene walks every scatter instance.
           const remainingMs = (steps - step) * stepMs;
-          if (sceneRefs && remainingMs < SIM_SYNC_TAIL_MS) syncScene(sceneRefs, game, stepMs);
+          if (sceneRefs && remainingMs < SIM_SYNC_TAIL_MS) syncScene(sceneRefs, game, stepMs, rules, actorsVisible);
         }
       },
       summary() {

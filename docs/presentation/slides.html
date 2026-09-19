@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบเกมออกกำลังกายผ่านเว็บแคม (Webcam Exergame) - Presentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0d14;
+      --card-bg: rgba(20, 27, 45, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00d2ff;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Kanit', sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* Ambient Background Glow */
+    .ambient-glow {
+      position: fixed;
+      top: -20%;
+      left: 10%;
+      width: 80vw;
+      height: 70vh;
+      background: radial-gradient(circle, rgba(0, 210, 255, 0.12) 0%, rgba(16, 185, 129, 0.04) 50%, transparent 70%);
+      filter: blur(80px);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Slide Deck Container */
+    .deck {
+      position: relative;
+      flex: 1;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+    }
+
+    .slide {
+      position: absolute;
+      width: 92vw;
+      max-width: 1400px;
+      height: 84vh;
+      max-height: 800px;
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 44px 56px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.96) translateY(20px);
+      transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1) translateY(0);
+    }
+
+    /* Slide Header */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 28px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 18px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(0, 210, 255, 0.12);
+      border: 1px solid rgba(0, 210, 255, 0.3);
+      color: var(--accent-cyan);
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .badge.amber {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: var(--accent-amber);
+    }
+
+    .badge.emerald {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: var(--accent-emerald);
+    }
+
+    .slide-title {
+      font-size: 38px;
+      font-weight: 700;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #ffffff 40%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .slide-subtitle {
+      color: var(--text-muted);
+      font-size: 16px;
+      font-weight: 400;
+      margin-top: 4px;
+    }
+
+    .slide-number {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 48px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Content Layout */
+    .slide-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 40px;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .cards-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 18px 22px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(0, 210, 255, 0.3);
+      background: rgba(15, 23, 42, 0.85);
+    }
+
+    .card-title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .icon-box {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-content: center;
+      font-size: 18px;
+      background: rgba(0, 210, 255, 0.15);
+      color: var(--accent-cyan);
+    }
+
+    .icon-box.amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-amber);
+    }
+
+    .icon-box.emerald {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+    }
+
+    .feature-card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .feature-card p {
+      font-size: 14.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .feature-card strong {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    /* Preview Visual Box */
+    .visual-box {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #020617;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    }
+
+    .visual-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .visual-caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 16px 20px;
+      background: linear-gradient(to top, rgba(10, 13, 20, 0.95), rgba(10, 13, 20, 0));
+      font-size: 13.5px;
+      color: #cbd5e1;
+    }
+
+    /* Bottom Navigation Bar */
+    .nav-bar {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 9999px;
+      padding: 8px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .nav-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: #f8fafc;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: grid;
+      place-content: center;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+
+    .nav-btn:hover {
+      background: rgba(0, 210, 255, 0.3);
+      color: #fff;
+    }
+
+    .dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .dot.active {
+      width: 28px;
+      border-radius: 9999px;
+      background: var(--accent-cyan);
+    }
+
+    .hotkey-hint {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      padding-left: 14px;
+    }
+
+    /* Biome grid on Slide 3 */
+    .biome-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      height: 100%;
+    }
+
+    .biome-item {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .biome-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .biome-label {
+      position: absolute;
+      bottom: 0;
+      inset-inline: 0;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.7);
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+
+  <main class="deck">
+    <!-- SLIDE 1: วิธีการเล่น -->
+    <section class="slide active" id="slide-1">
+      <div class="slide-header">
+        <div>
+          <span class="badge">หน้า 1 / 3 &bull; CONTROLS & GAMEPLAY</span>
+          <h1 class="slide-title">วิธีการเล่น (Gameplay & Pose Controls)</h1>
+          <p class="slide-subtitle">การควบคุมเกมด้วยท่าทางร่างกายผ่านกล้อง Webcam ไร้อุปกรณ์สวมใส่ (Markerless AI)</p>
+        </div>
+        <div class="slide-number">01</div>
+      </div>
+
+      <div class="slide-body">
+        <div class="cards-stack">
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box">↔</div>
+              <h3>1. เอนตัวหรือก้าวสลับเลน (Lateral Movement)</h3>
+            </div>
+            <p><strong>การกระทำ:</strong> เอนลำตัวหรือสไลด์ก้าวไปทางซ้าย/ขวา<br>
+            <strong>การตรวจจับ:</strong> MediaPipe วิเคราะห์จุดไหล่กึ่งกลาง (Mid-shoulder x-offset) เทียบ Baseline เพื่อสั่งให้ตัวละครสลับระหว่าง <strong>เลนซ้าย - เลนกลาง - เลนขวา</strong> อย่างแม่นยำ ป้องกันอาการวูบวาบ</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box">🏃</div>
+              <h3>2. วิ่งเหยาะอยู่กับที่เพื่อโจมตี (Jog in Place / High Knees)</h3>
+            </div>
+            <p><strong>การกระทำ:</strong> วิ่งยกเข่าสลับข้างต่อเนื่อง (Jogging in place)<br>
+            <strong>การตรวจจับ:</strong> วัดความต่างความสูงของหัวเข่า (Knee Delta) และจังหวะก้าว (Cadence SPM) เมื่อถึงเกณฑ์จะสั่งให้ตัวละคร <strong>ขว้างใบมีดโจมตีศัตรู</strong> ในเลนตรงหน้า พร้อมส่งเสริมการออกกำลังกายแบบคาร์ดิโอ</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box">🛡️</div>
+              <h3>3. กฎการเอาชีวิตรอดและคะแนน (Survival & Score)</h3>
+            </div>
+            <p><strong>หัวใจ 3 ดวง (3 HP):</strong> ชนศัตรูลด 1 ดวง และมีระยะอมตะกระพริบชั่วคราว (Invulnerability)<br>
+            <strong>ระบบสำรอง (Fallback):</strong> รองรับปุ่มลูกศรคีย์บอร์ด & Spacebar เพื่อความสะดวกในการทดสอบ</p>
+          </div>
+        </div>
+
+        <div class="visual-box">
+          <img src="01-whispering-pines.png" alt="Whispering Pines Controls Preview" />
+          <div class="visual-caption">
+            <strong>มุมมองการเล่น:</strong> ฉากวิ่ง 3 มิติแนวตั้ง (Portrait 3:4) ไร้สิ่งรบกวน โฟกัสการเคลื่อนไหวเต็มขอบเขต
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: ระบบศัตรู -->
+    <section class="slide" id="slide-2">
+      <div class="slide-header">
+        <div>
+          <span class="badge amber">หน้า 2 / 3 &bull; ENEMY & COMBAT</span>
+          <h1 class="slide-title">ระบบศัตรู (Enemy & Combat Mechanics)</h1>
+          <p class="slide-subtitle">ระบบศัตรูโครงกระดูก 3D Rigged และเทคนิค Optimization ระดับสูง</p>
+        </div>
+        <div class="slide-number">02</div>
+      </div>
+
+      <div class="slide-body">
+        <div class="cards-stack">
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box amber">💀</div>
+              <h3>1. พฤติกรรมและการเกิดของศัตรู (Spawning Logic)</h3>
+            </div>
+            <p><strong>เส้นทางการเดิน:</strong> ศัตรูเกิดข้างหน้าตามเลน (LCG Deterministic Seed) และเดินตรงมุ่งหน้าหาผู้เล่น (+z) โดยไม่มีการเปลี่ยนเลนกะทันหัน เปิดโอกาสให้ผู้เล่นประเมินว่าจะหลบหรือโจมตี</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box amber">⚡</div>
+              <h3>2. การเพิ่มประสิทธิภาพการจำลอง (Dynamic Rigging Cap)</h3>
+            </div>
+            <p><strong>Affordable Skinned Meshes:</strong> ใช้โมเดลโครงกระดูก 3D พร้อมกระดูกขยับได้จริง โดย <strong>คำนวณ AnimationMixer เฉพาะศัตรูที่อยู่ใกล้ผู้เล่นที่สุด (Nearest Enemies)</strong> ส่วนศัตรูที่อยู่ไกลจะค้างท่าวิ่งไว้ ทำให้คงเฟรมเรต 60 FPS ได้ลื่นไหลบนทุกอุปกรณ์</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box amber">⚔️</div>
+              <h3>3. การกำจัดและแอนิเมชันความตาย (Combat & Ragdoll Decay)</h3>
+            </div>
+            <p><strong>1-Hit Kill:</strong> ขว้างอาวุธโดนศัตรู = กำจัดทันที<br>
+            <strong>แอนิเมชันความตาย:</strong> ศัตรูล้มฟุบลงกับพื้น (Death Action) นอนนิ่ง 2.2 วินาที ก่อนค่อยๆ จมลงใต้ผืนทราย/ดิน 1.1 วินาทีอย่างนุ่มนวล โดยไม่ทำให้เกิดปัญหาการจัดเรียงความโปร่งใส (Sorting Artifacts)</p>
+          </div>
+        </div>
+
+        <div class="visual-box">
+          <img src="04-sunwash-dunes.png" alt="Oasis Biome Enemies" />
+          <div class="visual-caption">
+            <strong>ระบบศัตรู:</strong> จัดวางตามเลนชัดเจน ผู้เล่นสามารถตัดสินใจก้าวหลบหรือวิ่งยกเข่าเพื่อยิงทำลาย
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: ระบบด่าน -->
+    <section class="slide" id="slide-3">
+      <div class="slide-header">
+        <div>
+          <span class="badge emerald">หน้า 3 / 3 &bull; STAGES & BIOMES</span>
+          <h1 class="slide-title">ระบบด่าน (Stage Progression & Biomes)</h1>
+          <p class="slide-subtitle">การผจญภัยผ่าน 4 ภูมิประเทศพร้อมการไล่ระดับความยากและการเปลี่ยนฉากไร้รอยต่อ</p>
+        </div>
+        <div class="slide-number">03</div>
+      </div>
+
+      <div class="slide-body">
+        <div class="cards-stack">
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box emerald">🗺️</div>
+              <h3>1. โครงสร้าง 40 สเตจและ 4 สภาพแวดล้อม (4 Biomes)</h3>
+            </div>
+            <p><strong>ลำดับการปลดล็อก:</strong> Whispering Pines (ป่าสน) &rarr; Emberfall (ใบไม้เปลี่ยนสี) &rarr; Grey Crags (หน้าผาหิน) &rarr; Sunwash Dunes (ทะเลทราย)<br>
+            <strong>การแบ่งสเตจ:</strong> 10 ด่านต่อ Biome (รวม 40 สเตจ) เลือกความยากได้ 3 ระดับ: ง่าย (Easy), ปกติ (Normal), ท้าทาย (Hard)</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box emerald">🎨</div>
+              <h3>2. การเปลี่ยนผ่านฉากแบบไร้รอยต่อ (Seamless Crossfade)</h3>
+            </div>
+            <p><strong>Palette Dissolve:</strong> วิ่งทุกๆ 700 เมตร จะมีช่วงผสมสีฉาก 160 เมตร ท้องฟ้า หมอก แสงแดด และผืนดิน ค่อยๆ ไล่เฉดสีกลมกลืนโดยไม่ต้องตัดเข้าหน้าโหลด (Zero Loading Screens)<br>
+            <strong>Scatter Swap:</strong> โมเดลประกอบฉาก (ต้นไม้, หิน, กระบองเพชร) สลับชุดอย่างแนบเนียนที่จุดกึ่งกลาง</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title-row">
+              <div class="icon-box emerald">🏆</div>
+              <h3>3. เงื่อนไขการผ่านด่านและการบันทึกสถิติ (Clear & Metrics)</h3>
+            </div>
+            <p><strong>Goal Kills:</strong> แต่ละด่านมีโควตากำจัดศัตรูที่จะเพิ่มขึ้นตามเลขด่านและความยาก<br>
+            <strong>Health Metrics:</strong> บันทึกจำนวนการก้าว/ยกเข่า (Cadence), ระยะทาง, แคลอรี่ และเวลา เพื่อแสดงผลประเมินสุขภาพหลังจบเกม</p>
+          </div>
+        </div>
+
+        <div class="biome-grid">
+          <div class="biome-item">
+            <img src="01-whispering-pines.png" alt="01 Whispering Pines" />
+            <div class="biome-label">1. Whispering Pines (ป่าสน)</div>
+          </div>
+          <div class="biome-item">
+            <img src="02-emberfall.png" alt="02 Emberfall" />
+            <div class="biome-label">2. Emberfall (ใบไม้เปลี่ยนสี)</div>
+          </div>
+          <div class="biome-item">
+            <img src="03-grey-crags.png" alt="03 Grey Crags" />
+            <div class="biome-label">3. Grey Crags (หน้าผาหิน)</div>
+          </div>
+          <div class="biome-item">
+            <img src="04-sunwash-dunes.png" alt="04 Sunwash Dunes" />
+            <div class="biome-label">4. Sunwash Dunes (ทะเลทราย)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Navigation -->
+  <nav class="nav-bar">
+    <button class="nav-btn" id="prevBtn" title="สไลด์ก่อนหน้า (Arrow Left)">&#8592;</button>
+    <div class="dots" id="dots">
+      <div class="dot active" data-index="0"></div>
+      <div class="dot" data-index="1"></div>
+      <div class="dot" data-index="2"></div>
+    </div>
+    <button class="nav-btn" id="nextBtn" title="สไลด์ถัดไป (Arrow Right / Space)">&#8594;</button>
+    <span class="hotkey-hint">กดปุ่ม &larr; / &rarr; บนคีย์บอร์ดเพื่อเปลี่ยนหน้า</span>
+  </nav>
+
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    const dots = document.querySelectorAll('.dot');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    let currentIndex = 0;
+
+    function showSlide(index) {
+      if (index < 0) index = 0;
+      if (index >= slides.length) index = slides.length - 1;
+      currentIndex = index;
+
+      slides.forEach((s, i) => s.classList.toggle('active', i === currentIndex));
+      dots.forEach((d, i) => d.classList.toggle('active', i === currentIndex));
+    }
+
+    prevBtn.addEventListener('click', () => showSlide(currentIndex - 1));
+    nextBtn.addEventListener('click', () => showSlide(currentIndex + 1));
+    dots.forEach((dot) => {
+      dot.addEventListener('click', () => showSlide(Number(dot.dataset.index)));
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        showSlide(currentIndex + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        showSlide(currentIndex - 1);
+      }
+    });
+  </script>
+</body>
+</html>

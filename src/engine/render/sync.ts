@@ -42,15 +42,30 @@ export function syncScene(
   state: GameState,
   dtMs = 16.67,
   config: GameConfig = CONFIG.game,
+  actorsVisible = true,
 ): void {
   const dtSec = Math.min(dtMs / 1000, 0.1);
 
-  syncPlayer(sceneRefs.player, state, dtSec, config);
-  syncEnemies(sceneRefs.enemyPool, state.enemies, state.elapsedMs, dtSec, config);
-  stageKills(sceneRefs, state, config);
-  sceneRefs.enemyPool?.updateCorpses(dtSec, state.speed);
-  sceneRefs.effects?.update(dtSec, state.speed);
-  syncBullets(sceneRefs.bulletPool?.items, state.bullets, state.elapsedMs, config);
+  if (sceneRefs.player) {
+    sceneRefs.player.group.visible = actorsVisible;
+  }
+
+  if (actorsVisible) {
+    syncPlayer(sceneRefs.player, state, dtSec, config);
+    syncEnemies(sceneRefs.enemyPool, state.enemies, state.elapsedMs, dtSec, config);
+    stageKills(sceneRefs, state, config);
+    sceneRefs.enemyPool?.updateCorpses(dtSec, state.speed);
+    sceneRefs.effects?.update(dtSec, state.speed);
+    syncBullets(sceneRefs.bulletPool?.items, state.bullets, state.elapsedMs, config);
+  } else {
+    if (sceneRefs.enemyPool) {
+      for (const slot of sceneRefs.enemyPool.items) slot.group.visible = false;
+      for (const corpse of sceneRefs.enemyPool.corpses) corpse.group.visible = false;
+    }
+    if (sceneRefs.bulletPool) {
+      for (const slot of sceneRefs.bulletPool.items) slot.mesh.visible = false;
+    }
+  }
 
   sceneRefs.trailEdge?.update(state.distance);
   sceneRefs.applyBiome?.(state.distance, state.elapsedMs);

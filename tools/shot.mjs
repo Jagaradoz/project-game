@@ -30,6 +30,7 @@ const DEFAULTS = {
   settle: 1200,
   boot: 45000,
   sim: 0,
+  actors: 1,
 };
 
 const BIOME_FILES = {
@@ -138,12 +139,19 @@ async function main() {
 
     reportLogs(page.logs, 'boot');
     if (!hasHook) await sleep(4000);
+    const hideActors = args.actors === 0 || args.actors === '0' || args.actors === 'false' || args.actors === false;
+    if (hasHook && hideActors) {
+      await page.evaluate('window.__lane?.setActorsVisible(false)');
+    }
     if (args.clip) await isolateGameStage(page);
 
     let lastBiome = '';
     for (const shot of shots) {
       if (hasHook && shot.biome && shot.biome !== lastBiome) {
         await page.evaluate(`window.__lane.restart()`);
+        if (hideActors) {
+          await page.evaluate('window.__lane?.setActorsVisible(false)');
+        }
         await page.evaluate(`(() => {
           const select = document.getElementById('biomeSelect');
           if (select) {
@@ -162,11 +170,17 @@ async function main() {
       if (hasHook && Number(args.sim) > 0) {
         await page.evaluate(`window.__lane.simulate(${Number(args.sim)}, { firing: true })`);
       }
+      if (hasHook && hideActors) {
+        await page.evaluate('window.__lane?.setActorsVisible(false)');
+      }
       await sleep(Number(args.settle));
 
       const png = await captureFrame(page, args.clip);
       const name = fileName(shot.biome, biomes.length > 0 && distances.length === 1 ? 0 : shot.distance);
       writeFileSync(join(outDir, name), png);
+      if (shot.biome && shot.biome !== name.replace(/\.png$/, '')) {
+        writeFileSync(join(outDir, `${shot.biome}.png`), png);
+      }
 
       const state = hasHook ? await page.evaluate('JSON.stringify(window.__lane.summary())') : null;
       console.log(`  ${join(args.out, name)}  ${(png.length / 1024).toFixed(0)} KB${state ? `  ${state}` : ''}`);
