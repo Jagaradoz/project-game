@@ -40,8 +40,8 @@ export const passwordSchema = z
 export const displayNameSchema = z
   .string()
   .trim()
-  .min(DISPLAY_NAME_MIN, { message: `Display name must be at least ${DISPLAY_NAME_MIN} characters` })
-  .max(DISPLAY_NAME_MAX, { message: `Display name must be ${DISPLAY_NAME_MAX} characters or fewer` });
+  .min(DISPLAY_NAME_MIN, { message: `Username must be at least ${DISPLAY_NAME_MIN} characters` })
+  .max(DISPLAY_NAME_MAX, { message: `Username must be ${DISPLAY_NAME_MAX} characters or fewer` });
 
 export const registerSchema = z.object({
   email: emailSchema,

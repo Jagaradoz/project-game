@@ -8,7 +8,6 @@ import { Lock, Mail, User, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 import { GoogleOAuthButton } from '@/components/account/GoogleOAuthButton';
-import { LocalAccountNotice } from '@/components/account/LocalAccountNotice';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
@@ -55,63 +54,61 @@ export default function RegisterPage() {
     <PageShell
       eyebrow="Account"
       title="Create an Account"
-      subtitle="An account keeps your progress and puts your display name on the leaderboard."
+      subtitle="An account keeps your progress and puts your username on the leaderboard."
       width="narrow"
     >
-      <LocalAccountNotice />
-
       <Card>
         <div className="flex flex-col gap-4">
-          <GoogleOAuthButton label="Sign up with Google" />
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+            <Field
+              label="Email"
+              type="email"
+              autoComplete="email"
+              icon={<Mail size={18} />}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              error={errors.email}
+              hint="You will sign in with this address, and it cannot be changed later."
+            />
+
+            <Field
+              label="Username"
+              autoComplete="username"
+              icon={<User size={18} />}
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              error={errors.displayName}
+              hint="This is what appears on the leaderboard instead of your email."
+            />
+
+            <Field
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              icon={<Lock size={18} />}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              error={errors.password}
+              hint={`At least ${PASSWORD_MIN} characters.`}
+            />
+
+            {formError && <Notice tone="error">{formError}</Notice>}
+
+            <Button type="submit" isLoading={isSubmitting} icon={<UserPlus size={18} />} isFullWidth>
+              {isSubmitting ? 'Creating account…' : 'Create account'}
+            </Button>
+          </form>
 
           <div className="relative flex items-center justify-center">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-line" />
             </div>
             <span className="relative bg-surface px-3 text-xs font-medium uppercase tracking-wider text-muted">
-              or continue with email
+              or continue with Google
             </span>
           </div>
 
-          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-          <Field
-            label="Email"
-            type="email"
-            autoComplete="email"
-            icon={<Mail size={18} />}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            error={errors.email}
-            hint="You will sign in with this address, and it cannot be changed later."
-          />
-
-          <Field
-            label="Display name"
-            autoComplete="nickname"
-            icon={<User size={18} />}
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            error={errors.displayName}
-            hint="This is what appears on the leaderboard instead of your email."
-          />
-
-          <Field
-            label="Password"
-            type="password"
-            autoComplete="new-password"
-            icon={<Lock size={18} />}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            error={errors.password}
-            hint={`At least ${PASSWORD_MIN} characters.`}
-          />
-
-          {formError && <Notice tone="error">{formError}</Notice>}
-
-          <Button type="submit" isLoading={isSubmitting} icon={<UserPlus size={18} />} isFullWidth>
-            {isSubmitting ? 'Creating account…' : 'Create account'}
-          </Button>
-          </form>
+          <GoogleOAuthButton label="Sign up with Google" />
         </div>
       </Card>
 

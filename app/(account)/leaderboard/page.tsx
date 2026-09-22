@@ -47,7 +47,7 @@ export default function LeaderboardPage() {
     <PageShell
       eyebrow="Account"
       title="Leaderboard"
-      subtitle="The highest scores recorded, by display name."
+      subtitle="The highest scores recorded, by username."
       width="wide"
       actions={
         <LinkButton href="/stages" variant="primary" icon={<Map size={18} />}>
@@ -58,7 +58,7 @@ export default function LeaderboardPage() {
       <AccountTabs />
 
       <Notice tone="info">
-        This table shows only the <strong>display name</strong> each player has chosen — never an
+        This table shows only the <strong>username</strong> each player has chosen — never an
         email address or a real name. You can change yours on the edit profile page.
       </Notice>
 

@@ -129,8 +129,8 @@ export default function ProfileEditPage() {
             />
 
             <Field
-              label="Display name"
-              autoComplete="nickname"
+              label="Username"
+              autoComplete="username"
               icon={<User size={18} />}
               value={displayName}
               onChange={(event) => setDraft(event.target.value)}
