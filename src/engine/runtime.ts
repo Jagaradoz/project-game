@@ -475,7 +475,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       // Disposed while the scene was loading: throw it away rather than
       // attaching a renderer nobody will ever tear down.
       if (isDisposed) {
-        refs.renderer.dispose();
+        refs.dispose();
         return;
       }
 
@@ -756,7 +756,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       if (onResize) window.removeEventListener('resize', onResize);
       onResize = null;
 
-      sceneRefs?.renderer.dispose();
+      sceneRefs?.dispose();
       sceneRefs = null;
 
       exposure.dispose();

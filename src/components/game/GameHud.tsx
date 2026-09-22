@@ -24,9 +24,13 @@ export function GameHud({ snapshot }: GameHudProps) {
         <GoalBar snapshot={snapshot} />
 
         <div
-          className="flex items-center justify-center gap-1"
+          key={snapshot.hp}
+          className="flex items-center justify-center gap-1 rounded-full bg-black/55 px-2.5 py-1 ring-1 ring-white/15 backdrop-blur-[2px] animate-[pulse_280ms_ease-out_1] motion-reduce:animate-none"
           aria-label={`Health ${snapshot.hp} of ${snapshot.maxHp}`}
         >
+          <span className="mr-1 text-[9px] font-bold tracking-[0.14em] text-white/75 uppercase">
+            Health
+          </span>
           {pips.map((isFull, index) => (
             <Heart
               key={index}
@@ -43,9 +47,9 @@ export function GameHud({ snapshot }: GameHudProps) {
       </div>
 
       <div className="pointer-events-none absolute bottom-3 left-3 z-[1]">
-        <div className="rounded-md bg-[rgba(10,12,15,0.62)] px-3 py-2 ring-1 ring-white/10 backdrop-blur-[2px]">
+        <div className="rounded-lg border border-white/15 bg-[rgba(10,12,15,0.76)] px-3 py-2 shadow-[0_6px_20px_rgba(0,0,0,0.28)] backdrop-blur-[3px]">
           <div className="flex flex-col gap-0.5 font-semibold tabular-nums text-white">
-            <Stat label="Score" value={String(snapshot.score)} />
+            <Stat label="Score" value={String(snapshot.score)} reactiveKey={snapshot.score} accent />
             <Stat label="Distance" value={`${Math.round(snapshot.distance)} m`} />
           </div>
         </div>
@@ -55,52 +59,76 @@ export function GameHud({ snapshot }: GameHudProps) {
 }
 
 /**
- * The enemy health bar TOR 3 asks for at the top centre of the screen, drained
- * by progress towards the stage goal.
- *
- * It reads as the opposition's health -- it starts full and empties as enemies
- * die -- which is what the requirement is after: the player should see the
- * effect of their attacks clearly. There is no distinct boss entity in the
- * engine yet; when one lands, this is the bar it drives.
- *
- * Absent entirely in an endless run, which has no goal to show.
+ * Stage objective progress. Absent in an endless run, which has no goal.
  */
 function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
   if (snapshot.goalKills === null) return null;
 
-  const remaining = Math.max(0, snapshot.goalKills - snapshot.killCount);
-  const remainingShare = (remaining / snapshot.goalKills) * 100;
+  const completed = Math.min(snapshot.killCount, snapshot.goalKills);
+  const completedShare = (completed / snapshot.goalKills) * 100;
+  const remaining = Math.max(0, snapshot.goalKills - completed);
 
   return (
-    <div className="mx-auto flex w-full max-w-[280px] flex-col gap-1 pt-1">
+    <div className="mx-auto flex w-full max-w-[320px] flex-col gap-1.5 rounded-lg border border-white/15 bg-black/60 px-3 py-2 shadow-[0_5px_18px_rgba(0,0,0,0.24)] backdrop-blur-[3px]">
+      <div className="flex items-end justify-between gap-3 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+        <div className="min-w-0">
+          <p className="m-0 text-[9px] font-bold tracking-[0.16em] text-white/65 uppercase">
+            Stage objective
+          </p>
+          <p className="m-0 truncate text-xs font-extrabold tracking-wide uppercase">
+            Defeat {snapshot.goalKills} enemies
+          </p>
+        </div>
+        <span className="shrink-0 text-sm font-extrabold tabular-nums">
+          {completed}<span className="text-white/55">/{snapshot.goalKills}</span>
+        </span>
+      </div>
       <div
-        className="h-1.5 overflow-hidden rounded-full bg-[rgba(10,12,15,0.7)] ring-1 ring-white/15"
+        className="h-2 overflow-hidden rounded-full bg-white/15 ring-1 ring-black/40"
         role="progressbar"
-        aria-label="Enemy health remaining in this stage"
+        aria-label="Stage enemies defeated"
         aria-valuemin={0}
         aria-valuemax={snapshot.goalKills}
-        aria-valuenow={remaining}
+        aria-valuenow={completed}
       >
         <div
-          className="h-full rounded-full bg-enemy transition-[width] duration-200"
-          style={{ width: `${remainingShare}%` }}
+          className="h-full rounded-full bg-primary shadow-[0_0_9px_rgba(254,102,1,0.75)] transition-[width] duration-300 ease-out motion-reduce:transition-none"
+          style={{ width: `${completedShare}%` }}
         />
       </div>
-
-      <span className="text-center text-[10px] font-semibold tracking-wide tabular-nums text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-        {snapshot.killCount} / {snapshot.goalKills}
+      <span className="text-[9px] font-semibold tracking-wide text-white/65 uppercase">
+        {remaining === 0 ? 'Objective complete' : `${remaining} remaining`}
       </span>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  reactiveKey,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  reactiveKey?: number;
+  accent?: boolean;
+}) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-[10px] font-semibold tracking-[0.1em] text-white/70 uppercase">
         {label}
       </span>
-      <span className="text-base leading-tight tracking-tight">{value}</span>
+      <span
+        key={reactiveKey}
+        className={`text-base leading-tight tracking-tight ${
+          accent
+            ? 'text-primary animate-[pulse_300ms_ease-out_1] motion-reduce:animate-none'
+            : ''
+        }`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

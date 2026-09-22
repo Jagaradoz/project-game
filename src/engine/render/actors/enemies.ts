@@ -21,6 +21,8 @@ export interface EnemySlot {
   group: THREE_NS.Group;
   mixer: THREE_NS.AnimationMixer | null;
   action: THREE_NS.AnimationAction | null;
+  /** Ground-level threat marker. It keeps pale enemies readable against fog and dirt. */
+  aura?: THREE_NS.Mesh;
   spin?: THREE_NS.Object3D;
   elapsed?: number;
   sink?: number;
@@ -61,6 +63,23 @@ const CORPSE_SINK_SEC = 1.1;
 const CORPSE_SINK_DEPTH = 2.2;
 const CORPSE_DESPAWN_Z = 26;
 
+function buildThreatAura(
+  THREE: ThreeModule,
+  color: string,
+  radius: number,
+  shared?: { geometry: THREE_NS.RingGeometry; material: THREE_NS.MeshBasicMaterial },
+): THREE_NS.Mesh {
+  const geometry = shared?.geometry ?? new THREE.RingGeometry(radius * 0.72, radius, 24);
+  const material = shared?.material ?? new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.48, depthWrite: false, side: THREE.DoubleSide,
+    });
+  const aura = new THREE.Mesh(geometry, material);
+  aura.rotation.x = -Math.PI / 2;
+  aura.position.y = 0.035;
+  aura.renderOrder = 2;
+  return aura;
+}
+
 export async function addEnemyPool(
   THREE: ThreeModule,
   scene: THREE_NS.Scene,
@@ -68,7 +87,7 @@ export async function addEnemyPool(
   palette: Palette,
   loader: GLTFLoader | null,
 ): Promise<EnemyPool> {
-  const rigged = await buildRiggedPool(THREE, scene, config, loader);
+  const rigged = await buildRiggedPool(THREE, scene, config, palette, loader);
   return rigged ?? buildFallbackPool(THREE, scene, config, palette);
 }
 
@@ -76,6 +95,7 @@ async function buildRiggedPool(
   THREE: ThreeModule,
   scene: THREE_NS.Scene,
   config: GameConfig,
+  palette: Palette,
   loader: GLTFLoader | null,
 ): Promise<EnemyPool | null> {
   const definition = config.enemy as unknown as EnemyDef;
@@ -91,14 +111,15 @@ async function buildRiggedPool(
 
   const loaded: GLTF = gltf;
   const clipFor = buildClipLookup(loaded.animations, definition.animations);
+  const auraTemplate = createAuraTemplate(THREE, palette.accents.enemyTrim, config.enemyRadius * 1.65);
   const items = Array.from({ length: config.enemyPoolSize }, () =>
-    buildEnemy(THREE, scene, loaded, definition, clipFor, cloneSkeleton),
+    buildEnemy(THREE, scene, loaded, definition, clipFor, cloneSkeleton, palette, config.enemyRadius, auraTemplate),
   );
 
   // A separate, small pool. Reusing a live slot would not work: slots are keyed
   // to the reducer's enemy array, which reshuffles the moment one dies.
   const corpses = Array.from({ length: definition.corpseCount ?? 5 }, () =>
-    buildCorpse(THREE, scene, loaded, definition, clipFor, cloneSkeleton),
+    buildCorpse(THREE, scene, loaded, definition, clipFor, cloneSkeleton, palette, config.enemyRadius, auraTemplate),
   );
   let nextCorpse = 0;
 
@@ -153,8 +174,11 @@ async function buildRiggedPool(
       }
     },
 
-    applyPalette() {
-      // Enemy colouring comes from the model's own atlas; biome palettes leave it alone.
+    applyPalette(next: Palette) {
+      for (const slot of [...items, ...corpses]) {
+        const material = slot.aura?.material as THREE_NS.MeshBasicMaterial | undefined;
+        material?.color.set(next.accents.enemyTrim);
+      }
     },
   };
 }
@@ -166,8 +190,11 @@ function buildCorpse(
   definition: EnemyDef,
   clipFor: ClipLookup,
   cloneSkeleton: CloneSkeleton,
+  palette: Palette,
+  radius: number,
+  auraTemplate: { geometry: THREE_NS.RingGeometry; material: THREE_NS.MeshBasicMaterial },
 ): EnemySlot {
-  const corpse = buildEnemy(THREE, scene, gltf, definition, clipFor, cloneSkeleton);
+  const corpse = buildEnemy(THREE, scene, gltf, definition, clipFor, cloneSkeleton, palette, radius, auraTemplate);
   const deathClip = clipFor.death ?? clipFor.run;
 
   corpse.action?.stop();
@@ -184,6 +211,9 @@ function buildEnemy(
   definition: EnemyDef,
   clipFor: ClipLookup,
   cloneSkeleton: CloneSkeleton,
+  palette: Palette,
+  radius: number,
+  auraTemplate: { geometry: THREE_NS.RingGeometry; material: THREE_NS.MeshBasicMaterial },
 ): EnemySlot {
   const group = new THREE.Group();
   const model = cloneSkeleton(gltf.scene);
@@ -205,6 +235,9 @@ function buildEnemy(
   model.rotation.y = definition.rotationY ?? 0;
   group.add(model);
 
+  const aura = buildThreatAura(THREE, palette.accents.enemyTrim, radius * 1.65, auraTemplate);
+  group.add(aura);
+
   const mixer = new THREE.AnimationMixer(model);
   const runClip = clipFor.run ?? clipFor.walk;
   const action = runClip ? mixer.clipAction(runClip) : null;
@@ -219,7 +252,7 @@ function buildEnemy(
   group.visible = false;
   scene.add(group);
 
-  return { group, mixer, action };
+  return { group, mixer, action, aura };
 }
 
 function buildClipLookup(
@@ -244,6 +277,7 @@ function buildFallbackPool(
   config: GameConfig,
   palette: Palette,
 ): EnemyPool {
+  const auraTemplate = createAuraTemplate(THREE, palette.accents.enemyTrim, config.enemyRadius * 1.65);
   const coreGeo = new THREE.OctahedronGeometry(config.enemyRadius * 0.85, 0);
   const coreMat = new THREE.MeshStandardMaterial({
     color: palette.accents.enemy,
@@ -271,10 +305,13 @@ function buildFallbackPool(
     ring.position.y = config.enemyRadius;
     group.add(ring);
 
+    const aura = buildThreatAura(THREE, palette.accents.enemyTrim, config.enemyRadius * 1.65, auraTemplate);
+    group.add(aura);
+
     group.position.y = TRAIL_Y;
     group.visible = false;
     scene.add(group);
-    return { group, mixer: null, action: null, spin: core };
+    return { group, mixer: null, action: null, spin: core, aura };
   });
 
   return {
@@ -289,6 +326,18 @@ function buildFallbackPool(
       coreMat.color.set(next.accents.enemy);
       ringMat.color.set(next.accents.enemyTrim);
       ringMat.emissive.set(next.accents.enemyTrim).multiplyScalar(0.25);
+      for (const slot of items) {
+        const material = slot.aura?.material as THREE_NS.MeshBasicMaterial | undefined;
+        material?.color.set(next.accents.enemyTrim);
+      }
     },
+  };
+}
+
+function createAuraTemplate(THREE: ThreeModule, color: string, radius: number) {
+  const sample = buildThreatAura(THREE, color, radius);
+  return {
+    geometry: sample.geometry as THREE_NS.RingGeometry,
+    material: sample.material as THREE_NS.MeshBasicMaterial,
   };
 }

@@ -70,3 +70,16 @@ test('trail edge: the displacement dies away at the trail centre and out in the 
   assert.ok(settle(settings.halfWidth + settings.falloff + 1) < 1e-6, 'the bank must not move');
   assert.ok(settle(settings.halfWidth) > settle(settings.halfWidth * 0.4), 'the lip should move most');
 });
+
+
+test('scenery clearance rejects intersecting footprints across layers and the recycling seam', async () => {
+  const { hasSceneryClearance } = await import('@/engine/render/world/scatter');
+  const tree = { x: 8, z: -299, radius: 2 };
+  assert.equal(hasSceneryClearance({ x: 10, z: -299, radius: 1 }, [tree], 320), false);
+  assert.equal(hasSceneryClearance({ x: 8, z: 19, radius: 1 }, [tree], 320), false);
+  assert.equal(hasSceneryClearance({ x: 12, z: -299, radius: 1 }, [tree], 320), true);
+  for (const offset of [0, 17, 319, 640]) {
+    const wrap = (z: number) => -300 + ((z + 300 + offset) % 320);
+    assert.equal(hasSceneryClearance({ x: 8, z: wrap(19), radius: 1 }, [{ ...tree, z: wrap(tree.z) }], 320), false);
+  }
+});

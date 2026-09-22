@@ -20,6 +20,7 @@ import { addSky } from '@/engine/render/world/sky';
 import { configureRenderer, addLighting, SHADOW_QUALITY } from '@/engine/render/world/lighting';
 import { addGround, trailHalfWidth, TRAIL_Y } from '@/engine/render/world/ground';
 import { addScatter } from '@/engine/render/world/scatter';
+import { addLandmarks } from '@/engine/render/world/landmarks';
 import { createTrailEdge } from '@/engine/render/world/trailEdge';
 import { addClouds } from '@/engine/render/world/clouds';
 import { BIOMES, resolveBiome, blendPalettes, activeScatterSet } from '@/engine/render/world/biomes';
@@ -62,6 +63,9 @@ export async function createScene(
     span: config.scenery.span,
     seed: config.scenery.seed,
   });
+  const landmarks = await addLandmarks(THREE, scene, config, palette, {
+    span: config.scenery.span,
+  });
   const motes = addMotes(THREE, scene, palette);
   // `clouds` is not a CONFIG key today; addClouds falls back to its own
   // defaults. Typed as optional so setting it later needs no change here.
@@ -71,6 +75,10 @@ export async function createScene(
   const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
   const bulletPool = addBulletPool(THREE, scene, config, palette);
   const effects = createEffects(THREE, scene, palette);
+
+  // Short, damped camera impulses give hits and kills physical weight while
+  // leaving the authored runner framing untouched between events.
+  const cameraFeedback = createCameraFeedback(camera, config);
 
   // Only the ground. The displacement moves where the dirt ENDS, and nothing
   // else needs to follow it: a grass tuft that sometimes sits on the dirt is
@@ -145,8 +153,10 @@ export async function createScene(
     motes.applyPalette(next);
     clouds.applyPalette(next);
     scatter.applyPalette(next);
+    landmarks.applyPalette(next);
     effects.applyPalette(next);
     scatter.setActive(set);
+    landmarks.setActive(set);
   }
 
   /**
@@ -187,12 +197,14 @@ export async function createScene(
     ground,
     markers: ground.markers,
     scatter,
+    landmarks,
     motes,
     clouds,
     player,
     enemyPool,
     bulletPool,
     effects,
+    cameraFeedback,
     trailEdge,
     applyBiome,
     setBiomeOverride,
@@ -202,6 +214,67 @@ export async function createScene(
     },
     resize,
     render,
+    dispose() {
+      cameraFeedback.dispose();
+      const resources = new Set<{ dispose(): void }>();
+      scene.traverse((object) => {
+        const mesh = object as THREE_NS.Mesh;
+        if (!mesh.isMesh) return;
+        resources.add(mesh.geometry);
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          resources.add(material);
+          for (const value of Object.values(material)) {
+            if (value instanceof THREE.Texture) resources.add(value);
+          }
+        }
+        if (mesh.customDepthMaterial) resources.add(mesh.customDepthMaterial);
+      });
+      for (const resource of resources) resource.dispose();
+      renderer.dispose();
+    },
+  };
+}
+
+function createCameraFeedback(
+  camera: THREE_NS.PerspectiveCamera,
+  config: GameConfig,
+) {
+  const basePosition = new THREE.Vector3(config.camera.x, config.camera.y, config.camera.z);
+  const baseQuaternion = camera.quaternion.clone();
+  let trauma = 0;
+  let phase = 0;
+  const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let reduceMotion = motionQuery.matches;
+  const onMotionPreference = (event: MediaQueryListEvent) => {
+    reduceMotion = event.matches;
+    if (reduceMotion) trauma = 0;
+  };
+  motionQuery.addEventListener('change', onMotionPreference);
+
+  return {
+    hit() {
+      if (reduceMotion) return;
+      trauma = Math.max(trauma, 1);
+    },
+    kill(count = 1) {
+      if (reduceMotion) return;
+      trauma = Math.min(0.55, trauma + 0.16 * count);
+    },
+    update(dtSec: number) {
+      phase += dtSec * 48;
+      trauma = Math.max(0, trauma - dtSec * 3.8);
+      const strength = trauma * trauma;
+      camera.position.copy(basePosition);
+      camera.quaternion.copy(baseQuaternion);
+      if (strength <= 0) return;
+      camera.position.x += Math.sin(phase * 1.7) * 0.16 * strength;
+      camera.position.y += Math.cos(phase * 2.3) * 0.1 * strength;
+      camera.rotation.z += Math.sin(phase) * 0.012 * strength;
+    },
+    dispose() {
+      motionQuery.removeEventListener('change', onMotionPreference);
+
+    },
   };
 }
 

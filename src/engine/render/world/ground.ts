@@ -3,9 +3,9 @@
  *
  * The ground has a CONSTANT cross-section along z. That is the whole trick: a
  * corridor that never varies front-to-back is impossible to distinguish from an
- * infinite one while it scrolls, so it needs no recycling, no tiling and can
- * never show a seam -- the sense of movement comes entirely from the props and
- * markers travelling past it. It replaces the old stack of box strips, which
+ * infinite one while it scrolls, so the mesh needs no recycling and can
+ * never show a seam. Repeating soil detail scrolls with the props and
+ * markers. It replaces the old stack of box strips, which
  * ended in mid-air about 25 units out and left the visible hard edge.
  *
  * The wander in the trail's edge is not in this geometry: it is a vertex-shader
@@ -31,6 +31,51 @@ const GROUND_NEAR_Z = 60;
 const GROUND_Z_SLICES = 120;
 const GROUND_FAR_Z = -520;
 const TRAIL_Y = 0;
+const SOIL_TILE_SIZE = 12;
+
+/** Seamless multiscale soil, generated once without a canvas or network request. */
+function createSoilTexture(THREE: ThreeModule): THREE_NS.DataTexture {
+  const size = 256;
+  const rng = createRng(0x5011);
+  const layers = [8, 24, 64].map((cells) => ({
+    cells,
+    values: Float32Array.from({ length: cells * cells }, () => rng()),
+  }));
+  const sample = (layer: typeof layers[number], x: number, y: number) => {
+    const u = x / size * layer.cells;
+    const v = y / size * layer.cells;
+    const ix = Math.floor(u);
+    const iy = Math.floor(v);
+    const fx = u - ix;
+    const fy = v - iy;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const at = (a: number, b: number) => layer.values[(b % layer.cells) * layer.cells + a % layer.cells]!;
+    const near = at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx;
+    const far = at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx;
+    return near * (1 - sy) + far * sy;
+  };
+  const pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const grain = rng();
+      const value = Math.min(255, Math.round(174 + sample(layers[0]!, x, y) * 35
+        + sample(layers[1]!, x, y) * 22 + sample(layers[2]!, x, y) * 13
+        + grain * 10 + (grain > 0.97 ? 11 : 0)));
+      const offset = (y * size + x) * 4;
+      pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = value;
+      pixels[offset + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(pixels, size, size, THREE.RGBAFormat);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+  return texture;
+}
 
 /**
  * How far the dirt reaches beyond the outermost lane. This margin is what lets
@@ -168,15 +213,38 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
   }
 
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const uvs: number[] = [];
+  for (let index = 0; index < positions.length; index += 3) {
+    uvs.push(positions[index]! / SOIL_TILE_SIZE, positions[index + 2]! / SOIL_TILE_SIZE);
+  }
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(positions.length), 3));
   geometry.computeVertexNormals();
 
+  const soilTexture = createSoilTexture(THREE);
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true,
+    map: soilTexture,
+    bumpMap: soilTexture,
+    bumpScale: 0.085,
     roughness: 0.95,
     metalness: 0,
     flatShading: true,
   });
+  // The existing edge controller owns travelled distance. Reuse that uniform
+  // for both soil colour and relief so surface detail travels with the props.
+  material.onBeforeCompile = (shader) => {
+    if (!material.userData.trailEdge) {
+      shader.uniforms.uEdgeScroll = { value: 0 };
+      shader.vertexShader = `uniform float uEdgeScroll;\n${shader.vertexShader}`;
+    }
+    shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `
+      #include <uv_vertex>
+      vMapUv.y -= uEdgeScroll / ${SOIL_TILE_SIZE.toFixed(1)};
+      vBumpMapUv.y -= uEdgeScroll / ${SOIL_TILE_SIZE.toFixed(1)};
+    `);
+  };
+  material.customProgramCacheKey = () => 'soil-detail';
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.receiveShadow = true;

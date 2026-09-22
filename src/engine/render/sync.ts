@@ -46,6 +46,9 @@ export function syncScene(
 ): void {
   const dtSec = Math.min(dtMs / 1000, 0.1);
 
+  if (state.justHit) sceneRefs.cameraFeedback?.hit();
+  sceneRefs.cameraFeedback?.update(dtSec);
+
   if (sceneRefs.player) {
     sceneRefs.player.group.visible = actorsVisible;
   }
@@ -71,6 +74,7 @@ export function syncScene(
   sceneRefs.applyBiome?.(state.distance, state.elapsedMs);
   syncRecycled(sceneRefs.markers as unknown as ScrollLayer, state.distance);
   sceneRefs.scatter?.scroll(state.distance);
+  sceneRefs.landmarks?.scroll(state.distance);
   syncMotes(sceneRefs.motes as unknown as MoteLayer, state.distance, state.elapsedMs);
   sceneRefs.clouds?.scroll(state.distance, state.elapsedMs);
 }
@@ -155,6 +159,13 @@ function syncEnemies(
     slot.group.position.x = laneToX(enemy.lane, config);
     slot.group.position.z = enemy.z;
 
+    if (slot.aura) {
+      // Threats become louder as they approach without changing collision rules.
+      const proximity = Math.min(1, Math.max(0, (enemy.z + 55) / 55));
+      const pulse = 1 + Math.sin(elapsedMs * 0.009 + index * 1.7) * 0.12;
+      slot.aura.scale.setScalar(pulse * (0.82 + proximity * 0.28));
+    }
+
     if (!pool.isRigged) {
       // The stand-in has nothing to animate, so it tumbles instead.
       if (!slot.spin) continue;
@@ -202,6 +213,8 @@ function syncBullets(
  */
 function stageKills(sceneRefs: SceneRefs, state: GameState, config: GameConfig): void {
   if (state.justKilled.length === 0) return;
+
+  sceneRefs.cameraFeedback?.kill(state.justKilled.length);
 
   for (const kill of state.justKilled) {
     const x = laneToX(kill.lane, config);
