@@ -42,10 +42,10 @@ export function PageShell({
         className={`mx-auto flex w-full flex-col gap-6 py-8 sm:py-10 ${SHELL_GUTTER} ${SHELL_WIDTH[width]}`}
       >
         {heading && (
-          <header className="flex flex-wrap items-end justify-between gap-4">
+          <header className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-ink pb-5">
             <div className="flex flex-col gap-1.5">
               {eyebrow && <span className="eyebrow">{eyebrow}</span>}
-              <h1 className="m-0 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+              <h1 className="m-0 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1>
               {subtitle && <p className="m-0 max-w-2xl text-sm leading-relaxed text-muted">{subtitle}</p>}
             </div>
             {actions && <div className="flex flex-wrap gap-2">{actions}</div>}

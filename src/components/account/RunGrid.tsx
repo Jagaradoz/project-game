@@ -53,7 +53,7 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
             <Link
               href="/stages"
               aria-label={label}
-              className="relative block aspect-3/4 overflow-hidden rounded-sm text-text no-underline"
+              className="relative block aspect-3/4 overflow-hidden rounded-none border-2 border-ink text-white no-underline shadow-[4px_4px_0_0_var(--color-ink)]"
             >
               <TrailStill
                 src={biomeStillSrc(run.biomeId)}
@@ -73,7 +73,7 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
               )}
               <span className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 p-1.5 sm:p-2">
                 <span className="text-xs font-semibold leading-tight sm:text-sm">{name}</span>
-                <span className="text-[10px] tabular-nums text-text/85 sm:text-xs">
+                <span className="text-[10px] tabular-nums text-white/85 sm:text-xs">
                   Stage {run.stageNumber} · {formatNumber(run.score)} pts
                 </span>
               </span>

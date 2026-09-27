@@ -21,10 +21,10 @@ export function ProgressBar({ value, max, label }: ProgressBarProps) {
       aria-valuemin={0}
       aria-valuemax={max}
       aria-valuenow={value}
-      className="h-2 w-full overflow-hidden rounded-full bg-elevated"
+      className="h-3 w-full overflow-hidden rounded-none border border-ink bg-elevated"
     >
       <div
-        className="h-full rounded-full bg-primary transition-[width] duration-300"
+        className="h-full bg-primary transition-[width] duration-300"
         style={{ width: `${share}%` }}
       />
     </div>
@@ -45,7 +45,7 @@ export function StageStrip({ stages, label }: StageStripProps) {
       {stages.map((stage, index) => (
         <span
           key={index}
-          className={`h-1.5 flex-1 rounded-full ${
+          className={`h-2 flex-1 border border-ink ${
             stage.isCleared ? 'bg-ok' : stage.isUnlocked ? 'bg-primary/50' : 'bg-off/40'
           }`}
         />

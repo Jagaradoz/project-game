@@ -88,7 +88,7 @@ export default function LoginPage() {
 
           <div className="relative flex items-center justify-center">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-line" />
+              <div className="w-full border-t-2 border-ink" />
             </div>
             <span className="relative bg-surface px-3 text-xs font-medium uppercase tracking-wider text-muted">
               or continue with Google

@@ -119,12 +119,12 @@ export function CameraPermissionModal({ error, status, onAllow, onSkip }: Camera
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         aria-busy={isRequesting || undefined}
-        className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-line bg-surface p-5 sm:p-6"
+        className="flex w-full max-w-md flex-col gap-4 border-2 border-ink bg-surface p-5 shadow-[7px_7px_0_0_var(--color-primary)] sm:p-6"
       >
         <div className="flex items-start gap-3">
           <span
             aria-hidden
-            className="mt-0.5 grid size-9 flex-none place-items-center rounded-md bg-primary-soft text-primary"
+            className="mt-0.5 grid size-9 flex-none place-items-center rounded-none bg-primary-soft text-primary"
           >
             <Video size={20} />
           </span>

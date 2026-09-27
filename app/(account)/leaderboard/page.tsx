@@ -103,7 +103,7 @@ export default function LeaderboardPage() {
                 {entries.map((entry) => (
                   <tr
                     key={`${entry.rank}-${entry.displayName}`}
-                    className={`border-t border-line ${
+                    className={`border-t-2 border-ink ${
                       entry.isCurrentUser ? 'bg-primary-soft text-primary' : ''
                     }`}
                   >

@@ -3,7 +3,7 @@ import { SHELL_GUTTER, SHELL_WIDTH } from '@/components/layout/container';
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-line bg-bg">
+    <footer className="mt-auto border-t-2 border-ink bg-elevated">
       <div
         className={`mx-auto flex ${SHELL_WIDTH.wide} flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 ${SHELL_GUTTER}`}
       >

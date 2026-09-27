@@ -13,11 +13,11 @@ export function Wordmark({
   return (
     <Link
       href="/"
-      className={`flex flex-none items-center gap-2.5 text-[1.1rem] font-bold tracking-tight text-text no-underline transition-opacity hover:opacity-90 sm:text-[1.2rem] ${className}`}
+      className={`flex flex-none items-center gap-2.5 text-[1.1rem] font-black tracking-tight text-ink no-underline transition-opacity hover:opacity-80 sm:text-[1.2rem] ${className}`}
     >
       <span
         aria-hidden
-        className="relative size-7 overflow-hidden rounded-lg ring-1 ring-white/10 sm:size-8"
+        className="relative size-7 overflow-hidden border-2 border-ink sm:size-8"
       >
         <Image
           src="/icon.png"
@@ -28,7 +28,7 @@ export function Wordmark({
           className="size-full object-cover"
         />
       </span>
-      Webcam <span className="text-primary">Exergame</span>
+      Webcam <span className="bg-primary px-1 text-ink">Exergame</span>
     </Link>
   );
 }

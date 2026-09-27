@@ -90,7 +90,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
   const profileIsActive = pathname.startsWith('/profile') || pathname.startsWith('/leaderboard');
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line/80 bg-bg/80 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-t-[6px] border-b-2 border-ink bg-surface">
       <div className={`mx-auto flex h-16 ${SHELL_WIDTH.wide} items-center gap-2 ${SHELL_GUTTER}`}>
         <Wordmark priority />
 
@@ -108,7 +108,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
               <>
                 <Link
                   href="/register"
-                  className="inline-flex min-h-9 items-center px-2.5 text-sm font-semibold text-muted no-underline transition-colors hover:text-text"
+                  className="inline-flex min-h-9 items-center px-2.5 text-sm font-extrabold text-ink no-underline underline-offset-4 hover:underline"
                 >
                   Sign up
                 </Link>
@@ -124,7 +124,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
                   href="/profile"
                   aria-label="Profile"
                   aria-current={profileIsActive ? 'page' : undefined}
-                  className={`overflow-hidden rounded-full transition-opacity ${
+                  className={`overflow-hidden border-2 border-ink transition-opacity ${
                     profileIsActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-bg' : 'hover:opacity-80'
                   }`}
                 >
@@ -153,7 +153,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
             aria-expanded={isMenuOpen}
             aria-controls="mobile-nav"
             aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-            className="ml-auto grid size-11 cursor-pointer place-items-center rounded-md border border-line-strong text-text transition-colors hover:bg-surface lg:hidden"
+            className="ml-auto grid size-11 cursor-pointer place-items-center rounded-none border-2 border-ink bg-primary text-ink shadow-[3px_3px_0_var(--color-ink)] transition-colors hover:bg-primary-hover lg:hidden"
           >
             {isMenuOpen ? <X aria-hidden size={20} /> : <Menu aria-hidden size={20} />}
           </button>
@@ -164,7 +164,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
         <div
           id="mobile-nav"
           ref={panelRef}
-          className="border-t border-line bg-bg lg:hidden"
+          className="border-t-2 border-ink bg-surface lg:hidden"
         >
           <nav aria-label="Main" className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col p-3 sm:px-6`}>
             {links.map((link) => (
@@ -194,9 +194,9 @@ function NavItem({
     <Link
       href={link.href}
       aria-current={isActive ? 'page' : undefined}
-      className={`flex items-center gap-2 rounded-md font-medium transition-colors duration-200 ${
+      className={`flex items-center gap-2 rounded-none font-bold transition-colors duration-150 ${
         isStacked ? 'min-h-12 px-3 py-3 text-base' : 'px-3 py-1.5 text-sm'
-      } ${isActive ? 'bg-elevated text-text' : 'text-muted hover:bg-surface hover:text-text'}`}
+      } ${isActive ? 'border-2 border-ink bg-primary text-ink' : 'border-2 border-transparent text-ink hover:border-ink hover:bg-elevated'}`}
     >
       <Icon aria-hidden size={isStacked ? 18 : 15} />
       {link.label}

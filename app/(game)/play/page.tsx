@@ -18,8 +18,8 @@ const GameCanvas = dynamic(() => import('@/components/game/GameCanvas'), {
   ssr: false,
   loading: () => (
     <main className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6`}>
-      <div className="mx-auto grid aspect-3/4 w-full max-w-[calc(80vh*3/4)] place-content-center justify-items-center gap-4 rounded-lg border border-line bg-surface text-muted">
-        <div className="relative size-10 overflow-hidden rounded-md ring-1 ring-white/10">
+      <div className="mx-auto grid aspect-3/4 w-full max-w-[calc(80vh*3/4)] place-content-center justify-items-center gap-4 rounded-none border-2 border-ink bg-surface text-muted">
+        <div className="relative size-10 overflow-hidden rounded-none ring-1 ring-white/10">
           <Image
             src="/icon.png"
             alt="Webcam Exergame"

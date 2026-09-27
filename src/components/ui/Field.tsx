@@ -47,7 +47,7 @@ export function Field({ label, error, hint, icon, className = '', type, ...rest 
           type={resolvedType}
           aria-invalid={error ? true : undefined}
           aria-describedby={error || hint ? messageId : undefined}
-          className={`min-h-12 w-full rounded-md border bg-bg py-2.5 text-base text-text transition-colors placeholder:text-subtle hover:border-muted focus:border-primary disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted ${
+          className={`min-h-12 w-full rounded-none border-2 bg-surface py-2.5 text-base text-text shadow-[3px_3px_0_var(--color-ink)] transition-colors placeholder:text-subtle hover:border-ink focus:border-ink disabled:cursor-not-allowed disabled:bg-bg disabled:text-muted disabled:shadow-none ${
             icon ? 'pl-10' : 'pl-3'
           } ${isPassword ? 'pr-12' : 'pr-3'} ${error ? 'border-danger' : 'border-line-strong'} ${className}`}
           {...rest}
@@ -61,7 +61,7 @@ export function Field({ label, error, hint, icon, className = '', type, ...rest 
             // unnamed; the state is in the name rather than only in the icon.
             aria-label={isRevealed ? 'Hide password' : 'Show password'}
             aria-pressed={isRevealed}
-            className="absolute right-1 grid size-10 cursor-pointer place-items-center rounded-md text-muted transition-colors hover:text-text"
+            className="absolute right-1 grid size-10 cursor-pointer place-items-center rounded-none text-muted transition-colors hover:bg-elevated hover:text-text"
           >
             {isRevealed ? <EyeOff aria-hidden size={18} /> : <Eye aria-hidden size={18} />}
           </button>

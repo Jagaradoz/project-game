@@ -113,7 +113,7 @@ export default function ConsentPage() {
         </>
       ) : (
         <Card title="Your consent" icon={<Lock size={20} />}>
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-elevated p-4 text-sm leading-relaxed text-text">
+          <label className="flex cursor-pointer items-start gap-3 border-2 border-ink bg-elevated p-4 text-sm leading-relaxed text-text">
             <input
               type="checkbox"
               checked={isChecked}

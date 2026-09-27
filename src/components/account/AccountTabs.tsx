@@ -53,7 +53,7 @@ function activeTabHref(pathname: string, profileTab: string | null): string {
 
 function AccountTabStrip({ activeHref = '' }: { activeHref?: string }) {
   return (
-    <nav aria-label="Account views" className="flex border-b border-line">
+    <nav aria-label="Account views" className="flex border-b-2 border-ink">
       {TABS.map((tab) => {
         const isActive = activeHref === tab.href;
 

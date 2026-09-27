@@ -139,12 +139,12 @@ function ProfileHero({
           <Link
             href="/profile/edit"
             aria-label="Change avatar"
-            className="relative flex-none rounded-full no-underline"
+            className="relative flex-none rounded-none no-underline"
           >
             {avatar}
             <span
               aria-hidden
-              className="absolute right-0 bottom-0 grid size-7 place-items-center rounded-full border border-line-strong bg-surface text-text"
+              className="absolute right-0 bottom-0 grid size-7 place-items-center rounded-none border-2 border-ink bg-surface text-text"
             >
               <Pencil size={12} />
             </span>
@@ -232,7 +232,7 @@ function BiomeChips({ biomes }: { biomes: BiomeProgress[] }) {
     <div className="flex flex-wrap gap-2">
       {biomes.map((biome) => {
         const chipClass =
-          'inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3 text-sm font-semibold no-underline';
+          'inline-flex min-h-9 items-center gap-1.5 rounded-none border-2 border-ink bg-surface px-3 text-sm font-semibold no-underline';
 
         if (biome.isUnlocked) {
           return (

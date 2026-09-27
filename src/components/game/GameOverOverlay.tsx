@@ -25,11 +25,11 @@ export function GameOverOverlay({
   if (!snapshot.isOver) return null;
 
   return (
-    <div className="absolute inset-0 z-[3] grid content-end justify-items-stretch bg-[rgba(10,12,15,0.78)] p-6 pb-8 text-left backdrop-blur-[2px] sm:content-center sm:justify-items-center sm:text-center">
-      <div className="flex max-w-sm flex-col gap-3 sm:items-center">
+    <div className="absolute inset-0 z-[3] grid content-end justify-items-stretch bg-black/75 p-4 pb-8 text-left sm:content-center sm:justify-items-center sm:text-center">
+      <div className="flex max-w-sm flex-col gap-3 border-2 border-ink bg-surface p-6 shadow-[7px_7px_0_0_var(--color-primary)] sm:items-center">
         <span className="eyebrow">{snapshot.isCleared ? 'Cleared' : 'Complete'}</span>
 
-        <h2 className="m-0 text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h2 className="m-0 text-3xl font-black tracking-tight sm:text-4xl">
           {snapshot.isCleared ? 'Stage cleared' : 'Run complete'}
         </h2>
 

@@ -1,10 +1,6 @@
 /**
- * `primary` keeps the copper chip. It is the 10% of the palette, so at most one
- * card on a screen should ask for it -- the one that leads. Everything else
- * takes `default`, where the glyph sits inline in the sage accent.
- *
- * The chip used to be unconditional, which is how twelve identical
- * orange-square-plus-title-plus-grey-paragraph blocks ended up across the app.
+ * Cards share the heavy outline and offset shadow; the primary tone highlights
+ * the icon while preserving the same readable surface.
  */
 export type CardTone = 'default' | 'primary';
 
@@ -35,7 +31,7 @@ export function Card({
 }: CardProps) {
   return (
     <section
-      className={`flex flex-col rounded-lg border border-line bg-surface ${
+      className={`flex flex-col rounded-none border-2 border-ink bg-surface shadow-[5px_5px_0_var(--color-ink)] ${
         padded ? 'gap-4 p-4 sm:p-5' : ''
       } ${className}`}
     >
@@ -46,7 +42,7 @@ export function Card({
               (tone === 'primary' ? (
                 <span
                   aria-hidden
-                  className="mt-0.5 grid size-9 flex-none place-items-center rounded-md bg-primary-soft text-primary"
+                  className="mt-0.5 grid size-9 flex-none place-items-center border-2 border-ink bg-primary text-ink"
                 >
                   {icon}
                 </span>

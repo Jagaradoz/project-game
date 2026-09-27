@@ -1,12 +1,12 @@
 type BadgeTone = 'neutral' | 'primary' | 'ok' | 'warn' | 'danger' | 'navy';
 
 const TONE_CLASS: Record<BadgeTone, string> = {
-  neutral: 'border-line-strong bg-elevated text-accent-text',
-  primary: 'border-primary/40 bg-primary-soft text-primary',
-  navy: 'border-navy/40 bg-navy-soft text-navy-text',
-  ok: 'border-ok/40 bg-ok-soft text-ok-text',
-  warn: 'border-warn/40 bg-warn-soft text-warn-text',
-  danger: 'border-danger/40 bg-danger-soft text-danger-text',
+  neutral: 'bg-elevated text-ink',
+  primary: 'bg-primary text-ink',
+  navy: 'bg-navy-soft text-navy-text',
+  ok: 'bg-ok-soft text-ok-text',
+  warn: 'bg-warn-soft text-warn-text',
+  danger: 'bg-danger-soft text-danger-text',
 };
 
 interface BadgeProps {
@@ -25,7 +25,7 @@ interface BadgeProps {
 export function Badge({ tone = 'neutral', icon, children, className = '' }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${TONE_CLASS[tone]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-none border-2 border-ink px-2.5 py-0.5 text-xs font-extrabold whitespace-nowrap ${TONE_CLASS[tone]} ${className}`}
     >
       {icon && <span aria-hidden className="flex">{icon}</span>}
       {children}

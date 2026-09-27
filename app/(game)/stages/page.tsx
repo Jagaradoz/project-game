@@ -83,10 +83,10 @@ export default function StagesPage() {
               role="radio"
               aria-checked={difficulty === option}
               onClick={() => setDifficulty(option)}
-              className={`min-h-12 cursor-pointer rounded-lg border px-4 py-3 font-semibold transition-colors ${
+              className={`min-h-12 cursor-pointer border-2 border-ink px-4 py-3 font-black shadow-[3px_3px_0_0_var(--color-ink)] transition-[transform,box-shadow] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none ${
                 difficulty === option
-                  ? 'border-primary bg-primary text-on-primary'
-                  : 'border-line-strong bg-elevated text-text hover:border-muted'
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-elevated text-text'
               }`}
             >
               {difficultyLabel(option)}
@@ -215,12 +215,12 @@ function StageButton({ stage, goalKills, isSelected, onPlay }: StageButtonProps)
         stage.bestScore === null ? '' : `, best score ${stage.bestScore}`
       }`}
       title={`Target: ${goalKills} enemies`}
-      className={`flex aspect-square min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border font-bold transition-colors disabled:cursor-not-allowed disabled:border-line disabled:bg-bg disabled:text-subtle ${
+      className={`flex aspect-square min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 border-2 border-ink font-black shadow-[3px_3px_0_0_var(--color-ink)] transition-[transform,box-shadow] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none disabled:cursor-not-allowed disabled:bg-bg disabled:text-subtle disabled:shadow-none ${
         stage.isCleared
-          ? 'border-ok/50 bg-ok-soft text-ok-text hover:border-ok'
+          ? 'bg-ok-soft text-ok-text'
           : isSelected
-            ? 'border-primary bg-primary text-on-primary'
-            : 'border-line-strong bg-elevated text-text hover:border-muted'
+            ? 'bg-primary text-on-primary'
+            : 'bg-elevated text-text'
       }`}
     >
       <span className="text-xl leading-none font-semibold tabular-nums">{stage.stageNumber}</span>

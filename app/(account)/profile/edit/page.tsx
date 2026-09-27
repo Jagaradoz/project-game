@@ -154,7 +154,7 @@ export default function ProfileEditPage() {
                       onClick={() => setAvatarDraft(seed)}
                       aria-pressed={isSelected}
                       aria-label={isSelected ? 'Selected avatar' : 'Select this avatar'}
-                      className={`cursor-pointer rounded-full p-0.5 transition-shadow ${
+                      className={`cursor-pointer rounded-none p-0.5 transition-shadow ${
                         isSelected
                           ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface'
                           : 'hover:ring-2 hover:ring-line-strong hover:ring-offset-2 hover:ring-offset-surface'

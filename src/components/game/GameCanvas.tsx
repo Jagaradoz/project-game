@@ -148,7 +148,7 @@ export default function GameCanvas() {
            * window squash the box back to landscape, which is the bug this
            * screen started with.
            */
-          className="relative mx-auto aspect-3/4 w-full max-w-[calc(80vh*3/4)] touch-manipulation overflow-hidden rounded-lg border border-line bg-bg"
+          className="relative mx-auto aspect-3/4 w-full max-w-[calc(80vh*3/4)] touch-manipulation overflow-hidden rounded-none border-2 border-ink bg-bg"
         >
           <canvas ref={gameCanvasRef} className="block h-full w-full" />
 
@@ -187,7 +187,7 @@ export default function GameCanvas() {
                 if (event.key === 'Enter' || event.key === ' ') actions.setDevFire(false);
               }}
               onBlur={() => actions.setDevFire(false)}
-              className="min-h-11 rounded-md border border-line-strong bg-elevated px-6 text-sm font-semibold text-text touch-none select-none hover:border-primary active:bg-primary disabled:opacity-50"
+              className="min-h-11 rounded-none border-2 border-ink bg-elevated px-6 text-sm font-semibold text-text touch-none select-none hover:border-primary active:bg-primary disabled:opacity-50"
               >
                 Hold to fire · Space
               </button>

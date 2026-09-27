@@ -1,92 +1,60 @@
 @import "tailwindcss";
 
-/**
- * Design tokens. Tailwind v4 reads @theme and generates the utilities, so
- * `bg-surface`, `text-muted`, `border-line`, `bg-primary` etc. all resolve from
- * here. One place to restyle the app.
- *
- * Dark-only by choice: the gameplay screen is a lit 3D scene, and dark chrome is
- * the frame that suits it. Every pair below is checked against the surface it
- * actually lands on, not against pure black.
- *
- * Trail Studio budget, 60/30/10:
- *
- *   60  `bg` -- deep charcoal ground. Page background and any large empty area.
- *   30  `surface` / `elevated` / `line` / `accent*` -- cool stone. Every panel,
- *       border, secondary control and DECORATIVE ICON belongs here. Sage sits
- *       with the biomes; it is not a second brand colour.
- *   10  `primary` -- copper dusk. Primary CTAs and the one number on a screen
- *       that matters. Headlines stay off-white. Nothing else.
- *
- * If a new element needs a tint and it is not a call to action, it takes
- * `accent`, not `primary`.
- */
+/** Shared neo-brutalist palette and shape tokens. */
 @theme {
-  /* 60 -- the ground. Near-black charcoal, so stone panels read as a real lift. */
-  --color-bg: #0a0c0f;
+  --color-ink: #17120e;
+  --color-bg: #fff3e2;
+  --color-surface: #fffdf7;
+  --color-elevated: #ffe2bc;
+  --color-line: #17120e;
+  --color-line-strong: #17120e;
 
-  /* 30 -- cool stone, darkest to lightest. */
-  --color-surface: #12161c;
-  --color-elevated: #1a2029;
-  /* `line` is a decorative divider. `line-strong` is a CONTROL boundary and
-     clears 3:1 against bg, surface AND elevated, because on an input or a select
-     the border is the only thing that says a control is there (WCAG 1.4.11). */
-  --color-line: #252b33;
-  --color-line-strong: #7a838c;
+  --color-accent: #6e3f20;
+  --color-accent-soft: #ffebcf;
+  --color-accent-text: #503017;
 
-  /* The 30 as a foreground -- muted sage, biome-adjacent. Both clear 4.5:1 on
-     bg, surface and elevated. */
-  --color-accent: #a8b89c;
-  --color-accent-soft: #161c16;
-  --color-accent-text: #c5d4b8;
+  --color-text: #17120e;
+  --color-muted: #5d5147;
+  --color-subtle: #62564d;
 
-  /* Text, in descending emphasis. Slightly warm so it belongs on charcoal.
-     `muted` and `subtle` both clear 4.5:1 on all three surfaces -- `subtle`
-     carries the footer's safety notice. */
-  --color-text: #f2f0ea;
-  --color-muted: #a3aa9e;
-  --color-subtle: #969e96;
-
-  /* 10 -- brand. KMITL Orange (#fe6601) and Navy Blue (#030083) color theme. */
+  /* Keep the KMITL orange as the visible action colour. */
   --color-primary: #fe6601;
-  --color-primary-hover: #ff7719;
-  --color-primary-soft: #2e1504;
-  --color-on-primary: #0a0c0f;
-  --color-ring: #fe6601;
+  --color-primary-hover: #e75900;
+  --color-primary-soft: #ffe0c3;
+  --color-on-primary: #17120e;
+  --color-ring: #17120e;
 
   --color-orange: #fe6601;
-  --color-orange-hover: #ff7719;
-  --color-orange-soft: #2e1504;
+  --color-orange-hover: #e75900;
+  --color-orange-soft: #ffe0c3;
 
   /* Navy Blue palette tokens -- brightened royal/navy blue */
   --color-navy: #142ce6;
   --color-navy-hover: #263ff6;
-  --color-navy-soft: #0c103e;
-  --color-navy-text: #9fb0ff;
+  --color-navy-soft: #e8ecff;
+  --color-navy-text: #182b91;
   --color-on-navy: #ffffff;
 
   --color-blue: #142ce6;
   --color-blue-hover: #263ff6;
-  --color-blue-soft: #0c103e;
-  --color-blue-text: #9fb0ff;
+  --color-blue-soft: #e8ecff;
+  --color-blue-text: #182b91;
   --color-on-blue: #ffffff;
 
-  /* Semantic state. Hues are load-bearing -- Badge, Notice, StageStrip and
-     StageButton all encode meaning in them -- so they stay; only the soft
-     grounds shifted onto charcoal. */
-  --color-ok: #22c55e;
-  --color-ok-soft: #0c2a1c;
-  --color-ok-text: #86efac;
+  /* Keep the semantic hues and give their text readable light surfaces. */
+  --color-ok: #16803d;
+  --color-ok-soft: #dcf5e3;
+  --color-ok-text: #14532d;
   --color-on-ok: #052e16;
 
   --color-warn: #f59e0b;
-  --color-warn-soft: #2a2110;
-  --color-warn-text: #fcd34d;
+  --color-warn-soft: #fff0c2;
+  --color-warn-text: #624000;
 
   --color-danger: #ef4444;
-  --color-danger-soft: #2c1620;
-  --color-danger-text: #fca5a5;
-  --color-on-danger: #240404;
+  --color-danger-soft: #ffe0df;
+  --color-danger-text: #8a1d1d;
+  --color-on-danger: #ffffff;
 
   /* Game-world colours, used by the HUD over the canvas. */
   --color-enemy: #ef4444;
@@ -97,14 +65,14 @@
   --font-sans: var(--font-plus-jakarta), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-plus-jakarta), system-ui, sans-serif;
 
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.625rem;
-  --radius-xl: 0.75rem;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -132,7 +100,22 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.brutal-panel {
+  border: 2px solid var(--color-ink);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--color-ink);
+}
+
+.brutal-shadow {
+  box-shadow: 5px 5px 0 var(--color-ink);
+}
+
+.brutal-shadow-sm {
+  box-shadow: 3px 3px 0 var(--color-ink);
 }
 
 /**
@@ -172,10 +155,10 @@ h3 {
 .eyebrow {
   font-family: var(--font-sans);
   font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-accent-text);
+  color: var(--color-ink);
 }
 
 /**

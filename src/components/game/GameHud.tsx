@@ -25,7 +25,7 @@ export function GameHud({ snapshot }: GameHudProps) {
 
         <div
           key={snapshot.hp}
-          className="flex items-center justify-center gap-1 rounded-full bg-black/55 px-2.5 py-1 ring-1 ring-white/15 backdrop-blur-[2px] animate-[pulse_280ms_ease-out_1] motion-reduce:animate-none"
+          className="flex items-center justify-center gap-1 border border-white/70 bg-black/80 px-2.5 py-1 animate-[pulse_280ms_ease-out_1] motion-reduce:animate-none"
           aria-label={`Health ${snapshot.hp} of ${snapshot.maxHp}`}
         >
           <span className="mr-1 text-[9px] font-bold tracking-[0.14em] text-white/75 uppercase">
@@ -47,7 +47,7 @@ export function GameHud({ snapshot }: GameHudProps) {
       </div>
 
       <div className="pointer-events-none absolute bottom-3 left-3 z-[1]">
-        <div className="rounded-lg border border-white/15 bg-[rgba(10,12,15,0.76)] px-3 py-2 shadow-[0_6px_20px_rgba(0,0,0,0.28)] backdrop-blur-[3px]">
+        <div className="border border-white/70 bg-black/85 px-3 py-2 shadow-[3px_3px_0_0_var(--color-primary)]">
           <div className="flex flex-col gap-0.5 font-semibold tabular-nums text-white">
             <Stat label="Score" value={String(snapshot.score)} reactiveKey={snapshot.score} accent />
             <Stat label="Distance" value={`${Math.round(snapshot.distance)} m`} />
@@ -69,7 +69,7 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
   const remaining = Math.max(0, snapshot.goalKills - completed);
 
   return (
-    <div className="mx-auto flex w-full max-w-[320px] flex-col gap-1.5 rounded-lg border border-white/15 bg-black/60 px-3 py-2 shadow-[0_5px_18px_rgba(0,0,0,0.24)] backdrop-blur-[3px]">
+    <div className="mx-auto flex w-full max-w-[320px] flex-col gap-1.5 border border-white/70 bg-black/85 px-3 py-2 shadow-[3px_3px_0_0_var(--color-primary)]">
       <div className="flex items-end justify-between gap-3 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
         <div className="min-w-0">
           <p className="m-0 text-[9px] font-bold tracking-[0.16em] text-white/65 uppercase">
@@ -84,7 +84,7 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
         </span>
       </div>
       <div
-        className="h-2 overflow-hidden rounded-full bg-white/15 ring-1 ring-black/40"
+        className="h-2 overflow-hidden rounded-none bg-white/15 ring-1 ring-black/40"
         role="progressbar"
         aria-label="Stage enemies defeated"
         aria-valuemin={0}
@@ -92,7 +92,7 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
         aria-valuenow={completed}
       >
         <div
-          className="h-full rounded-full bg-primary shadow-[0_0_9px_rgba(254,102,1,0.75)] transition-[width] duration-300 ease-out motion-reduce:transition-none"
+          className="h-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none"
           style={{ width: `${completedShare}%` }}
         />
       </div>

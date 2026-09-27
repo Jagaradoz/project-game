@@ -20,7 +20,7 @@ export default function GlobalError({
     <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-5 px-4 text-center">
       <span
         aria-hidden
-        className="grid size-12 place-items-center rounded-full bg-danger-soft text-danger"
+        className="grid size-12 place-items-center rounded-none bg-danger-soft text-danger"
       >
         <TriangleAlert size={22} />
       </span>

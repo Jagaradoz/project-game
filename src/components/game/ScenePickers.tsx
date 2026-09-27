@@ -39,7 +39,7 @@ export function ScenePickers({
   const BiomeIcon = biome === BIOME_AUTO ? Shuffle : (BIOME_ICONS[biome] ?? Trees);
 
   return (
-    <div className="mx-auto flex w-full max-w-[calc(80vh*3/4)] flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-surface px-3 py-2 sm:px-3.5">
+    <div className="mx-auto flex w-full max-w-[calc(80vh*3/4)] flex-wrap items-center justify-between gap-3 rounded-none border-2 border-ink bg-surface px-3 py-2 sm:px-3.5">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <Label htmlFor="biomeSelect" icon={<BiomeIcon size={14} />}>
@@ -76,7 +76,7 @@ export function ScenePickers({
       {process.env.NODE_ENV !== 'production' && (
         <a
           href="/catalog.html"
-          className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-line-strong bg-elevated px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap text-muted no-underline transition-colors hover:border-muted hover:text-text"
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-none border-2 border-ink bg-elevated px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap text-muted no-underline transition-colors hover:border-muted hover:text-text"
         >
           <Trees aria-hidden size={13} />
           3D catalog
@@ -123,7 +123,7 @@ function Select({
       id={id}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="min-h-8 min-w-0 max-w-[200px] flex-auto cursor-pointer rounded-md border border-line-strong bg-surface px-2 py-1 text-xs font-semibold text-text transition-colors hover:border-muted focus:border-primary"
+      className="min-h-8 min-w-0 max-w-[200px] flex-auto cursor-pointer rounded-none border-2 border-ink bg-surface px-2 py-1 text-xs font-semibold text-text transition-colors hover:border-muted focus:border-primary"
       {...rest}
     >
       {children}

@@ -9,7 +9,7 @@ interface StatTileProps {
 
 export function StatTile({ label, value, detail, icon, isHighlighted }: StatTileProps) {
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-line bg-elevated px-3.5 py-3">
+    <div className="flex flex-col gap-1 rounded-none border-2 border-ink bg-elevated px-3.5 py-3 shadow-[3px_3px_0_var(--color-ink)]">
       <div className="flex items-center justify-between gap-2">
         <span className="eyebrow text-[11px] tracking-[0.1em]">
           {label}
@@ -19,7 +19,7 @@ export function StatTile({ label, value, detail, icon, isHighlighted }: StatTile
 
       <span
         className={`text-3xl leading-[1.1] font-semibold tracking-tight tabular-nums ${
-          isHighlighted ? 'text-primary' : 'text-text'
+          isHighlighted ? 'text-ink' : 'text-text'
         }`}
       >
         {value}

@@ -16,7 +16,7 @@ export function GoogleOAuthButton({
   return (
     <button
       type="button"
-      className={`inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-md border border-line-strong bg-surface px-4 py-3 text-center text-sm font-semibold text-text transition-colors duration-200 hover:border-muted hover:bg-elevated active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-ring ${className}`}
+      className={`inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-none border-2 border-ink bg-surface px-4 py-3 text-center text-sm font-semibold text-text transition-colors duration-200 hover:border-muted hover:bg-elevated active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-ring ${className}`}
     >
       <svg
         className="size-5 shrink-0"

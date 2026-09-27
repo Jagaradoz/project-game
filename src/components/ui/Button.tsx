@@ -6,12 +6,12 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary:
-    'border border-transparent bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-hover',
+    'border-2 border-ink bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-hover',
   secondary:
-    'border border-line-strong bg-surface text-text hover:border-muted hover:bg-elevated',
-  ghost: 'border border-transparent bg-transparent text-muted hover:bg-surface hover:text-text',
-  danger: 'border border-transparent bg-danger text-on-danger hover:brightness-110',
-  navy: 'border border-transparent bg-navy text-on-navy hover:bg-navy-hover active:bg-navy-hover',
+    'border-2 border-ink bg-surface text-text hover:bg-elevated',
+  ghost: 'border-2 border-transparent bg-transparent text-text hover:border-ink hover:bg-surface',
+  danger: 'border-2 border-ink bg-danger text-on-danger hover:brightness-110',
+  navy: 'border-2 border-ink bg-navy text-on-navy hover:bg-navy-hover active:bg-navy-hover',
 };
 
 /**
@@ -26,12 +26,14 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
 };
 
 const BASE =
-  'inline-flex cursor-pointer items-center justify-center rounded-md text-center font-semibold ' +
-  'no-underline transition-colors duration-200 ' +
+  'inline-flex cursor-pointer items-center justify-center rounded-none text-center font-extrabold ' +
+  'no-underline shadow-[4px_4px_0_var(--color-ink)] transition-[background-color,box-shadow,transform] duration-150 ' +
+  'hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_var(--color-ink)] ' +
+  'active:translate-x-[4px] active:translate-y-[4px] active:shadow-none ' +
   // Recessed rather than filled: a solid grey block reads as a button that
   // still does something, which is exactly what a disabled control is not.
-  'disabled:cursor-not-allowed disabled:border-line disabled:bg-transparent disabled:text-subtle ' +
-  'aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
+  'disabled:cursor-not-allowed disabled:border-line disabled:bg-surface disabled:text-subtle disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 ' +
+  'aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:shadow-none';
 
 interface StyleProps {
   variant?: ButtonVariant;

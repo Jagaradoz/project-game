@@ -59,46 +59,38 @@ const CAUTIONS = [
 export default function HomePage() {
   return (
     <BareShell bleed>
-      <section className="relative isolate flex min-h-[min(100dvh,52rem)] flex-col justify-center overflow-hidden">
-        <TrailStill
-          src={HERO_STILL}
-          alt="Silhouette walking a mountain trail at sunset"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-[center_58%]"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-linear-to-t from-bg via-bg/35 to-transparent"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-y-0 left-0 w-[min(100%,42rem)] bg-linear-to-r from-bg/70 via-bg/35 to-transparent"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-28 bg-linear-to-b from-bg/80 to-transparent"
-        />
-
-        <div
-          className={`relative mx-auto flex w-full flex-col items-start gap-5 py-16 sm:py-20 ${SHELL_GUTTER} ${SHELL_WIDTH.wide}`}
-        >
-          <span className="eyebrow">Webcam Exergame</span>
-
-          <h1 className="m-0 max-w-xl text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-            Your movement is <span className="text-navy">the controller</span>
-          </h1>
-
-          <p className="m-0 max-w-lg text-base leading-relaxed text-text/85 sm:text-lg">
-            Jog in place to attack enemies, step sideways to dodge and switch lanes. Every frame is processed
-            locally in your browser with real-time pose estimation.
-          </p>
-
-          <div className="flex flex-col gap-3 self-stretch sm:flex-row sm:self-auto">
-            <LinkButton href="/play" variant="primary" size="lg" icon={<Play size={20} />}>
-              Play now
-            </LinkButton>
+      <section className={`mx-auto w-full py-8 sm:py-12 ${SHELL_GUTTER} ${SHELL_WIDTH.wide}`}>
+        <div className="border-2 border-ink bg-surface shadow-[8px_8px_0_0_var(--color-ink)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-ink bg-primary px-5 py-3 text-xs font-black tracking-[0.14em] text-on-primary uppercase sm:px-8">
+            <span>Move / Play / Repeat</span>
+            <span>Webcam Exergame — 01</span>
+          </div>
+          <div className="grid lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="flex flex-col items-start justify-center gap-6 px-6 py-12 sm:px-10 sm:py-16 lg:px-12 lg:py-20">
+              <span className="eyebrow">Your body is the controller</span>
+              <h1 className="m-0 max-w-2xl text-5xl leading-[0.98] font-black tracking-[-0.06em] sm:text-6xl xl:text-7xl">
+                Get moving.<br /><span className="bg-primary px-2 text-on-primary">Get playing.</span>
+              </h1>
+              <p className="m-0 max-w-lg text-base leading-relaxed text-muted sm:text-lg">
+                Jog in place to attack. Step sideways to dodge. Your webcam reads your movement right here in your browser.
+              </p>
+              <LinkButton href="/play" variant="primary" size="lg" icon={<Play size={20} />}>
+                Play now
+              </LinkButton>
+            </div>
+            <div className="relative min-h-72 overflow-hidden border-t-2 border-ink bg-primary lg:min-h-[32rem] lg:border-t-0 lg:border-l-2">
+              <TrailStill
+                src={HERO_STILL}
+                alt="Silhouette walking a mountain trail at sunset"
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover object-[center_58%]"
+              />
+              <span className="absolute right-4 bottom-4 border-2 border-ink bg-surface px-3 py-2 text-xs font-black tracking-widest text-ink uppercase shadow-[4px_4px_0_0_var(--color-ink)]">
+                No controller needed
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -109,29 +101,29 @@ export default function HomePage() {
       >
         <h2
           id="features-heading"
-          className="m-0 text-center text-2xl font-semibold tracking-tight sm:text-3xl"
+          className="m-0 text-center text-3xl font-black tracking-tight sm:text-4xl"
         >
           What this is
         </h2>
-        <ul className="m-0 mt-8 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-3 sm:items-stretch">
+        <ul className="m-0 mt-8 grid list-none grid-cols-1 gap-5 p-0 sm:grid-cols-3 sm:items-stretch">
           {FEATURES.map((feature) => (
             <li key={feature.title} className="min-w-0">
               <article
-                className={`flex h-full flex-col gap-3 rounded-lg border bg-surface p-5 ${
-                  feature.mark ? 'border-primary/35' : 'border-line'
+                className={`flex h-full flex-col gap-3 border-2 border-ink bg-surface p-5 shadow-[5px_5px_0_0_var(--color-ink)] ${
+                  feature.mark ? 'border-t-[10px] border-t-primary' : ''
                 }`}
               >
                 {feature.mark ? (
                   <p className="m-0 flex items-baseline gap-2">
-                    <span className="text-4xl font-semibold tracking-tight text-primary">
+                    <span className="text-4xl font-black tracking-tight text-primary">
                       {feature.mark}
                     </span>
                     <span className="text-sm text-muted">{feature.markLabel}</span>
                   </p>
                 ) : (
-                  <feature.icon aria-hidden size={20} className="text-accent" />
+                  <feature.icon aria-hidden size={28} className="text-primary" />
                 )}
-                <h3 className="m-0 text-base font-semibold text-text">{feature.title}</h3>
+                <h3 className="m-0 text-lg font-black text-text">{feature.title}</h3>
                 <p className="m-0 text-sm leading-relaxed text-muted">{feature.body}</p>
               </article>
             </li>
@@ -141,14 +133,14 @@ export default function HomePage() {
 
       <section
         id="how-to-play"
-        className="band scroll-mt-20 bg-surface py-16 sm:py-20"
+        className="band scroll-mt-20 border-y-2 border-ink bg-primary-soft py-16 sm:py-20"
         aria-labelledby="how-heading"
       >
         <div className={`mx-auto flex w-full flex-col gap-12 ${SHELL_GUTTER} ${SHELL_WIDTH.wide}`}>
           <div>
             <h2
               id="how-heading"
-              className="m-0 text-center text-2xl font-semibold tracking-tight sm:text-3xl"
+              className="m-0 text-center text-3xl font-black tracking-tight sm:text-4xl"
             >
               How to Play
             </h2>
@@ -160,11 +152,11 @@ export default function HomePage() {
               {CONTROLS.map((control) => (
                 <li
                   key={control.action}
-                  className="flex items-center gap-4 rounded-md border border-line bg-elevated px-4 py-3.5"
+                  className="flex items-center gap-4 border-2 border-ink bg-surface px-4 py-3.5 shadow-[4px_4px_0_0_var(--color-ink)]"
                 >
                   <span
                     aria-hidden
-                    className="grid size-10 flex-none place-items-center rounded-md bg-surface text-accent"
+                    className="grid size-10 flex-none place-items-center border-2 border-ink bg-primary text-on-primary"
                   >
                     <control.icon size={20} />
                   </span>
@@ -177,8 +169,8 @@ export default function HomePage() {
             </ul>
           </div>
 
-          <div className="flex flex-col gap-5 border-t border-line pt-10">
-            <h3 id="safety-heading" className="m-0 text-xl font-semibold tracking-tight sm:text-2xl">
+          <div className="flex flex-col gap-5 border-t-2 border-ink pt-10">
+            <h3 id="safety-heading" className="m-0 text-xl font-black tracking-tight sm:text-2xl">
               Before you start
             </h3>
 

@@ -30,7 +30,7 @@ export function PlayerAvatar({
 }: PlayerAvatarProps) {
   return (
     <span
-      className={`inline-flex flex-none overflow-hidden rounded-full bg-elevated ${SIZE_CLASS[size]} ${className}`}
+      className={`inline-flex flex-none overflow-hidden rounded-none bg-elevated ${SIZE_CLASS[size]} ${className}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

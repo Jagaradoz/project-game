@@ -10,7 +10,7 @@ import './globals.css';
  */
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-plus-jakarta',
   display: 'swap',
 });
@@ -62,7 +62,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#0a0c0f',
+  themeColor: '#fff7ec',
 };
 
 export default function RootLayout({
