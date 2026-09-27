@@ -55,6 +55,7 @@ const IDLE_SNAPSHOT: HudSnapshot = {
   cameraLabel: null,
   quality: null,
   isCameraRunning: false,
+  isCameraSkipped: false,
   isSceneReady: false,
   status: 'Idle.',
   error: null,
@@ -79,7 +80,9 @@ export interface UseGameRuntimeOptions {
 export interface GameActions {
   startCamera: () => Promise<void>;
   stopCamera: () => void;
+  skipCamera: () => void;
   recalibrate: () => void;
+  setDevFire: (active: boolean) => void;
   restart: () => void;
   /** Null when the engine is not mounted, so callers must handle its absence. */
   getRunSummary: () => RunSummary | null;
@@ -179,7 +182,9 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
     () => ({
       startCamera: () => runtimeRef.current?.startCamera() ?? Promise.resolve(),
       stopCamera: () => runtimeRef.current?.stopCamera(),
+      skipCamera: () => runtimeRef.current?.skipCamera(),
       recalibrate: () => runtimeRef.current?.recalibrate(),
+      setDevFire: (active) => runtimeRef.current?.setDevFire(active),
       restart: () => runtimeRef.current?.restart(),
       getRunSummary: () => runtimeRef.current?.getRunSummary() ?? null,
     }),

@@ -29,6 +29,7 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   let isFiring = true; // Keyboard-only play still shoots, so it is playable solo.
   let lastPoseLabel: LateralLabel | null = null;
   let hasPose = false;
+  let devFire = false;
   let detachKeyboard: () => void = () => {};
 
   /** `label` is null when no body is tracked. */
@@ -62,6 +63,13 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   function attachKeyboard(target: EventTarget = window): () => void {
     const onKeyDown = (event: Event) => {
       const key = event as KeyboardEvent;
+      const focusedControl = key.target instanceof HTMLElement
+        && key.target.closest('button, input, select, textarea, a');
+      if (key.key === ' ' && !focusedControl) {
+        devFire = true;
+        key.preventDefault();
+        return;
+      }
       if (key.repeat) return;
       if (KEY_LEFT.has(key.key)) {
         step(-1);
@@ -71,21 +79,38 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
         key.preventDefault();
       }
     };
+    const onKeyUp = (event: Event) => {
+      if ((event as KeyboardEvent).key === ' ') devFire = false;
+    };
+    const onBlur = () => {
+      devFire = false;
+    };
 
     target.addEventListener('keydown', onKeyDown);
-    detachKeyboard = () => target.removeEventListener('keydown', onKeyDown);
+    target.addEventListener('keyup', onKeyUp);
+    target.addEventListener('blur', onBlur);
+    detachKeyboard = () => {
+      target.removeEventListener('keydown', onKeyDown);
+      target.removeEventListener('keyup', onKeyUp);
+      target.removeEventListener('blur', onBlur);
+      devFire = false;
+    };
     return detachKeyboard;
   }
 
   function read(): GameInput {
-    return { lane, isFiring };
+    return { lane, isFiring: isFiring || devFire };
   }
 
   function reset(): void {
     lane = clampLane((config.laneCount - 1) / 2, config);
     lastPoseLabel = null;
+    devFire = false;
     if (!hasPose) isFiring = true;
   }
 
-  return { setPose, clearPose, attachKeyboard, detach: () => detachKeyboard(), read, reset, step };
+  return {
+    setPose, clearPose, attachKeyboard, detach: () => detachKeyboard(), read, reset, step,
+    setDevFire: (active) => { devFire = active; },
+  };
 }

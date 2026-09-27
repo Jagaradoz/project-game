@@ -38,7 +38,7 @@ export interface PlayerRefs {
   modelContainer: THREE_NS.Group;
   fallbackGroup: THREE_NS.Group;
   projectile?: ProjectileSource | null;
-  playAnimation(name: string, duration?: number, loop?: boolean): void;
+  playAnimation(name: string, duration?: number, loop?: boolean, restart?: boolean): void;
   loadCharacter(charId: string): Promise<boolean>;
 }
 
@@ -92,7 +92,7 @@ export async function addPlayer(
     actions: {},
     currentAction: null,
     currentActionName: null,
-    characterId: config.defaultCharacter || 'robot',
+    characterId: config.defaultCharacter,
     fallbackVisible: true,
     modelContainer,
     fallbackGroup,
@@ -110,17 +110,24 @@ export async function addPlayer(
    */
   let loadToken = 0;
 
-  playerObj.playAnimation = function playAnimation(name: string, duration = 0.2, loop = true) {
+  playerObj.playAnimation = function playAnimation(name: string, duration = 0.2, loop = true, restart = false) {
     if (!playerObj.mixer || playerObj.fallbackVisible) return;
-    if (playerObj.currentActionName === name && playerObj.currentAction?.isRunning()) return;
+    if (!restart && playerObj.currentActionName === name && (
+      playerObj.currentAction?.isRunning() ||
+      (name === 'death' && playerObj.currentAction?.paused)
+    )) return;
 
     const targetAction =
       playerObj.actions[name] ||
-      playerObj.actions.run ||
-      playerObj.actions.idle ||
-      Object.values(playerObj.actions)[0];
+      playerObj.actions.run;
 
     if (!targetAction) return;
+
+    // A missing attack must keep running rather than turn the run into a
+    // clamped one-shot (or accidentally choose an idle clip).
+    const resolvedName = playerObj.actions[name] ? name : 'run';
+    if (resolvedName !== name) loop = true;
+    if (!restart && playerObj.currentAction === targetAction && targetAction.isRunning()) return;
 
     if (loop) {
       targetAction.setLoop(THREE.LoopRepeat, Infinity);
@@ -132,16 +139,20 @@ export async function addPlayer(
 
     if (playerObj.currentAction && playerObj.currentAction !== targetAction) {
       targetAction.reset();
+      targetAction.setEffectiveTimeScale(resolvedName === 'shoot' ? 2 : 1);
+      targetAction.setEffectiveWeight(1);
       targetAction.fadeIn(duration);
       targetAction.play();
       playerObj.currentAction.fadeOut(duration);
     } else {
       targetAction.reset();
+      targetAction.setEffectiveTimeScale(resolvedName === 'shoot' ? 2 : 1);
+      targetAction.setEffectiveWeight(1);
       targetAction.play();
     }
 
     playerObj.currentAction = targetAction;
-    playerObj.currentActionName = name;
+    playerObj.currentActionName = resolvedName;
   };
 
   playerObj.loadCharacter = async function loadCharacter(charId: string): Promise<boolean> {
@@ -165,7 +176,7 @@ export async function addPlayer(
     }
 
     const roster = config.characters as unknown as CharacterRoster;
-    const charDef: CharacterDef | undefined = roster?.[charId] ?? roster?.robot;
+    const charDef: CharacterDef | undefined = roster?.[charId] ?? roster?.[config.defaultCharacter];
     if (!charDef || !charDef.path) return false;
 
     try {
@@ -235,9 +246,8 @@ export async function addPlayer(
       }
 
       if (Object.keys(actions).length === 0 && gltf.animations.length > 0) {
-        gltf.animations.forEach((clip, index) => {
-          actions[index === 0 ? 'run' : clip.name.toLowerCase()] = mixer.clipAction(clip);
-        });
+        const runClip = gltf.animations.find((clip) => /^run(?:ning)?(?:_|$)/i.test(clip.name));
+        if (runClip) actions.run = mixer.clipAction(runClip);
       }
 
       playerObj.mixer = mixer;
@@ -256,11 +266,17 @@ export async function addPlayer(
       fallbackGroup.visible = true;
       playerObj.fallbackVisible = true;
       playerObj.materials = [bodyMat, ringMat];
+      playerObj.mixer?.stopAllAction();
+      playerObj.mixer = null;
+      playerObj.actions = {};
+      playerObj.currentAction = null;
+      playerObj.currentActionName = null;
+      playerObj.projectile = null;
       return false;
     }
   };
 
-  await playerObj.loadCharacter(config.defaultCharacter || 'robot');
+  await playerObj.loadCharacter(config.defaultCharacter);
 
   return playerObj;
 }

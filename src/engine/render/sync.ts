@@ -106,20 +106,7 @@ function syncPlayer(
     for (const material of player.materials) material.opacity = opacity;
   }
 
-  if (player.mixer) player.mixer.update(dtSec);
-
-  if (state.isOver) {
-    player.playAnimation?.('death', 0.2, false);
-  } else if (state.isFiring) {
-    // `isFiring` IS the jog signal: setPose() derives it from the jog detector.
-    // This read used to be `state.isJogging`, a field the reducer never sets, so
-    // the faster run cycle never played.
-    player.playAnimation?.('run', 0.15, true);
-    if (player.currentAction) player.currentAction.timeScale = 1.35;
-  } else {
-    player.playAnimation?.('run', 0.2, true);
-    if (player.currentAction) player.currentAction.timeScale = 1.0;
-  }
+  updatePlayerAnimation(player, state, dtSec);
 
   if (player.fallbackVisible) {
     if (player.ring) player.ring.rotation.z = state.elapsedMs * 0.003;
@@ -128,6 +115,22 @@ function syncPlayer(
       player.body.rotation.x = Math.sin(state.elapsedMs * 0.008) * 0.08;
     }
   }
+}
+
+/** Each actual shot starts a fresh attack; rapid shots cut off the prior swing. */
+export function updatePlayerAnimation(
+  player: PlayerRefs,
+  state: Pick<GameState, 'isOver' | 'isFiring' | 'justFired'>,
+  dtSec: number,
+): void {
+  if (state.isOver) {
+    player.playAnimation('death', 0.2, false);
+  } else if (state.justFired) {
+    player.playAnimation('shoot', 0.06, false, true);
+  } else if (player.currentActionName !== 'shoot' || !player.currentAction?.isRunning()) {
+    player.playAnimation('run', 0.1, true);
+  }
+  player.mixer?.update(dtSec);
 }
 
 /**

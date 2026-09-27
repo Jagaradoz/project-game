@@ -100,6 +100,17 @@ test('input: jogging opens fire, standing still holds fire', () => {
   assert.equal(input.read().isFiring, false);
 });
 
+test('input: dev fire temporarily overrides a stationary camera pose', () => {
+  const input = createInput();
+  input.setPose(LATERAL.CENTER, false);
+  input.setDevFire(true);
+  assert.equal(input.read().isFiring, true);
+  input.setPose(LATERAL.CENTER, false);
+  assert.equal(input.read().isFiring, true);
+  input.setDevFire(false);
+  assert.equal(input.read().isFiring, false);
+});
+
 test('input: losing the body holds the lane and holds fire', () => {
   const input = createInput();
   input.setPose(LATERAL.LEFT, true);

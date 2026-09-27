@@ -47,6 +47,7 @@ export function createGameState(seed = 1, config: RunConfig = CONFIG.game): Game
     invulnUntilMs: -Infinity,
     /** Set on the frame a hit lands, so the view can flash without polling HP. */
     justHit: false,
+    justFired: false,
     /**
      * Where enemies died this frame. The view needs a position to play a death
      * animation at, and it cannot recover one from an enemy that has already
@@ -87,8 +88,8 @@ export function updateGame(
   config: RunConfig = CONFIG.game,
 ): GameState {
   if (state.isOver) {
-    if (!state.justHit && state.justKilled.length === 0) return state;
-    return { ...state, justHit: false, justKilled: [] };
+    if (!state.justHit && !state.justFired && state.justKilled.length === 0) return state;
+    return { ...state, justHit: false, justFired: false, justKilled: [] };
   }
 
   const stepMs = Math.min(Math.max(dtMs, 0), config.maxFrameMs);
@@ -149,6 +150,7 @@ export function updateGame(
     nextSpawnMs: spawned.nextSpawnMs,
     invulnUntilMs: hitCount > 0 ? elapsedMs + config.invulnMs : state.invulnUntilMs,
     justHit: hitCount > 0,
+    justFired: fired.didFire,
     justKilled: shots.killed,
     killCount,
     isCleared,
@@ -242,14 +244,15 @@ function fireDue(
   { bullets, cooldownMs }: { bullets: GameBody[]; cooldownMs: number },
   { lane, isFiring, stepMs }: { lane: number; isFiring: boolean; stepMs: number },
   config: RunConfig,
-): { bullets: GameBody[]; cooldownMs: number } {
+): { bullets: GameBody[]; cooldownMs: number; didFire: boolean } {
   const remainingMs = Math.max(0, cooldownMs - stepMs);
-  if (!isFiring || remainingMs > 0) return { bullets, cooldownMs: isFiring ? remainingMs : 0 };
+  if (!isFiring || remainingMs > 0) return { bullets, cooldownMs: isFiring ? remainingMs : 0, didFire: false };
 
   const muzzleZ = config.playerZ - config.playerRadius;
   return {
     bullets: [...bullets, { lane, z: muzzleZ, previousZ: muzzleZ }],
     cooldownMs: config.fireIntervalMs,
+    didFire: true,
   };
 }
 

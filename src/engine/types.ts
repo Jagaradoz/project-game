@@ -165,6 +165,7 @@ export interface GameState {
   nextSpawnMs: number;
   invulnUntilMs: number;
   justHit: boolean;
+  justFired: boolean;
   justKilled: KillMark[];
   /** Enemies killed this run. Distinct from `score`, which stages may weight. */
   killCount: number;
@@ -192,6 +193,7 @@ export interface InputHandle {
   read(): GameInput;
   reset(): void;
   step(delta: number): void;
+  setDevFire(active: boolean): void;
 }
 
 /* -------------------------------------------------------------- render ---- */

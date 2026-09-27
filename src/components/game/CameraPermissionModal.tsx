@@ -8,7 +8,7 @@
  * gesture. This dialog is that gesture: it cannot auto-fire on mount.
  */
 
-import { Map, Video } from 'lucide-react';
+import { Keyboard, Map, Video } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 
@@ -19,11 +19,12 @@ interface CameraPermissionModalProps {
   error: string | null;
   status?: string | null;
   onAllow: () => void | Promise<void>;
+  onSkip?: () => void;
 }
 
 type PermissionHint = 'prompt' | 'granted' | 'denied' | 'unknown';
 
-export function CameraPermissionModal({ error, status, onAllow }: CameraPermissionModalProps) {
+export function CameraPermissionModal({ error, status, onAllow, onSkip }: CameraPermissionModalProps) {
   const router = useRouter();
   const titleId = useId();
   const descriptionId = useId();
@@ -164,6 +165,11 @@ export function CameraPermissionModal({ error, status, onAllow }: CameraPermissi
             Back to stages
           </LinkButton>
         </div>
+        {onSkip && (
+          <Button variant="secondary" icon={<Keyboard size={18} />} onClick={onSkip}>
+            Play without camera (dev)
+          </Button>
+        )}
       </div>
     </div>
   );

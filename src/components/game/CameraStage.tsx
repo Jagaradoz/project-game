@@ -7,6 +7,7 @@ interface CameraStageProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   overlayRef: RefObject<HTMLCanvasElement | null>;
   isCameraRunning: boolean;
+  isCameraSkipped: boolean;
 }
 
 /**
@@ -17,13 +18,13 @@ interface CameraStageProps {
  * the skeleton stays glued to the body without any flipping in the drawing code.
  * Changing one without the other detaches the skeleton -- see app/globals.css.
  */
-export function CameraStage({ videoRef, overlayRef, isCameraRunning }: CameraStageProps) {
+export function CameraStage({ videoRef, overlayRef, isCameraRunning, isCameraSkipped }: CameraStageProps) {
   const [isVideoReady, setIsVideoReady] = useState(false);
   const showFeed = isCameraRunning && isVideoReady;
 
   return (
     <div
-      className={`absolute right-3 bottom-3 z-[2] overflow-hidden border bg-[rgba(10,12,15,0.82)] shadow-[0_6px_20px_rgba(0,0,0,0.3)] backdrop-blur-[3px] transition-[width,height,border-radius] duration-200 motion-reduce:transition-none ${
+      className={`absolute right-3 bottom-3 z-[2] overflow-hidden border bg-[rgba(10,12,15,0.82)] shadow-[0_6px_20px_rgba(0,0,0,0.3)] backdrop-blur-[3px] transition-[width,height,border-radius] duration-200 motion-reduce:transition-none ${isCameraSkipped ? 'invisible' : ''} ${
         showFeed
           ? 'aspect-9/16 w-[72px] rounded-lg border-white/20 sm:w-[84px]'
           : 'h-9 w-[116px] rounded-full border-white/15'

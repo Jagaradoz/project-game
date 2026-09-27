@@ -157,6 +157,7 @@ export default function GameCanvas() {
             videoRef={videoRef}
             overlayRef={overlayRef}
             isCameraRunning={snapshot.isCameraRunning}
+            isCameraSkipped={snapshot.isCameraSkipped}
           />
           <GameOverOverlay
             snapshot={snapshot}
@@ -167,24 +168,59 @@ export default function GameCanvas() {
         </div>
 
         {showDebugTools && (
-          <ScenePickers
-            character={character}
-            biome={biome}
-            onCharacterChange={setCharacter}
-            onBiomeChange={setBiome}
-          />
+          <>
+            <div className="mx-auto flex w-full max-w-[calc(80vh*3/4)] justify-center">
+              <button
+              type="button"
+              disabled={snapshot.isOver || !snapshot.isSceneReady}
+              onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                actions.setDevFire(true);
+              }}
+              onPointerUp={() => actions.setDevFire(false)}
+              onPointerCancel={() => actions.setDevFire(false)}
+              onLostPointerCapture={() => actions.setDevFire(false)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') actions.setDevFire(true);
+              }}
+              onKeyUp={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') actions.setDevFire(false);
+              }}
+              onBlur={() => actions.setDevFire(false)}
+              className="min-h-11 rounded-md border border-line-strong bg-elevated px-6 text-sm font-semibold text-text touch-none select-none hover:border-primary active:bg-primary disabled:opacity-50"
+              >
+                Hold to fire · Space
+              </button>
+            </div>
+            <ScenePickers
+              character={character}
+              biome={biome}
+              onCharacterChange={setCharacter}
+              onBiomeChange={setBiome}
+            />
+          </>
         )}
 
         <p className="m-0 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[13px] text-muted">
-          <span className="flex items-center gap-1.5">
-            <MoveHorizontal aria-hidden size={15} />
-            Step or lean sideways to change lane
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Footprints aria-hidden size={15} />
-            Jog in place to attack
-          </span>
-          <span className="text-subtle">Arrow keys also work</span>
+          {snapshot.isCameraSkipped ? (
+            <>
+              <span>Camera-free dev mode</span>
+              <span>← / → or A / D to change lane</span>
+              <span>Hold Space or the fire button to attack</span>
+            </>
+          ) : (
+            <>
+              <span className="flex items-center gap-1.5">
+                <MoveHorizontal aria-hidden size={15} />
+                Step or lean sideways to change lane
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Footprints aria-hidden size={15} />
+                Jog in place to attack
+              </span>
+              <span className="text-subtle">Arrow keys also work</span>
+            </>
+          )}
         </p>
 
         {snapshot.error && snapshot.isCameraRunning && (
@@ -206,11 +242,12 @@ export default function GameCanvas() {
           />
         )}
 
-        {!snapshot.isCameraRunning && (
+        {!snapshot.isCameraRunning && !snapshot.isCameraSkipped && (
           <CameraPermissionModal
             error={snapshot.error}
             status={snapshot.status}
             onAllow={actions.startCamera}
+            onSkip={showDebugTools && process.env.NODE_ENV !== 'production' ? actions.skipCamera : undefined}
           />
         )}
       </main>

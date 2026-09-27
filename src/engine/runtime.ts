@@ -143,6 +143,7 @@ export interface HudSnapshot {
   quality: ShadowQuality | null;
 
   isCameraRunning: boolean;
+  isCameraSkipped: boolean;
   isSceneReady: boolean;
   status: string;
   error: string | null;
@@ -165,7 +166,9 @@ export interface GameRuntime {
   start(): void;
   startCamera(): Promise<void>;
   stopCamera(): void;
+  skipCamera(): void;
   recalibrate(): void;
+  setDevFire(active: boolean): void;
   restart(): void;
   setCharacter(charId: string): Promise<void>;
   setBiome(choice: string): void;
@@ -201,6 +204,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   let isDisposed = false;
   let isPoseRunning = false;
+  let isCameraSkipped = false;
+  let isCameraStarting = false;
+  let cameraRequestId = 0;
   let gameFrameId: number | null = null;
   let poseFrameId: number | null = null;
   let resizeObserver: ResizeObserver | null = null;
@@ -300,6 +306,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       quality: sceneRefs?.quality ?? null,
 
       isCameraRunning: isPoseRunning,
+      isCameraSkipped,
       isSceneReady: sceneRefs !== null,
       status,
       error: errorMessage,
@@ -341,11 +348,11 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     const dtMs = nowMs - lastGameMs;
     lastGameMs = nowMs;
 
-    // The run waits for the camera. The scene still paints, so /play can show
-    // the trail behind the permission dialog and tools/shot.mjs can photograph
-    // it without ever calling getUserMedia.
-    const stepMs = isPoseRunning ? dtMs : 0;
-    if (isPoseRunning) {
+    // The run waits for pose tracking or the explicit dev bypass. The scene
+    // still paints behind the dialog and remains available to tools/shot.mjs.
+    const isPlaying = isPoseRunning || isCameraSkipped;
+    const stepMs = isPlaying ? dtMs : 0;
+    if (isPlaying) {
       sampleQuality(dtMs);
       game = updateGame(game, input.read(), dtMs, rules);
     }
@@ -504,9 +511,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   /** Loads a character and re-skins the projectiles to match their weapon. */
   async function applyCharacter(charId: string): Promise<void> {
-    pendingCharacter = charId;
+    pendingCharacter = Object.hasOwn(CONFIG.game.characters, charId) ? charId : CONFIG.game.defaultCharacter;
     if (!sceneRefs) return;
-    await sceneRefs.player.loadCharacter(charId);
+    await sceneRefs.player.loadCharacter(pendingCharacter);
     if (isDisposed) return;
     sceneRefs.bulletPool.setProjectile(sceneRefs.player.projectile);
   }
@@ -632,13 +639,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     async startCamera() {
-      if (isDisposed || isPoseRunning) return;
+      if (isDisposed || isPoseRunning || isCameraStarting) return;
+      isCameraStarting = true;
+      const requestId = ++cameraRequestId;
       setError(null);
 
       try {
         setStatus('Requesting camera...');
         const camera = await startCamera(els.video);
-        if (isDisposed) {
+        if (isDisposed || requestId !== cameraRequestId) {
           stopCamera(camera.stream);
           return;
         }
@@ -647,23 +656,31 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
         setStatus(`Loading pose model (${CONFIG.pose.model})...`);
         const pose = await initPose();
-        if (isDisposed) return;
+        if (isDisposed || requestId !== cameraRequestId) {
+          closePose();
+          return;
+        }
 
         connections = pose.connections;
         delegate = pose.delegate;
         poseModel = pose.model;
 
         isPoseRunning = true;
+        isCameraSkipped = false;
         setStatus('Running. Stand still for a second to calibrate center.');
         schedulePoseFrame();
       } catch (error) {
+        if (isDisposed || requestId !== cameraRequestId) return;
         setError(describeCameraError(error));
         setStatus('Stopped.');
         console.error(error);
+      } finally {
+        isCameraStarting = false;
       }
     },
 
     stopCamera() {
+      cameraRequestId += 1;
       isPoseRunning = false;
       cancelPoseFrame();
       stopCamera(stream);
@@ -673,9 +690,26 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       setStatus('Camera stopped.');
     },
 
+    skipCamera() {
+      if (process.env.NODE_ENV === 'production' || isDisposed || mode !== 'game') return;
+      cameraRequestId += 1;
+      isPoseRunning = false;
+      cancelPoseFrame();
+      stopCamera(stream);
+      stream = null;
+      input.clearPose();
+      isCameraSkipped = true;
+      setError(null);
+      setStatus('Development mode: keyboard controls, camera off.');
+    },
+
     recalibrate() {
       lateral = recalibrateLateral(lateral);
       setStatus('Recalibrating center -- stand still for a second.');
+    },
+
+    setDevFire(active: boolean) {
+      if (!isDisposed && mode === 'game') input.setDevFire(active);
     },
 
     restart() {
@@ -737,6 +771,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     dispose() {
       if (isDisposed) return;
       isDisposed = true;
+      cameraRequestId += 1;
       isPoseRunning = false;
 
       if (gameFrameId !== null) cancelAnimationFrame(gameFrameId);

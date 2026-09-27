@@ -41,7 +41,9 @@ export const useSettings = create<SettingsState>()(
       stageBiomeId: FIRST_BIOME_ID,
       stageNumber: 1,
       difficulty: DEFAULT_DIFFICULTY,
-      setCharacter: (character) => set({ character }),
+      setCharacter: (character) => set({
+        character: Object.hasOwn(CONFIG.game.characters, character) ? character : CONFIG.game.defaultCharacter,
+      }),
       setBiome: (biome) => set({ biome }),
       setStage: (stageBiomeId, stageNumber) =>
         // The stage's biome is also the scene it is played in, so picking a
@@ -54,6 +56,16 @@ export const useSettings = create<SettingsState>()(
       // stored _v1 object has neither, and zustand's persist merges shallowly,
       // so a returning player would otherwise get `difficulty: undefined`.
       name: 'trail_runner_settings_v2',
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<SettingsState> | undefined;
+        return {
+          ...current,
+          ...saved,
+          character: saved?.character && Object.hasOwn(CONFIG.game.characters, saved.character)
+            ? saved.character
+            : CONFIG.game.defaultCharacter,
+        };
+      },
     },
   ),
 );
