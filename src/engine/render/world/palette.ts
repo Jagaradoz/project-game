@@ -17,32 +17,32 @@ import type { ThreeModule } from '@/engine/types';
 export const UNMANAGED_MATERIALS = new Set(['_defaultMat']);
 
 const FOREST_KIT = {
-  grass: '#5f9a41',
-  leafsGreen: '#57a049',
-  leafsDark: '#337542',
-  leafsFall: '#d98b3a',
-  dirt: '#9c7752',
-  dirtDark: '#7c5d3f',
-  stone: '#9ba4a8',
-  stoneDark: '#717c82',
-  wood: '#a97a40',
-  woodBark: '#7b5533',
-  woodBarkDark: '#5f4027',
-  woodDark: '#4b3321',
-  woodBirch: '#e9e3d3',
-  woodInner: '#c9a16b',
-  water: '#5fa8c4',
-  corn: '#e0c060',
-  colorRed: '#cf4239',
-  colorRedDark: '#a5302c',
-  colorYellow: '#f2c44a',
-  colorPurple: '#9b7bd4',
-  colorWhite: '#f2efe6',
-  colorTan: '#e0c39a',
+  grass: '#63834a',
+  leafsGreen: '#537d3f',
+  leafsDark: '#2e5433',
+  leafsFall: '#e48b3a',
+  dirt: '#a98055',
+  dirtDark: '#715338',
+  stone: '#b8b1a2',
+  stoneDark: '#726b60',
+  wood: '#b9864a',
+  woodBark: '#765033',
+  woodBarkDark: '#493322',
+  woodDark: '#17120e',
+  woodBirch: '#fff3e2',
+  woodInner: '#d3a36b',
+  water: '#5e9ea5',
+  corn: '#e8bb63',
+  colorRed: '#fe6601',
+  colorRedDark: '#a84314',
+  colorYellow: '#f5c75b',
+  colorPurple: '#9972a5',
+  colorWhite: '#fff3e2',
+  colorTan: '#e7c395',
 };
 
 /**
- * Golden-hour woodland: warm low sun, hazy blue distance, saturated canopy.
+ * Graphic woodland: cream distance, layered sage ridges, deep green canopy.
  * The horizon band of the sky is deliberately the same colour as the fog so
  * that ground, trees and sky meet without a seam.
  */
@@ -55,51 +55,51 @@ export const GOLDEN_FOREST = {
   scatterSet: 'forest',
 
   sky: {
-    haze: '#bcd9e0',
-    glow: '#ffd9a0',
-    mid: '#7fc4e8',
-    zenith: '#4f9fd4',
+    haze: '#fff3e2',
+    glow: '#ffd6a3',
+    mid: '#e9ddc9',
+    zenith: '#c9d2bc',
   },
 
   light: {
-    sun: '#fff0c8',
+    sun: '#fff0d7',
     sunIntensity: 3.1,
-    hemiSky: '#cfe8ff',
-    hemiGround: '#6b8a4a',
+    hemiSky: '#fff3e2',
+    hemiGround: '#5c7144',
     hemiIntensity: 1.15,
-    rim: '#a8d8ff',
+    rim: '#ffe0b8',
     rimIntensity: 0.55,
     exposure: 1.0,
   },
 
   fog: {
-    color: '#bcd9e0',
+    color: '#fff3e2',
     near: 90,
     far: 285,
   },
 
   ground: {
-    trail: '#8a6a45',
-    trailEdge: '#6f5436',
-    verge: '#5c7d3a',
-    grass: '#4a7f3e',
-    grassDeep: '#31653a',
-    meadow: '#54874a',
+    trail: '#9e754b',
+    trailEdge: '#17120e',
+    verge: '#6c8044',
+    grass: '#547345',
+    grassDeep: '#314f32',
+    meadow: '#75915a',
   },
 
   ridge: {
-    near: '#8fb3ae',
-    mid: '#a3c3c8',
-    far: '#b6cfd8',
+    near: '#8da17f',
+    mid: '#b5c2a6',
+    far: '#dcdac6',
   },
 
   accents: {
-    marker: '#d6c7a4',
-    mote: '#ffe9a8',
-    player: '#3b6fd4',
-    enemy: '#ded6c2',
-    enemyTrim: '#b8433a',
-    bullet: '#e8dfc8',
+    marker: '#fe6601',
+    mote: '#fead61',
+    player: '#fe6601',
+    enemy: '#fff3e2',
+    enemyTrim: '#17120e',
+    bullet: '#fff3e2',
   },
 
   kit: FOREST_KIT,

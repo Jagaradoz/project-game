@@ -22,7 +22,7 @@ import type { ThreeModule } from '@/engine/types';
 
 import { createRng, range } from '@/engine/render/world/rng';
 
-const CLOUD_COUNT = 24;
+const CLOUD_COUNT = 10;
 /** Reaches behind the camera, so clouds leave the frame instead of stopping short. */
 const CLOUD_START_Z = 140;
 const CLOUD_SPAN = 840;

@@ -98,12 +98,11 @@ export function isLandmarkZone(z: number, farZ: number, span: number, radius = 1
  */
 const FOREST_LAYERS = {
   /**
-   * Grass tufts, and a lot of them. A bank of flat vertex-coloured ground reads
-   * as painted cardboard no matter how good the lighting is; breaking the
-   * silhouette with cheap geometry is what makes it read as terrain.
+   * Keep enough grass to break the ground silhouette, but leave broad quiet
+   * shapes so the trail reads like the site's poster-style panels.
    */
   groundcover: {
-    count: 1100,
+    count: 520,
     band: [5.6, 16],
     scale: [1.8, 3.0],
     castShadow: false,
@@ -112,14 +111,14 @@ const FOREST_LAYERS = {
     clusterSpread: 9,
   },
   flowers: {
-    count: 340,
+    count: 110,
     band: [5.7, 9],
     scale: [1.6, 2.6],
     castShadow: false,
     models: ['flower_redA', 'flower_yellowB', 'flower_purpleB'],
   },
   verge: {
-    count: 230,
+    count: 95,
     band: [5.2, 9.5],
     scale: [1.2, 2.1],
     castShadow: false,
@@ -132,7 +131,7 @@ const FOREST_LAYERS = {
     clusterSpread: 6,
   },
   understory: {
-    count: 145,
+    count: 100,
     band: [6, 12],
     scale: [1.6, 2.5],
     castShadow: true,
@@ -144,7 +143,7 @@ const FOREST_LAYERS = {
     clusterSpread: 8,
   },
   midground: {
-    count: 118,
+    count: 100,
     band: [7, 17],
     scale: [2.2, 3.4],
     castShadow: true,
@@ -157,7 +156,7 @@ const FOREST_LAYERS = {
     clusterSpread: 10,
   },
   canopy: {
-    count: 130,
+    count: 95,
     band: [15, 48],
     scale: [2.8, 4.2],
     castShadow: false,
@@ -173,7 +172,7 @@ const FOREST_LAYERS = {
 
 const HIGHLANDS_LAYERS = {
   groundcover: {
-    count: 300,
+    count: 170,
     band: [5.2, 20],
     scale: [1.2, 2.1],
     castShadow: false,
@@ -182,7 +181,7 @@ const HIGHLANDS_LAYERS = {
     clusterSpread: 10,
   },
   verge: {
-    count: 220,
+    count: 125,
     band: [5.2, 10],
     scale: [1.3, 2.3],
     castShadow: false,
@@ -194,7 +193,7 @@ const HIGHLANDS_LAYERS = {
     clusterSpread: 7,
   },
   understory: {
-    count: 135,
+    count: 100,
     band: [6.2, 13],
     scale: [1.5, 2.2],
     castShadow: true,
@@ -206,7 +205,7 @@ const HIGHLANDS_LAYERS = {
     clusterSpread: 9,
   },
   midground: {
-    count: 105,
+    count: 90,
     band: [7, 18],
     scale: [2.0, 3.2],
     castShadow: true,
@@ -219,7 +218,7 @@ const HIGHLANDS_LAYERS = {
     clusterSpread: 11,
   },
   canopy: {
-    count: 115,
+    count: 85,
     band: [15, 48],
     scale: [2.6, 4.4],
     castShadow: false,
@@ -234,7 +233,7 @@ const HIGHLANDS_LAYERS = {
 
 const OASIS_LAYERS = {
   groundcover: {
-    count: 220,
+    count: 130,
     band: [5.2, 20],
     scale: [1.1, 2.0],
     castShadow: false,
@@ -243,7 +242,7 @@ const OASIS_LAYERS = {
     clusterSpread: 10,
   },
   verge: {
-    count: 165,
+    count: 100,
     band: [5.2, 10],
     scale: [1.3, 2.2],
     castShadow: false,
@@ -252,7 +251,7 @@ const OASIS_LAYERS = {
     clusterSpread: 8,
   },
   understory: {
-    count: 112,
+    count: 85,
     band: [6.2, 13],
     scale: [1.5, 2.2],
     castShadow: true,
@@ -261,7 +260,7 @@ const OASIS_LAYERS = {
     clusterSpread: 10,
   },
   midground: {
-    count: 92,
+    count: 82,
     band: [7, 18],
     scale: [2.0, 3.2],
     castShadow: true,
@@ -273,7 +272,7 @@ const OASIS_LAYERS = {
     clusterSpread: 12,
   },
   canopy: {
-    count: 96,
+    count: 75,
     band: [15, 48],
     scale: [2.6, 4.0],
     castShadow: false,

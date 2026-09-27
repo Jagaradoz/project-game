@@ -33,11 +33,11 @@ const GROUND_FAR_Z = -520;
 const TRAIL_Y = 0;
 const SOIL_TILE_SIZE = 12;
 
-/** Seamless multiscale soil, generated once without a canvas or network request. */
+/** Low-contrast printed grain, generated once without a canvas or network request. */
 function createSoilTexture(THREE: ThreeModule): THREE_NS.DataTexture {
   const size = 256;
   const rng = createRng(0x5011);
-  const layers = [8, 24, 64].map((cells) => ({
+  const layers = [8, 24].map((cells) => ({
     cells,
     values: Float32Array.from({ length: cells * cells }, () => rng()),
   }));
@@ -58,10 +58,8 @@ function createSoilTexture(THREE: ThreeModule): THREE_NS.DataTexture {
   const pixels = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      const grain = rng();
-      const value = Math.min(255, Math.round(174 + sample(layers[0]!, x, y) * 35
-        + sample(layers[1]!, x, y) * 22 + sample(layers[2]!, x, y) * 13
-        + grain * 10 + (grain > 0.97 ? 11 : 0)));
+      const value = Math.round(226 + sample(layers[0]!, x, y) * 15
+        + sample(layers[1]!, x, y) * 5);
       const offset = (y * size + x) * 4;
       pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = value;
       pixels[offset + 3] = 255;
@@ -90,10 +88,10 @@ const RIDGE_LAYERS: { z: number; height: number; spread: number; seed: number; k
   { z: -500, height: 92, spread: 460, seed: 0xc2b2, key: 'far' },
 ];
 
-const MARKER_STONE = { radius: 0.3, height: 0.07, sides: 6 };
+const MARKER_BLOCK = { width: 0.55, height: 0.06, length: 0.8 };
 const MARKER_SEED = 0x7a11;
-const MARKER_JITTER_X = 0.22;
-const MARKER_SKIP_CHANCE = 0.22;
+const MARKER_JITTER_X = 0.06;
+const MARKER_SKIP_CHANCE = 0.08;
 
 /**
  * Where the dirt nominally ends: past the lanes by `TRAIL_MARGIN`, so the edge
@@ -226,7 +224,7 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
     vertexColors: true,
     map: soilTexture,
     bumpMap: soilTexture,
-    bumpScale: 0.085,
+    bumpScale: 0.018,
     roughness: 0.95,
     metalness: 0,
     flatShading: true,
@@ -282,7 +280,7 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
 }
 
 /**
- * Lane boundaries as sunken trail stones. Same recycling contract as every other
+ * Lane boundaries as bold printed blocks. Same recycling contract as every other
  * scrolling layer, so render.js treats it identically.
  */
 function addLaneMarkers(
@@ -291,11 +289,10 @@ function addLaneMarkers(
   config: GameConfig,
   palette: Palette,
 ) {
-  const geometry = new THREE.CylinderGeometry(
-    MARKER_STONE.radius,
-    MARKER_STONE.radius * 0.85,
-    MARKER_STONE.height,
-    MARKER_STONE.sides,
+  const geometry = new THREE.BoxGeometry(
+    MARKER_BLOCK.width,
+    MARKER_BLOCK.height,
+    MARKER_BLOCK.length,
   );
   const material = new THREE.MeshStandardMaterial({
     color: palette.accents.marker,
@@ -313,21 +310,19 @@ function addLaneMarkers(
     const laneX = (lane - config.laneCount / 2) * config.laneWidth;
 
     for (let index = 0; index < config.markerCount; index += 1) {
-      // Gaps in the run. A stone at every single interval is what made these
-      // read as road markings rather than something the trail wore in.
+      // A few missing blocks keep the cadence from looking mechanically tiled.
       if (rng() < MARKER_SKIP_CHANCE) continue;
 
-      const baseZ = config.spawnZ + index * period + range(rng, -period * 0.3, period * 0.3);
+      const baseZ = config.spawnZ + index * period + range(rng, -period * 0.08, period * 0.08);
       const mesh = new THREE.Mesh(geometry, material);
-      const scale = range(rng, 0.62, 1.35);
+      const scale = range(rng, 0.88, 1.12);
 
       mesh.position.set(
         laneX + range(rng, -MARKER_JITTER_X, MARKER_JITTER_X),
-        TRAIL_Y + (MARKER_STONE.height * scale) / 4,
+        TRAIL_Y + (MARKER_BLOCK.height * scale) / 2,
         baseZ,
       );
-      mesh.scale.set(scale, range(rng, 0.7, 1.2), scale * range(rng, 0.8, 1.25));
-      mesh.rotation.set(range(rng, -0.12, 0.12), rng() * Math.PI * 2, range(rng, -0.1, 0.1));
+      mesh.scale.set(scale, 1, scale);
       mesh.receiveShadow = true;
       scene.add(mesh);
       items.push({ mesh, baseZ });
