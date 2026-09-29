@@ -12,9 +12,7 @@ import {
 import { LinkButton } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { BareShell } from '@/components/ui/PageShell';
-import { TrailStill } from '@/components/ui/TrailStill';
 import { SHELL_GUTTER, SHELL_WIDTH } from '@/components/layout/container';
-import { HERO_STILL } from '@/lib/media/stills';
 
 /* TOR 3: หน้าแรกและคำแนะนำการใช้งาน -- the landing screen and its safety notes. */
 
@@ -60,38 +58,38 @@ export default function HomePage() {
   return (
     <BareShell bleed>
       <section className={`mx-auto w-full py-8 sm:py-12 ${SHELL_GUTTER} ${SHELL_WIDTH.wide}`}>
-        <div className="border-2 border-ink bg-surface shadow-[8px_8px_0_0_var(--color-ink)]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-ink bg-primary px-5 py-3 text-xs font-black tracking-[0.14em] text-on-primary uppercase sm:px-8">
-            <span>Move / Play / Repeat</span>
-            <span>Webcam Exergame — 01</span>
+        <div className="mx-auto flex max-w-3xl flex-col items-center gap-7 py-10 text-center sm:py-16">
+          <span className="eyebrow">Your body is the controller</span>
+          <h1 className="m-0 text-5xl leading-[1.02] font-black tracking-[-0.05em] sm:text-7xl xl:text-8xl">
+            Get moving.
+            <br />
+            <span className="mt-2 inline-block bg-primary px-3 text-on-primary shadow-[6px_6px_0_0_var(--color-ink)]">
+              Get playing.
+            </span>
+          </h1>
+          <p className="m-0 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
+            Jog in place to attack. Step sideways to dodge. Your webcam reads your movement right
+            here in your browser — no controller needed.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <LinkButton href="/play" variant="primary" size="lg" icon={<Play size={20} />}>
+              Play now
+            </LinkButton>
+            <LinkButton href="#how-to-play" variant="secondary" size="lg">
+              How to play
+            </LinkButton>
           </div>
-          <div className="grid lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="flex flex-col items-start justify-center gap-6 px-6 py-12 sm:px-10 sm:py-16 lg:px-12 lg:py-20">
-              <span className="eyebrow">Your body is the controller</span>
-              <h1 className="m-0 max-w-2xl text-5xl leading-[0.98] font-black tracking-[-0.06em] sm:text-6xl xl:text-7xl">
-                Get moving.<br /><span className="bg-primary px-2 text-on-primary">Get playing.</span>
-              </h1>
-              <p className="m-0 max-w-lg text-base leading-relaxed text-muted sm:text-lg">
-                Jog in place to attack. Step sideways to dodge. Your webcam reads your movement right here in your browser.
-              </p>
-              <LinkButton href="/play" variant="primary" size="lg" icon={<Play size={20} />}>
-                Play now
-              </LinkButton>
-            </div>
-            <div className="relative min-h-72 overflow-hidden border-t-2 border-ink bg-primary lg:min-h-[32rem] lg:border-t-0 lg:border-l-2">
-              <TrailStill
-                src={HERO_STILL}
-                alt="Silhouette walking a mountain trail at sunset"
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover object-[center_58%]"
-              />
-              <span className="absolute right-4 bottom-4 border-2 border-ink bg-surface px-3 py-2 text-xs font-black tracking-widest text-ink uppercase shadow-[4px_4px_0_0_var(--color-ink)]">
-                No controller needed
-              </span>
-            </div>
-          </div>
+          <ul className="m-0 mt-2 flex list-none flex-wrap justify-center gap-2 p-0">
+            {CONTROLS.map((control) => (
+              <li
+                key={control.action}
+                className="flex items-center gap-2 border-2 border-ink px-3 py-1.5 text-xs font-bold tracking-wide text-text uppercase"
+              >
+                <control.icon aria-hidden size={14} className="text-primary" />
+                {control.action}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
