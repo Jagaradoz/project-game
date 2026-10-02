@@ -1,7 +1,7 @@
 """Build a three-row Blender preview for the magician character animations.
 
 Run with Blender, not regular Python:
-  blender --background public/assets/models/magicians_scene.blend \
+  blender --background public/assets/models/blender/magicians/magicians_scene.blend \
     --python tools/build_magicians_animation_catalog.py
 """
 
@@ -11,8 +11,11 @@ import bpy
 from mathutils import Vector
 
 
-ROOT = Path(bpy.data.filepath).resolve().parents[3]
-OUTPUT = ROOT / "public" / "assets" / "models" / "magicians_animation_catalog.blend"
+p = Path(bpy.data.filepath).resolve()
+while p.name != 'public' and p.parent != p:
+    p = p.parent
+ROOT = p.parent
+OUTPUT = ROOT / "public" / "assets" / "models" / "blender" / "magicians" / "magicians_animation_catalog.blend"
 
 CHARACTERS = (
     ("Rig.001", "Mage"),

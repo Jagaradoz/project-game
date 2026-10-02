@@ -1,5 +1,5 @@
 """Rig the four forest characters and author looping in-place Walk actions.
-Run: blender --background public/assets/models/forest_selected_characters.blend --python tools/rig_forest_walks.py
+Run: blender --background public/assets/models/blender/forest_enemies/forest_selected_characters.blend --python tools/rig_forest_walks.py
 Source blend and hidden original Goblin collection are preserved.
 """
 from pathlib import Path
@@ -8,9 +8,9 @@ import bpy
 from mathutils import Vector, Matrix
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'public/assets/models/forest_characters_rigged_walk.blend'
-PREVIEW = ROOT / 'public/assets/models/forest_walk_preview'
-PREVIEW.mkdir(exist_ok=True)
+OUT = ROOT / 'public/assets/models/blender/forest_enemies/forest_characters_rigged_walk.blend'
+PREVIEW = ROOT / 'public/assets/models/previews/forest'
+PREVIEW.mkdir(parents=True, exist_ok=True)
 CONFIGS = [
  dict(root='F02_BrambleSkeleton', label='Bramble Skeleton', period=32, hip=(0,0,.92), neck=1.57, top=2.1, leg=[(.13,0,.9),(.14,-.05,.5),(.14,-.02,.09)], arms=[[(.3,.02,1.49),(.42,-.05,1.17),(.4,-.4,1.1)],[(-.3,.02,1.49),(-.37,0,1.13),(-.4,-.12,.79)]], stride=.13,lift=.09,sway=.017,bob=.017),
  dict(root='F03_ShroomBrute', label='Shroom Brute', period=40, hip=(0,0,.59), neck=1.61, top=2.7, leg=[(.32,-.02,.60),(.35,-.07,.34),(.37,-.14,.13)], arms=[[(.6,-.02,1.12),(.98,-.12,.82),(1,-.55,.66)],[(-.6,-.02,1.12),(-.95,-.1,.8),(-1.03,-.32,.42)]],stride=.11,lift=.08,sway=.045,bob=.018),
@@ -330,7 +330,7 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT))
     lines=['# Forest character rig and walk validation','','## Summary','- Preserved the source blend and hidden Goblin original backup.','- Added one articulated 17-bone rig per character, bone-bound rigid details, smoothly weighted continuous legs, and four editable Walk actions.','- Weapons and grip fingers share their hand bone. Feet use a flat planted stance and raised swing; hips, arms and canopy have secondary motion.','','## Validation','| Character | Bound parts | Cycle at 24 fps | Rest matrix error | Seam error | Third-cycle error | Pose movement |','|---|---:|---:|---:|---:|---:|---:|']
     for c in CONFIGS:lines.append(f"| {c['label']} | {len(c['parts'])} | {c['period']} frames | {c['rest_error']:.8f} | {c['seam_error']:.8f} | {c['repeat_error']:.8f} | {c['motion']:.5f} |")
-    lines+=['','- Blender 5.1 layered action curves include Cycles modifiers; loops validated beyond authored frames.','- Source object transforms preserved in rest pose (tolerance 0.0001).','- Contact and passing previews rendered in `public/assets/models/forest_walk_preview/`.','- These are in-place Blender animations; application integration and GLB export are outside this change.','','## Blockers','- None.']
+    lines+=['','- Blender 5.1 layered action curves include Cycles modifiers; loops validated beyond authored frames.','- Source object transforms preserved in rest pose (tolerance 0.0001).','- Contact and passing previews rendered in `public/assets/models/previews/forest/`.','- These are in-place Blender animations; application integration and GLB export are outside this change.','','## Blockers','- None.']
     (ROOT/'docs/forest-rig-walk-validation.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
     print('SAVED',OUT,flush=True)
 

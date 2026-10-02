@@ -1,6 +1,6 @@
 """Export the approved Blender catalog as game-ready Run/Attack GLBs.
 
-Run with Blender --background magicians_animation_catalog_refined.blend
+Run with Blender --background public/assets/models/blender/magicians/magicians_animation_catalog_refined.blend
 --python tools/export_magician_game_clips.py. The source blend is never saved.
 """
 from pathlib import Path
@@ -8,7 +8,10 @@ import json
 import struct
 import bpy
 
-root = Path(bpy.data.filepath).resolve().parents[3]
+p = Path(bpy.data.filepath).resolve()
+while p.name != 'public' and p.parent != p:
+    p = p.parent
+root = p.parent
 output = root / 'public/assets/models/characters/animated'
 output.mkdir(parents=True, exist_ok=True)
 characters = ('Mage', 'Druid', 'Skeleton Mage', 'Witch', 'Magical Girl')

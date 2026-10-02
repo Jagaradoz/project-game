@@ -19,7 +19,7 @@
 - Source object transforms preserved in rest pose (tolerance 0.0001).
 - Corrected 177 skeleton vine pieces and bound disconnected thorn islands to their host vines; rerendered affected previews.
 - Collective preview range is 1120 frames (common cycle length).
-- Contact and passing previews rendered in `public/assets/models/forest_walk_preview/`.
+- Contact and passing previews rendered in `public/assets/models/previews/forest/`.
 - These are in-place Blender animations; application integration and GLB export are outside this change.
 
 ## Blockers
