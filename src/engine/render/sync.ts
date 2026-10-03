@@ -71,7 +71,6 @@ export function syncScene(
   }
 
   sceneRefs.trailEdge?.update(state.distance);
-  sceneRefs.applyBiome?.(state.distance, state.elapsedMs);
   syncRecycled(sceneRefs.markers as unknown as ScrollLayer, state.distance);
   sceneRefs.scatter?.scroll(state.distance);
   sceneRefs.landmarks?.scroll(state.distance);

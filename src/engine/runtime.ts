@@ -66,8 +66,6 @@ const SIM_SYNC_TAIL_MS = 1500;
 /** A HUD does not need 60 Hz. Anything not in FORCE_EMIT_KEYS waits for this. */
 const SNAPSHOT_INTERVAL_MS = 100;
 
-export const BIOME_AUTO = 'auto';
-
 /**
  * 'game' is the full runner. 'pose' runs the camera and the detectors and
  * nothing else -- no WebGL context, no reducer, no keyboard.
@@ -90,7 +88,6 @@ export interface RuntimeOptions {
   /** Passed in rather than generated here, so a server render and a client render agree. */
   seed?: number;
   character?: string;
-  biome?: string;
   mode?: RuntimeMode;
   /** Which stage to play. Omitted means an endless run with no goal. */
   stage?: StageSelection;
@@ -171,7 +168,6 @@ export interface GameRuntime {
   setDevFire(active: boolean): void;
   restart(): void;
   setCharacter(charId: string): Promise<void>;
-  setBiome(choice: string): void;
   /** Retunes the run in place. Restarts it, because difficulty cannot change mid-run. */
   setStage(stage: StageSelection | null): void;
   /** What /result submits. Read after the run ends. */
@@ -236,7 +232,6 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let luma: number | null = null;
 
   let pendingCharacter = options.character ?? CONFIG.game.defaultCharacter;
-  let pendingBiome = options.biome ?? BIOME_AUTO;
   let actorsVisible = true;
 
   /**
@@ -488,7 +483,6 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
       sceneRefs = refs;
       await applyCharacter(pendingCharacter);
-      applyBiome(pendingBiome);
       observeResize();
       exposeTestHook();
       publish();
@@ -518,18 +512,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     sceneRefs.bulletPool.setProjectile(sceneRefs.player.projectile);
   }
 
-  function applyBiome(choice: string): void {
-    pendingBiome = choice;
-    const isKnown = BIOMES.some((biome) => biome.id === choice);
-    sceneRefs?.setBiomeOverride(choice === BIOME_AUTO || !isKnown ? null : choice);
-  }
-
   /* ------------------------------------------------------- test hook ------ */
 
   /**
    * Dev hook for tools/shot.mjs. The headless harness needs to know when the
    * scene has finished loading, to jump the run forward to photograph a later
-   * biome, and to read renderer.info for the draw-call budget.
+   * stretch of trail, and to read renderer.info for the draw-call budget.
    *
    * Development only. `warpTo` and `simulate` drive the real reducer, so in a
    * production build this would be a one-line path to an arbitrary score right
@@ -545,9 +533,6 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       ready: true,
       warpTo(distance: number) {
         game = { ...game, distance: Number(distance) || 0 };
-      },
-      setBiome(choice: string) {
-        applyBiome(choice);
       },
       restart() {
         game = restartGame(game, rules);
@@ -609,7 +594,6 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           quality: sceneRefs?.quality ?? null,
           corpses: sceneRefs?.enemyPool?.corpses?.filter((c) => c.group.visible).length ?? 0,
           character: player?.characterId ?? null,
-          biome: pendingBiome,
           anim: player?.currentActionName ?? null,
           animRunning: Boolean(player?.currentAction?.isRunning?.()),
           clips: Object.keys(player?.actions ?? {}),
@@ -722,10 +706,6 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     setCharacter(charId: string) {
       return applyCharacter(charId);
-    },
-
-    setBiome(choice: string) {
-      applyBiome(choice);
     },
 
     setStage(next: StageSelection | null) {

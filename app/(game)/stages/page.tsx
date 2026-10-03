@@ -59,7 +59,7 @@ export default function StagesPage() {
     <PageShell
       eyebrow="The trail"
       title="Stages"
-      subtitle="Ten stages per biome, cleared in order. Clear a biome to unlock the next one."
+      subtitle="Ten stages, cleared in order. Clear a stage to unlock the next one."
       width="wide"
       actions={
         <LinkButton href="/calibrate" icon={<Camera size={18} />}>

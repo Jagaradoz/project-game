@@ -48,7 +48,6 @@ beforeEach(() => {
 });
 
 const FIRST_BIOME = BIOME_CATALOG[0]!.biomeId;
-const SECOND_BIOME = BIOME_CATALOG[1]!.biomeId;
 
 function runInput(overrides: Partial<SubmitRunInput> = {}): SubmitRunInput {
   return {
@@ -231,7 +230,6 @@ test('only the first stage of the first biome starts unlocked', async () => {
   assert.equal(biomes[0]!.isUnlocked, true);
   assert.equal(biomes[0]!.stages[0]!.isUnlocked, true);
   assert.equal(biomes[0]!.stages[1]!.isUnlocked, false);
-  assert.equal(biomes[1]!.isUnlocked, false);
 });
 
 test('clearing a stage unlocks the next one, and failing it does not', async () => {
@@ -249,7 +247,7 @@ test('clearing a stage unlocks the next one, and failing it does not', async () 
   assert.equal(biomes[0]!.stages[2]!.isUnlocked, false);
 });
 
-test('clearing all ten stages unlocks the next biome', async () => {
+test('clearing all ten stages completes the biome', async () => {
   const repo = createMockRepository();
 
   for (let stageNumber = 1; stageNumber <= STAGES_PER_BIOME; stageNumber += 1) {
@@ -258,17 +256,6 @@ test('clearing all ten stages unlocks the next biome', async () => {
 
   const biomes = await repo.getBiomes();
   assert.equal(biomes[0]!.stages.every((stage) => stage.isCleared), true);
-  assert.equal(biomes[1]!.isUnlocked, true);
-  assert.equal(biomes[1]!.stages[0]!.isUnlocked, true);
-});
-
-test('a run in a locked biome does not unlock it', async () => {
-  const repo = createMockRepository();
-  await repo.submitRun(runInput({ biomeId: SECOND_BIOME, stageNumber: 1, isCleared: true }));
-
-  const biomes = await repo.getBiomes();
-  assert.equal(biomes[1]!.isUnlocked, false);
-  assert.equal(biomes[1]!.stages[0]!.isCleared, false, 'a locked biome reported progress');
 });
 
 test('bestScore per stage is the highest of that stage, not the latest', async () => {

@@ -45,7 +45,6 @@ export interface CloudRefs {
   mesh: THREE_NS.InstancedMesh;
   scroll(distance: number, elapsedMs: number): void;
   setVisible(visible: boolean): void;
-  applyPalette(next: Palette): void;
 }
 
 export function addClouds(
@@ -58,13 +57,17 @@ export function addClouds(
   const geometry = buildCloudGeometry(THREE);
 
   // Unlit, like the horizon ridges: directional lighting on a faceted blob makes
-  // it read as a boulder, so the shape is carried by baked vertex shading. Fog
-  // is on, though -- the fog colour is the sky's own haze, so distant clouds
-  // dissolve into the horizon while near ones stay crisp.
+  // it read as a boulder, so the shape is carried by baked vertex shading.
+  // Unfogged: they are sky, and the short ground fog would erase all of them.
   const material = new THREE.MeshBasicMaterial({
     vertexColors: true,
-    fog: true,
+    fog: false,
   });
+  // The sky's haze, lifted past 1 and kept out of tone mapping, so the baked
+  // shading's undersides stay soft cream instead of grey. Fog used to do this
+  // wash before the fog was shortened; the tops simply clip to the haze.
+  material.color.set(palette.sky.haze).multiplyScalar(1.35);
+  material.toneMapped = false;
 
   const mesh = new THREE.InstancedMesh(geometry, material, count);
   mesh.castShadow = false;
@@ -126,10 +129,6 @@ export function addClouds(
       mesh.visible = visible;
     },
 
-    applyPalette(next: Palette) {
-      // Tinted towards the sky's own glow so clouds belong to the sky they sit in.
-      material.color.set(next.sky.glow).lerp(new THREE.Color('#ffffff'), 0.7);
-    },
   };
 }
 

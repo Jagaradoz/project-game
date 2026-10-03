@@ -301,7 +301,8 @@ export const CONFIG = {
      * longer at the cost of more instances resident at once.
      */
     scenery: {
-      span: 320,
+      // Keeps the recycle seam (camera z + span - 20) beyond the fog's far edge.
+      span: 160,
       seed: 24289,
     },
 

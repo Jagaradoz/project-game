@@ -52,7 +52,6 @@ export type KitPalette = Record<string, string>;
 export const GOLDEN_FOREST = {
   id: 'forest',
   name: 'Whispering Pines',
-  scatterSet: 'forest',
 
   sky: {
     haze: '#fff3e2',
@@ -72,19 +71,23 @@ export const GOLDEN_FOREST = {
     exposure: 1.0,
   },
 
+  // Short on purpose: the forest is dense to the fog line and nothing past it
+  // is drawn. The scatter span is sized so props recycle inside full fog.
   fog: {
     color: '#fff3e2',
-    near: 90,
-    far: 285,
+    near: 30,
+    far: 150,
   },
 
   ground: {
     trail: '#9e754b',
-    trailEdge: '#17120e',
+    // Damp soil where the dirt meets the grass, not an outline.
+    trailEdge: '#5e4229',
     verge: '#6c8044',
     grass: '#547345',
     grassDeep: '#314f32',
     meadow: '#75915a',
+    pebble: '#cfc2a3',
   },
 
   ridge: {

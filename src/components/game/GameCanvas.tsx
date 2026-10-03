@@ -36,9 +36,7 @@ export default function GameCanvas() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
 
   const character = useSettings((state) => state.character);
-  const biome = useSettings((state) => state.biome);
   const setCharacter = useSettings((state) => state.setCharacter);
-  const setBiome = useSettings((state) => state.setBiome);
   // Validated on the way out of the store: persisted preferences are untrusted.
   const stage = useStageSelection();
   const showDebugTools = usePlayDebugTools();
@@ -52,7 +50,7 @@ export default function GameCanvas() {
       video: videoRef,
       overlay: overlayRef,
     },
-    { character, biome, stage },
+    { character, stage },
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -194,9 +192,7 @@ export default function GameCanvas() {
             </div>
             <ScenePickers
               character={character}
-              biome={biome}
               onCharacterChange={setCharacter}
-              onBiomeChange={setBiome}
             />
           </>
         )}

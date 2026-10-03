@@ -25,7 +25,6 @@ export interface EffectsRefs {
   mesh: THREE_NS.InstancedMesh;
   burst(x: number, y: number, z: number): void;
   update(dtSec: number, worldSpeed?: number): void;
-  applyPalette(next: Palette): void;
 }
 
 export function createEffects(
@@ -117,8 +116,5 @@ export function createEffects(
       if (dirty) mesh.instanceMatrix.needsUpdate = true;
     },
 
-    applyPalette(next: Palette) {
-      material.color.set(next.accents.enemy);
-    },
   };
 }

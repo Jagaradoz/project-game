@@ -51,7 +51,6 @@ export interface LightingRefs {
   sun: THREE_NS.DirectionalLight;
   hemi: THREE_NS.HemisphereLight;
   rim: THREE_NS.DirectionalLight;
-  applyPalette(next: Palette, renderer?: THREE_NS.WebGLRenderer): void;
 }
 
 export function addLighting(
@@ -99,15 +98,5 @@ export function addLighting(
     sun,
     hemi,
     rim,
-    applyPalette(next: Palette, renderer?: THREE_NS.WebGLRenderer) {
-      sun.color.set(next.light.sun);
-      sun.intensity = next.light.sunIntensity;
-      hemi.color.set(next.light.hemiSky);
-      hemi.groundColor.set(next.light.hemiGround);
-      hemi.intensity = next.light.hemiIntensity;
-      rim.color.set(next.light.rim);
-      rim.intensity = next.light.rimIntensity;
-      if (renderer) renderer.toneMappingExposure = next.light.exposure;
-    },
   };
 }

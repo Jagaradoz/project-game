@@ -26,14 +26,13 @@ test('the catalogue mirrors the engine, in order', () => {
   );
 });
 
-test('the TOR requires 10 stages per biome and at least two biomes', () => {
+test('one biome of ten stages', () => {
   assert.equal(STAGES_PER_BIOME, 10);
-  assert.ok(BIOME_CATALOG.length >= 2);
+  assert.equal(BIOME_CATALOG.length, 1);
 });
 
 test('biomeIndex gives the unlock order and -1 for a stranger', () => {
   assert.equal(biomeIndex(FIRST_BIOME_ID), 0);
-  assert.equal(biomeIndex(BIOME_CATALOG[1]!.biomeId), 1);
   assert.equal(biomeIndex('atlantis'), -1);
 });
 

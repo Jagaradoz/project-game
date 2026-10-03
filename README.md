@@ -13,8 +13,8 @@ place to shoot. Built on a webcam pose-detection testbed that answers one questi
 - 3 HP, one hit each, brief grace period, then a score + distance screen
 - Arrow keys / `A`,`D` work too, so the game is playable with no camera at all
 - Detector debug (skeleton, offsets, cadence, FPS, inference ms) still there, collapsed
-- The run travels through **four biomes** — forest, autumn, highlands, oasis — crossfading
-  every 700 m in palette and in which props line the trail, or pick one from the selector
+- One biome, **Whispering Pines**: a flat forest floor filled out to the fog line, with a
+  far-forest layer that thins itself on slow devices
 - The trail **winds**, without the lanes moving. See "The trail that isn't there" below
 - Five rigged **adventurers** to run as, each throwing their own weapon
 - Skeletons **die where they fall** and burst into bone chips
@@ -192,7 +192,7 @@ src/engine/util/landmarks.ts      visibility gating + scale-invariant body measu
 src/engine/util/luma.ts           frame brightness + the /calibrate lighting & distance verdicts
 src/engine/util/smooth.ts         EMA, sliding window, cadence
 src/engine/pose/exposure.ts       throttled 32x24 frame sampler feeding util/luma.ts
-src/engine/render/scene.ts        Three.js scene assembly and the biome crossfade
+src/engine/render/scene.ts        Three.js scene assembly
 src/engine/render/sync.ts         one-way sync: game state -> meshes
 src/engine/render/world/          palette, biomes, sky, lighting, ground, scatter,
                                   trailEdge, clouds, rng
@@ -328,5 +328,5 @@ Kay Lousberg and Kenney are credited here because the art is most of what you se
 Every nature model is 5-17 KB, carries **no textures at all**, and names its materials
 for what they are (`grass`, `leafsGreen`, `woodBark`, `stone`). Colour is therefore a
 lookup table rather than an art job: `src/engine/render/world/palette.ts` maps material names to
-hex values, so the same 329 models repaint themselves for a new biome. Autumn is the
-forest with a different table — no extra download.
+hex values, so the kit's authored colours can be corrected in one place with no extra
+download.

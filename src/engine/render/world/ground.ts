@@ -88,10 +88,108 @@ const RIDGE_LAYERS: { z: number; height: number; spread: number; seed: number; k
   { z: -500, height: 92, spread: 460, seed: 0xc2b2, key: 'far' },
 ];
 
-const MARKER_BLOCK = { width: 0.55, height: 0.06, length: 0.8 };
+/**
+ * Lane boundaries are small clusters of half-buried pebbles rather than painted
+ * blocks: still a readable dotted line from the runner's camera, but something
+ * a forest path could plausibly have.
+ */
+const PEBBLE = {
+  radius: 0.15,
+  flatten: 0.42,
+  minCount: 2,
+  maxCount: 4,
+  spreadX: 0.22,
+  spreadZ: 0.5,
+  /** Distinct cluster shapes, shared across every slot so the line does not repeat visibly. */
+  variants: 8,
+};
 const MARKER_SEED = 0x7a11;
-const MARKER_JITTER_X = 0.06;
-const MARKER_SKIP_CHANCE = 0.08;
+const MARKER_JITTER_X = 0.08;
+const MARKER_SKIP_CHANCE = 0.12;
+
+/**
+ * The dirt/grass boundary is broken up per fragment. These bound how far it can
+ * move from the nominal lip, in world units, and are spliced into the shader so
+ * the lane-safety test reads the same numbers the GPU does.
+ */
+const EDGE_BIAS = 0.08;
+const EDGE_WOBBLE_IN = 0.25;
+const EDGE_WOBBLE_OUT = 0.3;
+const EDGE_CLUMP = 0.12;
+/** Width of the band the fragment shader repaints, inside and outside the lip. */
+const EDGE_ZONE_IN = 2.2;
+const EDGE_ZONE_OUT = 0.65;
+
+/** Furthest the broken-up grass line can creep inward past the nominal lip. */
+export const EDGE_BREAKUP_INSET = EDGE_WOBBLE_IN + EDGE_CLUMP - EDGE_BIAS;
+
+/** Noise lattice period. Wrapping it keeps the hash inputs small as distance grows. */
+const NOISE_PERIOD = 256;
+
+/**
+ * Replaces the flat dark lip with a trampled edge: the grass line wobbles along
+ * the path, pushes tongues into the dirt, and the soil darkens just before it
+ * meets the grass. Outside the edge zone the vertex colours are left alone, and
+ * the zone fades out where the tint already equals them, so there is no seam.
+ */
+const EDGE_FRAGMENT_PARS = /* glsl */ `
+uniform vec3 uGroundTrail;
+uniform vec3 uGroundEdge;
+uniform vec3 uGroundVerge;
+uniform float uGroundDirtHalf;
+uniform float uEdgeScroll;
+varying vec3 vGroundPos;
+
+float groundHash( vec2 p ) {
+  return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
+}
+
+float groundNoise( vec2 p ) {
+  vec2 i = floor( p );
+  vec2 f = fract( p );
+  vec2 u = f * f * ( 3.0 - 2.0 * f );
+  vec2 i0 = mod( i, ${glslFloat(NOISE_PERIOD)} );
+  vec2 i1 = mod( i + 1.0, ${glslFloat(NOISE_PERIOD)} );
+  return mix(
+    mix( groundHash( i0 ), groundHash( vec2( i1.x, i0.y ) ), u.x ),
+    mix( groundHash( vec2( i0.x, i1.y ) ), groundHash( i1 ), u.x ),
+    u.y
+  );
+}
+
+vec3 groundTint( vec3 base ) {
+  float d = abs( vGroundPos.x );
+  float side = vGroundPos.x < 0.0 ? 41.0 : 0.0;
+  float along = vGroundPos.z - uEdgeScroll;
+
+  float wobble = groundNoise( vec2( along * 0.45, side ) ) * 0.6
+    + groundNoise( vec2( along * 1.7, side + 9.0 ) ) * 0.4;
+  float boundary = uGroundDirtHalf + ${glslFloat(EDGE_BIAS)}
+    + mix( -${glslFloat(EDGE_WOBBLE_IN)}, ${glslFloat(EDGE_WOBBLE_OUT)}, wobble );
+  float clump = groundNoise( vec2( d * 3.2 + side, along * 2.4 ) ) * 2.0 - 1.0;
+  float edge = d - boundary + clump * ${glslFloat(EDGE_CLUMP)};
+
+  float grass = smoothstep( -0.03, 0.03, edge );
+  float rim = smoothstep( -0.85, 0.0, edge ) * 0.6;
+  vec3 tinted = mix( mix( uGroundTrail, uGroundEdge, rim ), uGroundVerge, grass );
+
+  float zone = smoothstep( uGroundDirtHalf - ${glslFloat(EDGE_ZONE_IN)}, uGroundDirtHalf - ${glslFloat(EDGE_ZONE_IN - 0.5)}, d )
+    * ( 1.0 - smoothstep( uGroundDirtHalf + ${glslFloat(EDGE_ZONE_OUT - 0.1)}, uGroundDirtHalf + ${glslFloat(EDGE_ZONE_OUT)}, d ) );
+  vec3 colour = mix( base, tinted, zone );
+
+  // Broad damp and dry patches, so the trail is not one flat brown.
+  float mottle = groundNoise( vec2( vGroundPos.x * 0.32, along * 0.22 ) ) * 0.6
+    + groundNoise( vec2( vGroundPos.x * 1.1, along * 0.9 ) ) * 0.4;
+  float onDirt = ( 1.0 - grass ) * ( 1.0 - step( uGroundDirtHalf + ${glslFloat(EDGE_ZONE_OUT)}, d ) );
+  return colour * mix( 1.0, 0.9 + mottle * 0.18, onDirt );
+}
+`;
+
+/** GLSL wants a float literal; `2` would be an int and fail to compile in a float expression. */
+function glslFloat(value: number): string {
+  const rounded = Math.round(value * 1e4) / 1e4;
+  return Number.isInteger(rounded) ? `${rounded}.0` : String(rounded);
+}
 
 /**
  * Where the dirt nominally ends: past the lanes by `TRAIL_MARGIN`, so the edge
@@ -103,19 +201,48 @@ export function trailHalfWidth(config: GameConfig): number {
 }
 
 /**
- * Half a cross-section, from the trail centre outward. Mirrored for -x.
- *
- * The banks climb steeply on purpose: a shallow profile reads as open meadow
- * with a path across it, and the trail has to feel enclosed by the forest.
+ * One point on the ground cross-section. `hard` bands take a flat colour so the
+ * trail edge stays crisp. `mix` blends towards a second band colour, so densely
+ * sampled curve points keep the broad gradients of the sparse control points.
  */
-/** One point on the ground cross-section. `hard` bands take a flat colour so the trail edge stays crisp. */
 interface ProfilePoint {
   x: number;
   y: number;
   key: GroundBandKey;
   hard?: boolean;
+  mix?: { key: GroundBandKey; t: number };
 }
 
+/** The colour half of a profile point. */
+type BandColour = Pick<ProfilePoint, 'key' | 'mix'>;
+
+/**
+ * The bank beyond the shoulder, as offsets from the trail lip. Heights pass
+ * through these exactly; between them the curve is monotone cubic, so the
+ * slope changes smoothly instead of creasing at each point.
+ */
+const BANK_CONTROLS: { offset: number; y: number; key: GroundBandKey }[] = [
+  { offset: 0.65, y: 0.24, key: 'verge' },
+  // Near-level shoulder: the path sits in a valley floor before the rise.
+  { offset: 4.5, y: 0.36, key: 'grass' },
+  { offset: 10, y: 0.55, key: 'grass' },
+  { offset: 16, y: 0.75, key: 'grassDeep' },
+  { offset: 24, y: 1.0, key: 'meadow' },
+  { offset: 40, y: 1.4, key: 'grassDeep' },
+  { offset: 75, y: 2.1, key: 'meadow' },
+  { offset: 200, y: 3.2, key: 'grassDeep' },
+];
+/** Curve samples per control span. Enough that flat shading reads as a curve. */
+const BANK_SAMPLES = 4;
+
+/**
+ * Half a cross-section, from the trail centre outward. Mirrored for -x.
+ *
+ * Nearly flat, with only a gentle rise far out. Flat ground foreshortens away
+ * from the low camera, so the far-forest scatter hides it with far fewer props
+ * than a tilted bank would need; the faint rise keeps it from reading as a
+ * table top. Fog and the horizon ridges hide where the mesh ends.
+ */
 function halfProfile(dirtHalf: number): ProfilePoint[] {
   return [
     { x: 0, y: TRAIL_Y, key: 'trail' },
@@ -127,14 +254,43 @@ function halfProfile(dirtHalf: number): ProfilePoint[] {
     { x: dirtHalf - 0.35, y: TRAIL_Y, key: 'trail', hard: true },
     { x: dirtHalf, y: 0.17, key: 'trailEdge', hard: true },
     { x: dirtHalf + 0.65, y: 0.24, key: 'verge', hard: true },
-    { x: dirtHalf + 3, y: 0.6, key: 'grass' },
-    { x: dirtHalf + 7, y: 1.2, key: 'grass' },
-    { x: dirtHalf + 13, y: 2.3, key: 'grassDeep' },
-    { x: dirtHalf + 22, y: 4.4, key: 'meadow' },
-    { x: dirtHalf + 40, y: 8.5, key: 'grassDeep' },
-    { x: dirtHalf + 75, y: 14, key: 'meadow' },
-    { x: dirtHalf + 200, y: 24, key: 'grassDeep' },
+    ...sampleBank(dirtHalf),
   ];
+}
+
+/** Fritsch-Carlson tangents: a cubic through the controls that never overshoots. */
+function sampleBank(dirtHalf: number): ProfilePoint[] {
+  const xs = BANK_CONTROLS.map((point) => point.offset);
+  const ys = BANK_CONTROLS.map((point) => point.y);
+  const slopes = xs.slice(1).map((x, index) => (ys[index + 1]! - ys[index]!) / (x - xs[index]!));
+  const tangents = xs.map((_, index) => {
+    if (index === 0) return slopes[0]!;
+    if (index === xs.length - 1) return slopes[slopes.length - 1]!;
+    const before = slopes[index - 1]!;
+    const after = slopes[index]!;
+    return before * after <= 0 ? 0 : (2 * before * after) / (before + after);
+  });
+
+  const points: ProfilePoint[] = [];
+  for (let span = 0; span < xs.length - 1; span += 1) {
+    const width = xs[span + 1]! - xs[span]!;
+    for (let step = 1; step <= BANK_SAMPLES; step += 1) {
+      const t = step / BANK_SAMPLES;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const y = (2 * t3 - 3 * t2 + 1) * ys[span]!
+        + (t3 - 2 * t2 + t) * width * tangents[span]!
+        + (-2 * t3 + 3 * t2) * ys[span + 1]!
+        + (t3 - t2) * width * tangents[span + 1]!;
+      points.push({
+        x: dirtHalf + xs[span]! + width * t,
+        y,
+        key: BANK_CONTROLS[span]!.key,
+        mix: { key: BANK_CONTROLS[span + 1]!.key, t },
+      });
+    }
+  }
+  return points;
 }
 
 /**
@@ -173,11 +329,6 @@ export function addGround(
     valley,
     markers,
     ridges,
-    applyPalette(next: Palette) {
-      valley.applyPalette(next);
-      markers.applyPalette(next);
-      ridges.applyPalette(next);
-    },
   };
 }
 
@@ -185,7 +336,7 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
   const profile = halfProfile(dirtHalf);
   const geometry = new THREE.BufferGeometry();
   const positions: number[] = [];
-  const bandKeys: [GroundBandKey, GroundBandKey, boolean][] = [];
+  const bandKeys: [BandColour, BandColour][] = [];
 
   // Mirror the half-profile into a full one so the two sides share vertices at x = 0.
   const full = [
@@ -206,7 +357,11 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
         a.x, a.y, nearZ, b.x, b.y, nearZ, b.x, b.y, farZ,
         a.x, a.y, nearZ, b.x, b.y, farZ, a.x, a.y, farZ,
       );
-      bandKeys.push([a.key, b.key, Boolean(b.hard)]);
+      // A band is hard when its OUTER point is. On the mirrored left side the
+      // outer point is `a`, not `b`; reading `b` there shifted the flat bands one
+      // step out and left a hard colour step on the left bank only.
+      const outer = Math.abs(a.x) > Math.abs(b.x) ? a : b;
+      bandKeys.push(outer.hard ? [{ key: outer.key }, { key: outer.key }] : [a, b]);
     }
   }
 
@@ -229,6 +384,13 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
     metalness: 0,
     flatShading: true,
   });
+  const edgeUniforms = {
+    uGroundTrail: { value: new THREE.Color(palette.ground.trail) },
+    uGroundEdge: { value: new THREE.Color(palette.ground.trailEdge) },
+    uGroundVerge: { value: new THREE.Color(palette.ground.verge) },
+    uGroundDirtHalf: { value: dirtHalf },
+  };
+
   // The existing edge controller owns travelled distance. Reuse that uniform
   // for both soil colour and relief so surface detail travels with the props.
   material.onBeforeCompile = (shader) => {
@@ -236,11 +398,18 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
       shader.uniforms.uEdgeScroll = { value: 0 };
       shader.vertexShader = `uniform float uEdgeScroll;\n${shader.vertexShader}`;
     }
-    shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `
+    Object.assign(shader.uniforms, edgeUniforms);
+    shader.vertexShader = `varying vec3 vGroundPos;\n${shader.vertexShader}`
+      .replace('#include <uv_vertex>', `
       #include <uv_vertex>
       vMapUv.y -= uEdgeScroll / ${SOIL_TILE_SIZE.toFixed(1)};
       vBumpMapUv.y -= uEdgeScroll / ${SOIL_TILE_SIZE.toFixed(1)};
-    `);
+    `)
+      // Undisplaced: the bands are laid out in this space, so the edge test
+      // below stays aligned with the vertex colours however the lip wanders.
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundPos = position;');
+    shader.fragmentShader = `${EDGE_FRAGMENT_PARS}\n${shader.fragmentShader}`
+      .replace('#include <color_fragment>', 'diffuseColor.rgb *= groundTint( vColor );');
   };
   material.customProgramCacheKey = () => 'soil-detail';
 
@@ -257,10 +426,15 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
     const colors = (geometry.attributes.color as THREE_NS.BufferAttribute).array as Float32Array;
     const near = new THREE.Color();
     const far = new THREE.Color();
+    const blend = new THREE.Color();
+    const resolve = (target: THREE_NS.Color, { key, mix }: BandColour) => {
+      target.set(next.ground[key]);
+      if (mix) target.lerp(blend.set(next.ground[mix.key]), mix.t);
+    };
 
-    bandKeys.forEach(([keyA, keyB, isHard], index) => {
-      far.set(next.ground[keyB]);
-      near.copy(isHard ? far : new THREE.Color(next.ground[keyA]));
+    bandKeys.forEach(([colourA, colourB], index) => {
+      resolve(near, colourA);
+      resolve(far, colourB);
 
       // Vertex order per band: a, b, b, a, b, a.
       const order = [near, far, far, near, far, near];
@@ -273,15 +447,18 @@ function addValley(THREE: ThreeModule, scene: THREE_NS.Scene, dirtHalf: number, 
     });
 
     geometry.attributes.color.needsUpdate = true;
+    edgeUniforms.uGroundTrail.value.set(next.ground.trail);
+    edgeUniforms.uGroundEdge.value.set(next.ground.trailEdge);
+    edgeUniforms.uGroundVerge.value.set(next.ground.verge);
   }
 
   paint(palette);
-  return { mesh, applyPalette: paint };
+  return { mesh };
 }
 
 /**
- * Lane boundaries as bold printed blocks. Same recycling contract as every other
- * scrolling layer, so render.js treats it identically.
+ * Lane boundaries as clusters of half-buried pebbles. Same recycling contract as
+ * every other scrolling layer, so sync.ts treats it identically.
  */
 function addLaneMarkers(
   THREE: ThreeModule,
@@ -289,40 +466,33 @@ function addLaneMarkers(
   config: GameConfig,
   palette: Palette,
 ) {
-  const geometry = new THREE.BoxGeometry(
-    MARKER_BLOCK.width,
-    MARKER_BLOCK.height,
-    MARKER_BLOCK.length,
-  );
+  const rng = createRng(MARKER_SEED);
+  const variants = Array.from({ length: PEBBLE.variants }, () => buildPebbleCluster(THREE, rng));
   const material = new THREE.MeshStandardMaterial({
-    color: palette.accents.marker,
-    roughness: 0.95,
+    color: palette.ground.pebble,
+    vertexColors: true,
+    roughness: 0.9,
     metalness: 0,
     flatShading: true,
   });
 
   const period = config.markerLength + config.markerGap;
   const span = config.markerCount * period;
-  const rng = createRng(MARKER_SEED);
   const items: { mesh: THREE_NS.Mesh; baseZ: number }[] = [];
 
   for (let lane = 1; lane < config.laneCount; lane += 1) {
     const laneX = (lane - config.laneCount / 2) * config.laneWidth;
 
     for (let index = 0; index < config.markerCount; index += 1) {
-      // A few missing blocks keep the cadence from looking mechanically tiled.
+      // A few missing clusters keep the cadence from looking mechanically tiled.
       if (rng() < MARKER_SKIP_CHANCE) continue;
 
-      const baseZ = config.spawnZ + index * period + range(rng, -period * 0.08, period * 0.08);
+      const baseZ = config.spawnZ + index * period + range(rng, -period * 0.15, period * 0.15);
+      const geometry = variants[Math.floor(rng() * variants.length)]!;
       const mesh = new THREE.Mesh(geometry, material);
-      const scale = range(rng, 0.88, 1.12);
 
-      mesh.position.set(
-        laneX + range(rng, -MARKER_JITTER_X, MARKER_JITTER_X),
-        TRAIL_Y + (MARKER_BLOCK.height * scale) / 2,
-        baseZ,
-      );
-      mesh.scale.set(scale, 1, scale);
+      mesh.position.set(laneX + range(rng, -MARKER_JITTER_X, MARKER_JITTER_X), TRAIL_Y, baseZ);
+      mesh.rotation.y = rng() < 0.5 ? 0 : Math.PI;
       mesh.receiveShadow = true;
       scene.add(mesh);
       items.push({ mesh, baseZ });
@@ -334,10 +504,47 @@ function addLaneMarkers(
     period,
     span,
     startZ: config.spawnZ,
-    applyPalette(next: Palette) {
-      material.color.set(next.accents.marker);
-    },
   };
+}
+
+/**
+ * A few flattened low-poly stones merged into one geometry, so a cluster is one
+ * draw call. Each stone sits about a third out of the ground; the per-vertex
+ * shade lets one material carry light and dark pebbles.
+ */
+function buildPebbleCluster(THREE: ThreeModule, rng: () => number): THREE_NS.BufferGeometry {
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const count = PEBBLE.minCount + Math.floor(rng() * (PEBBLE.maxCount - PEBBLE.minCount + 1));
+  const matrix = new THREE.Matrix4();
+  const rotation = new THREE.Quaternion();
+  const euler = new THREE.Euler();
+  const offset = new THREE.Vector3();
+  const size = new THREE.Vector3();
+
+  for (let stone = 0; stone < count; stone += 1) {
+    const radius = PEBBLE.radius * range(rng, 0.55, 1.3);
+    size.set(radius * range(rng, 1, 1.5), radius * PEBBLE.flatten * range(rng, 0.8, 1.25), radius * range(rng, 0.8, 1.2));
+    euler.set(range(rng, -0.2, 0.2), rng() * Math.PI * 2, range(rng, -0.2, 0.2));
+    rotation.setFromEuler(euler);
+    offset.set(range(rng, -PEBBLE.spreadX, PEBBLE.spreadX), size.y * 0.3, range(rng, -PEBBLE.spreadZ, PEBBLE.spreadZ));
+    matrix.compose(offset, rotation, size);
+
+    const source = new THREE.DodecahedronGeometry(1, 0).applyMatrix4(matrix);
+    const points = source.getAttribute('position');
+    const shade = range(rng, 0.78, 1.08);
+    for (let index = 0; index < points.count; index += 1) {
+      positions.push(points.getX(index), points.getY(index), points.getZ(index));
+      colors.push(shade, shade, shade * 0.97);
+    }
+    source.dispose();
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 /**
@@ -361,9 +568,6 @@ function addRidges(THREE: ThreeModule, scene: THREE_NS.Scene, palette: Palette) 
 
   return {
     layers,
-    applyPalette(next: Palette) {
-      for (const layer of layers) layer.material.color.set(next.ridge[layer.key]);
-    },
   };
 }
 

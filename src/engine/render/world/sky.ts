@@ -30,7 +30,6 @@ const STOPS = [
 
 export interface SkyRefs {
   dome: THREE_NS.Mesh;
-  applyPalette(next: Palette): void;
 }
 
 export function addSky(THREE: ThreeModule, scene: THREE_NS.Scene, palette: Palette): SkyRefs {
@@ -55,18 +54,6 @@ export function addSky(THREE: ThreeModule, scene: THREE_NS.Scene, palette: Palet
 
   return {
     dome,
-    /** Repaints the gradient in place when a biome changes. */
-    applyPalette(next: Palette) {
-      const repainted = buildGradientColors(THREE, geometry, next.sky);
-      const colorAttr = geometry.attributes.color as THREE_NS.BufferAttribute;
-      colorAttr.copyArray(repainted);
-      colorAttr.needsUpdate = true;
-      (scene.background as THREE_NS.Color).set(next.sky.haze);
-      const fog = scene.fog as THREE_NS.Fog;
-      fog.color.set(next.fog.color);
-      fog.near = next.fog.near;
-      fog.far = next.fog.far;
-    },
   };
 }
 

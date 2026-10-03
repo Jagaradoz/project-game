@@ -49,7 +49,6 @@ export interface EnemyPool {
   animateBeyondZ: number;
   spawnDeath(x?: number, z?: number): EnemySlot | void;
   updateCorpses(dtSec?: number, worldSpeed?: number): void;
-  applyPalette(next: Palette): void;
 }
 
 type CloneSkeleton = (source: THREE_NS.Object3D) => THREE_NS.Object3D;
@@ -174,12 +173,6 @@ async function buildRiggedPool(
       }
     },
 
-    applyPalette(next: Palette) {
-      for (const slot of [...items, ...corpses]) {
-        const material = slot.aura?.material as THREE_NS.MeshBasicMaterial | undefined;
-        material?.color.set(next.accents.enemyTrim);
-      }
-    },
   };
 }
 
@@ -322,15 +315,6 @@ function buildFallbackPool(
     animateBeyondZ: 0,
     spawnDeath() {},
     updateCorpses() {},
-    applyPalette(next: Palette) {
-      coreMat.color.set(next.accents.enemy);
-      ringMat.color.set(next.accents.enemyTrim);
-      ringMat.emissive.set(next.accents.enemyTrim).multiplyScalar(0.25);
-      for (const slot of items) {
-        const material = slot.aura?.material as THREE_NS.MeshBasicMaterial | undefined;
-        material?.color.set(next.accents.enemyTrim);
-      }
-    },
   };
 }
 

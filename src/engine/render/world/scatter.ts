@@ -15,8 +15,8 @@
 import type * as THREE_NS from 'three';
 import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import type { KitPalette, Palette } from '@/engine/render/world/palette';
-import type { GameConfig, ThreeModule } from '@/engine/types';
+import type { Palette } from '@/engine/render/world/palette';
+import type { GameConfig, ShadowQuality, ThreeModule } from '@/engine/types';
 import type { Rng } from '@/engine/render/world/rng';
 
 /** One band of props at a fixed distance range from the trail. */
@@ -29,21 +29,22 @@ interface ScatterLayer {
   /** Props arrive in readable groves instead of uniform procedural noise. */
   clusterSize?: number;
   clusterSpread?: number;
+  /** Thinned by the quality level; see DETAIL_FRACTION. Only for layers that are pure filler. */
+  detail?: boolean;
+  /**
+   * Skips the footprint clearance check. For dense low grass only: overlapping
+   * a tuft is invisible, and checking thousands of tiny footprints against
+   * every prop would dominate load time.
+   */
+  overlap?: boolean;
 }
 
 type ScatterLayers = Record<string, ScatterLayer>;
-
-/** A managed material: recoloured per biome by its Kenney material name. */
-interface ManagedMaterial {
-  name: string;
-  material: THREE_NS.MeshStandardMaterial;
-}
 
 interface ModelPart {
   geometry: THREE_NS.BufferGeometry;
   material: THREE_NS.Material;
   matrix: THREE_NS.Matrix4;
-  managed: ManagedMaterial[];
 }
 
 interface Placement {
@@ -59,16 +60,13 @@ interface ScatterMeshEntry {
   mesh: THREE_NS.InstancedMesh;
   baseZ: Float32Array;
   zOffset: Float32Array;
-}
-
-interface ScatterSet {
-  group: THREE_NS.Group;
-  meshes: ScatterMeshEntry[];
-  managed: ManagedMaterial[];
+  /** Instances built; `mesh.count` may draw fewer when the layer is a detail layer. */
+  fullCount: number;
+  detail: boolean;
 }
 
 export interface ScatterOptions {
-  sets?: Record<string, ScatterLayers>;
+  layers?: ScatterLayers;
   span?: number;
   seed?: number;
   startZ?: number;
@@ -79,7 +77,20 @@ import { repaintKitModel } from '@/engine/render/world/palette';
 import { createHeightSampler } from '@/engine/render/world/ground';
 
 const MODEL_DIR = '/assets/models/nature';
+
+/**
+ * Share of a detail layer drawn at each quality level. Placements are random,
+ * so drawing a prefix of the instance buffer is an even thinning, and it can
+ * change at runtime with no rebuild -- the runtime's auto-quality uses this.
+ */
+export const DETAIL_FRACTION: Record<ShadowQuality, number> = {
+  high: 1,
+  medium: 0.5,
+  low: 0,
+};
 const Z_TRANSLATION_OFFSET = 14;
+/** Landmarks sit within this distance of the trail centre; props further out need not avoid them. */
+const LANDMARK_REACH_X = 18;
 
 /** Shared authored beats. Scatter leaves these slices open for landmarks. */
 export const LANDMARK_ZONE_FRACTIONS = [0.12, 0.38, 0.64, 0.88] as const;
@@ -102,8 +113,8 @@ const FOREST_LAYERS = {
    * shapes so the trail reads like the site's poster-style panels.
    */
   groundcover: {
-    count: 520,
-    band: [5.6, 16],
+    count: 480,
+    band: [5.6, 24],
     scale: [1.8, 3.0],
     castShadow: false,
     models: ['grass', 'plant_flatTall'],
@@ -111,14 +122,14 @@ const FOREST_LAYERS = {
     clusterSpread: 9,
   },
   flowers: {
-    count: 110,
+    count: 70,
     band: [5.7, 9],
     scale: [1.6, 2.6],
     castShadow: false,
     models: ['flower_redA', 'flower_yellowB', 'flower_purpleB'],
   },
   verge: {
-    count: 95,
+    count: 60,
     band: [5.2, 9.5],
     scale: [1.2, 2.1],
     castShadow: false,
@@ -131,164 +142,84 @@ const FOREST_LAYERS = {
     clusterSpread: 6,
   },
   understory: {
-    count: 100,
+    count: 65,
     band: [6, 12],
     scale: [1.6, 2.5],
     castShadow: true,
     models: [
-      'plant_bush', 'plant_bushDetailed', 'plant_bushLarge',
-      'log', 'stump_old', 'stump_roundDetailed', 'rock_smallA',
+      'plant_bush', 'plant_bushLarge',
+      'log', 'stump_old', 'stump_round', 'rock_smallA',
     ],
     clusterSize: 7,
     clusterSpread: 8,
   },
+  /**
+   * A handful of big stones near the path: a mid-height silhouette between
+   * the bushes and the trees, and a landmark to measure speed against.
+   */
+  boulders: {
+    count: 12,
+    band: [6.5, 14],
+    scale: [3.2, 4.6],
+    castShadow: true,
+    models: ['rock_largeB', 'rock_largeC', 'rock_largeD', 'stone_largeB', 'stone_largeD'],
+    clusterSize: 3,
+    clusterSpread: 5,
+  },
   midground: {
-    count: 100,
+    count: 65,
     band: [7, 17],
     scale: [2.2, 3.4],
     castShadow: true,
     models: [
-      'tree_pineTallC_detailed', 'tree_pineTallD_detailed', 'tree_detailed',
-      'tree_thin', 'tree_oak', 'tree_detailed',
+      'tree_pineTallC', 'tree_pineTallD', 'tree_simple',
+      'tree_thin', 'tree_oak',
       'rock_largeA', 'rock_tallA', 'stone_largeA', 'stone_tallC',
     ],
     clusterSize: 5,
     clusterSpread: 10,
   },
   canopy: {
-    count: 95,
+    count: 70,
     band: [15, 48],
     scale: [2.8, 4.2],
     castShadow: false,
     models: [
-      'tree_pineRoundA', 'tree_pineRoundD', 'tree_pineTallA_detailed',
-      'tree_pineTallB_detailed', 'tree_pineDefaultA', 'tree_plateau',
-      'tree_detailed', 'tree_pineTallC_detailed', 'tree_pineTallD_detailed',
+      'tree_pineRoundA', 'tree_pineRoundD', 'tree_pineTallA',
+      'tree_pineTallB', 'tree_pineDefaultA', 'tree_plateau',
+      'tree_pineTallC', 'tree_pineTallD',
     ],
     clusterSize: 6,
     clusterSpread: 13,
   },
-};
-
-const HIGHLANDS_LAYERS = {
-  groundcover: {
-    count: 170,
-    band: [5.2, 20],
-    scale: [1.2, 2.1],
-    castShadow: false,
-    models: ['grass', 'plant_flatTall', 'rock_smallA'],
-    clusterSize: 12,
-    clusterSpread: 10,
-  },
-  verge: {
-    count: 125,
-    band: [5.2, 10],
-    scale: [1.3, 2.3],
+  /**
+   * Fills the flat ground out to where the fog takes over, so the forest reads
+   * as continuous instead of a strip along the path. Simplest kit trees, no
+   * shadows, and thinned by quality: this is the first thing a slow device loses.
+   */
+  farForest: {
+    count: 300,
+    band: [40, 100],
+    scale: [3.0, 4.6],
     castShadow: false,
     models: [
-      'rock_smallA', 'rock_smallG', 'stone_smallB', 'stone_smallE', 'stone_smallF',
-      'mushroom_tanTall', 'plant_bush',
+      'tree_pineRoundA', 'tree_pineRoundD', 'tree_pineTallA',
+      'tree_pineDefaultA', 'tree_simple', 'tree_cone',
     ],
-    clusterSize: 9,
-    clusterSpread: 7,
-  },
-  understory: {
-    count: 100,
-    band: [6.2, 13],
-    scale: [1.5, 2.2],
-    castShadow: true,
-    models: [
-      'rock_largeA', 'rock_largeE', 'rock_tallF', 'rock_tallG',
-      'stone_largeA', 'stone_tallC', 'stump_old', 'plant_bush',
-    ],
-    clusterSize: 6,
-    clusterSpread: 9,
-  },
-  midground: {
-    count: 90,
-    band: [7, 18],
-    scale: [2.0, 3.2],
-    castShadow: true,
-    models: [
-      'cliff_blockHalf_stone', 'cliff_blockQuarter_stone', 'cliff_half_rock',
-      'stone_tallD', 'stone_tallE', 'rock_tallH',
-      'tree_pineSmallB', 'tree_simple_dark', 'tree_thin_dark',
-    ],
-    clusterSize: 4,
-    clusterSpread: 11,
-  },
-  canopy: {
-    count: 85,
-    band: [15, 48],
-    scale: [2.6, 4.4],
-    castShadow: false,
-    models: [
-      'cliff_block_rock', 'cliff_blockSlope_rock', 'cliff_top_stone',
-      'tree_pineDefaultA', 'tree_plateau_dark', 'tree_cone_dark', 'tree_tall_dark',
-    ],
-    clusterSize: 5,
-    clusterSpread: 14,
-  },
-};
-
-const OASIS_LAYERS = {
-  groundcover: {
-    count: 130,
-    band: [5.2, 20],
-    scale: [1.1, 2.0],
-    castShadow: false,
-    models: ['grass', 'plant_flatTall', 'stone_smallB'],
-    clusterSize: 11,
-    clusterSpread: 10,
-  },
-  verge: {
-    count: 100,
-    band: [5.2, 10],
-    scale: [1.3, 2.2],
-    castShadow: false,
-    models: ['cactus_short', 'rock_smallA', 'rock_smallG', 'stone_smallE', 'plant_bush'],
     clusterSize: 8,
-    clusterSpread: 8,
+    clusterSpread: 16,
+    detail: true,
   },
-  understory: {
-    count: 85,
-    band: [6.2, 13],
-    scale: [1.5, 2.2],
-    castShadow: true,
-    models: ['cactus_tall', 'rock_largeA', 'stone_largeC', 'stump_old', 'log'],
-    clusterSize: 5,
-    clusterSpread: 10,
-  },
-  midground: {
-    count: 82,
-    band: [7, 18],
-    scale: [2.0, 3.2],
-    castShadow: true,
-    models: [
-      'tree_palmShort', 'tree_palmBend', 'tree_palmDetailedShort',
-      'rock_tallF', 'stone_tallC', 'cactus_tall',
-    ],
-    clusterSize: 4,
-    clusterSpread: 12,
-  },
-  canopy: {
-    count: 75,
-    band: [15, 48],
-    scale: [2.6, 4.0],
+  /** Grass across the open ground between the trees, out to the fog. */
+  meadow: {
+    count: 1500,
+    band: [20, 95],
+    scale: [2.2, 3.6],
     castShadow: false,
-    models: [
-      'tree_palm', 'tree_palmTall', 'tree_palmDetailedTall',
-      'cliff_top_stone', 'rock_largeE',
-    ],
-    clusterSize: 5,
-    clusterSpread: 15,
+    models: ['grass', 'grass_large', 'plant_flatTall'],
+    detail: true,
+    overlap: true,
   },
-};
-
-export const SCATTER_SETS: Record<string, ScatterLayers> = {
-  forest: FOREST_LAYERS,
-  highlands: HIGHLANDS_LAYERS,
-  oasis: OASIS_LAYERS,
 };
 
 export async function addScatter(
@@ -299,97 +230,54 @@ export async function addScatter(
   loader: GLTFLoader | null,
   options: ScatterOptions = {},
 ) {
-  const { sets = SCATTER_SETS, span = 320, seed = 0x5eed, startZ = 20 } = options;
+  const { layers = FOREST_LAYERS, span = 320, seed = 0x5eed, startZ = 20 } = options;
   const farZ = startZ - span;
 
   if (!loader) return emptyScatter(span, farZ);
 
-  // Every set is built up front. The models are 5-17 KB each, so holding all
-  // three biomes resident costs far less than a load pause mid-run would.
-  const names = [
-    ...new Set(
-      Object.values(sets).flatMap((set) => Object.values(set).flatMap((layer) => layer.models)),
-    ),
-  ];
+  const names = [...new Set(Object.values(layers).flatMap((layer) => layer.models))];
   const sources = await loadModels(THREE, loader, names, palette);
   const heightAt = createHeightSampler(config);
 
-  const built = new Map<string, ScatterSet>();
-  let setIndex = 0;
+  const group = new THREE.Group();
+  scene.add(group);
+  const meshes: ScatterMeshEntry[] = [];
+  const rng = createRng(seed);
+  const occupied: Footprint[] = [];
 
-  for (const [setName, layers] of Object.entries(sets)) {
-    const group = new THREE.Group();
-    group.visible = false;
-    scene.add(group);
-
-    const meshes: ScatterMeshEntry[] = [];
-    const managed: ManagedMaterial[] = [];
-    // A distinct stream per set, so adding a biome cannot reshuffle the others.
-    const rng = createRng(seed + setIndex * 7919);
-    setIndex += 1;
-
-    const occupied: Footprint[] = [];
-    // Reserve the largest silhouettes first, across every layer.
-    for (const [layerName, layer] of Object.entries(layers).reverse()) {
-      const placements = planPlacements(rng, layer, span, farZ, heightAt, sources, occupied);
-      for (const [modelName, forModel] of groupByModel(placements)) {
-        const source = sources.get(modelName);
-        if (!source) continue;
-        for (const part of source.parts) {
-          meshes.push(buildInstancedMesh(THREE, group, part, forModel, layer, layerName));
-          managed.push(...part.managed);
-        }
+  // Reserve the largest silhouettes first, across every layer.
+  for (const [layerName, layer] of Object.entries(layers).reverse()) {
+    const placements = planPlacements(rng, layer, span, farZ, heightAt, sources, occupied);
+    for (const [modelName, forModel] of groupByModel(placements)) {
+      const source = sources.get(modelName);
+      if (!source) continue;
+      for (const part of source.parts) {
+        meshes.push(buildInstancedMesh(THREE, group, part, forModel, layer, layerName));
       }
     }
-
-    built.set(setName, { group, meshes, managed });
   }
 
-  let active = built.get(Object.keys(sets)[0]!);
-  if (active) active.group.visible = true;
-
-  // Deduplicated across sets: a model shared by two biomes has one material.
-  const allManaged = [...built.values()]
-    .flatMap((entry) => entry.managed)
-    .filter((entry, index, list) => list.findIndex((other) => other.material === entry.material) === index);
-
   return {
-    sets: built,
+    meshes,
     span,
     startZ: farZ,
-    get meshes() {
-      return active ? active.meshes : [];
-    },
-    /** Switches which biome's props are on screen. */
-    setActive(setName: string) {
-      const next = built.get(setName);
-      if (!next || next === active) return;
-      if (active) active.group.visible = false;
-      next.group.visible = true;
-      active = next;
+    /** Thins every detail layer to the level's share. */
+    setQuality(level: ShadowQuality) {
+      const fraction = DETAIL_FRACTION[level] ?? 1;
+      for (const entry of meshes) {
+        if (entry.detail) entry.mesh.count = Math.round(entry.fullCount * fraction);
+      }
     },
     /** One float per instance per frame; see the module note. */
     scroll(distance: number) {
-      if (!active) return;
       const offset = distance % span;
-      for (const entry of active.meshes) {
+      for (const entry of meshes) {
         const array = entry.mesh.instanceMatrix.array as Float32Array;
-        for (let index = 0; index < entry.baseZ.length; index += 1) {
+        for (let index = 0; index < entry.mesh.count; index += 1) {
           const shifted = entry.baseZ[index]! - farZ + offset;
           array[index * 16 + Z_TRANSLATION_OFFSET] = farZ + (shifted % span) + entry.zOffset[index]!;
         }
         entry.mesh.instanceMatrix.needsUpdate = true;
-      }
-    },
-    /**
-     * Every set is repainted, not just the visible one: a set that is hidden
-     * during a crossfade would otherwise appear still wearing the palette of
-     * whichever biome was on screen when it was last shown.
-     */
-    applyPalette(next: Palette) {
-      for (const entry of allManaged) {
-        const hex = (next.kit as KitPalette)[entry.name];
-        if (hex) entry.material.color.set(hex);
       }
     },
   };
@@ -397,13 +285,11 @@ export async function addScatter(
 
 function emptyScatter(span: number, startZ: number) {
   return {
-    sets: new Map<string, ScatterSet>(),
     meshes: [] as ScatterMeshEntry[],
     span,
     startZ,
-    setActive(_setName: string) {},
+    setQuality(_level: ShadowQuality) {},
     scroll(_distance: number) {},
-    applyPalette(_next: Palette) {},
   };
 }
 
@@ -449,7 +335,6 @@ function collectParts(THREE: ThreeModule, root: THREE_NS.Object3D): ModelPart[] 
       geometry: mesh.geometry,
       material,
       matrix: mesh.matrixWorld.clone(),
-      managed: [{ name: material.name, material }],
     });
   });
 
@@ -490,10 +375,13 @@ function planPlacements(
     if (Math.abs(x) > maxDist) continue;
     const z = farZ + rng() * span;
     // Reserve complete landmark silhouettes, including the prop's own radius.
-    if (isLandmarkZone(z, farZ, span, 7 + radius)) continue;
+    const nearLandmarks = Math.abs(x) - radius < LANDMARK_REACH_X;
+    if (nearLandmarks && isLandmarkZone(z, farZ, span, 7 + radius)) continue;
     const candidate = { x, z, radius };
-    if (!hasSceneryClearance(candidate, occupied, span)) continue;
-    occupied.push(candidate);
+    if (!layer.overlap) {
+      if (!hasSceneryClearance(candidate, occupied, span)) continue;
+      occupied.push(candidate);
+    }
     placements.push({ model, x, y: heightAt(x) - 0.03, z, rotationY: rng() * Math.PI * 2, scale });
   }
   return placements;
@@ -549,7 +437,7 @@ function buildInstancedMesh(
 
   mesh.instanceMatrix.needsUpdate = true;
   group.add(mesh);
-  return { mesh, baseZ, zOffset };
+  return { mesh, baseZ, zOffset, fullCount: placements.length, detail: Boolean(layer.detail) };
 }
 
 /** Curved, tapered blades in one geometry keep each tuft to a single draw batch. */

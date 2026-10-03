@@ -30,10 +30,10 @@ const FEATURES: {
   },
   {
     icon: Map,
-    title: 'Biomes and stages',
-    body: 'Clear them in order. Finish a biome and the next one opens.',
+    title: 'Ten stages',
+    body: 'Clear them in order. Each one you clear opens the next.',
     mark: '10',
-    markLabel: 'stages in each biome',
+    markLabel: 'stages to clear',
   },
   {
     icon: MonitorSmartphone,

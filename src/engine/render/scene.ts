@@ -23,7 +23,6 @@ import { addScatter } from '@/engine/render/world/scatter';
 import { addLandmarks } from '@/engine/render/world/landmarks';
 import { createTrailEdge } from '@/engine/render/world/trailEdge';
 import { addClouds } from '@/engine/render/world/clouds';
-import { BIOMES, resolveBiome, blendPalettes, activeScatterSet } from '@/engine/render/world/biomes';
 import { addEnemyPool } from '@/engine/render/actors/enemies';
 import { addPlayer } from '@/engine/render/actors/player';
 import { createEffects } from '@/engine/render/actors/effects';
@@ -31,11 +30,6 @@ import { createEffects } from '@/engine/render/actors/effects';
 const MOTE_COUNT = 26;
 const MOTE_SPAN = 180;
 const MOTE_START_Z = 20;
-
-/** How often the biome crossfade is recomputed. Colour drifts far too slowly to need every frame. */
-const BIOME_UPDATE_MS = 120;
-/** How long a hand-picked biome takes to fade in, so the selector never snaps. */
-const BIOME_MANUAL_BLEND_MS = 1400;
 
 export async function createScene(
   canvas: HTMLCanvasElement,
@@ -63,6 +57,7 @@ export async function createScene(
     span: config.scenery.span,
     seed: config.scenery.seed,
   });
+  scatter.setQuality(config.quality ?? 'high');
   const landmarks = await addLandmarks(THREE, scene, config, palette, {
     span: config.scenery.span,
   });
@@ -98,67 +93,6 @@ export async function createScene(
     renderer.render(scene, camera);
   }
 
-  // Reused every update so the crossfade allocates nothing per frame.
-  const blended = structuredClone(palette);
-  const autoScratch = structuredClone(palette);
-  let overrideFrom = structuredClone(palette);
-  let lastBiomeMs = -Infinity;
-  let override: Palette | null = null;
-  let overrideT = 1;
-
-  /**
-   * Pins the world to one biome, or returns to distance-driven cycling when
-   * given null. Either way it eases rather than snapping, from wherever the
-   * palette happens to be at the moment of the switch.
-   */
-  function setBiomeOverride(biomeId: string | null) {
-    const next = biomeId ? BIOMES.find((biome) => biome.id === biomeId) ?? null : null;
-    if ((next?.id ?? null) === (override?.id ?? null)) return;
-
-    overrideFrom = structuredClone(blended);
-    override = next;
-    overrideT = 0;
-    // Restart resets game.elapsedMs to 0; without this, applyBiome thinks the
-    // last update is still in the future and never paints the new palette.
-    lastBiomeMs = -Infinity;
-  }
-
-  /**
-   * Drives the biome crossfade, from distance travelled or from the selector.
-   * Cheap enough to call every frame; it throttles itself.
-   */
-  function applyBiome(distance: number, elapsedMs: number) {
-    const sinceMs = elapsedMs >= lastBiomeMs ? elapsedMs - lastBiomeMs : BIOME_UPDATE_MS;
-    if (sinceMs < BIOME_UPDATE_MS) return;
-    lastBiomeMs = elapsedMs;
-
-    const transition = resolveBiome(distance);
-    const autoPalette = blendPalettes(transition.from, transition.to, transition.t, autoScratch);
-    const autoSet = activeScatterSet(transition);
-
-    let next = autoPalette;
-    let set = autoSet;
-
-    if (override || overrideT < 1) {
-      overrideT = Math.min(1, overrideT + sinceMs / BIOME_MANUAL_BLEND_MS);
-      const target = override ?? autoPalette;
-      const eased = overrideT * overrideT * (3 - 2 * overrideT);
-      next = blendPalettes(overrideFrom, target, eased, blended);
-      set = overrideT < 0.5 ? set : (override?.scatterSet ?? autoSet);
-    }
-
-    sky.applyPalette(next);
-    lighting.applyPalette(next, renderer);
-    ground.applyPalette(next);
-    motes.applyPalette(next);
-    clouds.applyPalette(next);
-    scatter.applyPalette(next);
-    landmarks.applyPalette(next);
-    effects.applyPalette(next);
-    scatter.setActive(set);
-    landmarks.setActive(set);
-  }
-
   /**
    * Drops the shadow budget when the machine cannot keep up. Pose inference is
    * sharing this device, so the game does not get the whole frame to itself.
@@ -179,6 +113,7 @@ export async function createScene(
 
     renderer.shadowMap.needsUpdate = true;
     clouds.setVisible(level !== 'low');
+    scatter.setQuality(level);
     quality = level;
   }
 
@@ -206,8 +141,6 @@ export async function createScene(
     effects,
     cameraFeedback,
     trailEdge,
-    applyBiome,
-    setBiomeOverride,
     setQuality,
     get quality() {
       return quality;
@@ -304,9 +237,6 @@ function addMotes(THREE: ThreeModule, scene: THREE_NS.Scene, palette: Palette) {
     items,
     span: MOTE_SPAN,
     startZ,
-    applyPalette(next: Palette) {
-      material.color.set(next.accents.mote);
-    },
   };
 }
 

@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * Developer chrome on /play: biome override, character swap, 3D catalog and the
+ * Developer chrome on /play: character swap, 3D catalog and the
  * detector panel. Players never see it. Append `?debug=1` to bring it back on a
  * production tunnel; `?debug=0` hides it even in `next dev`.
  */

@@ -18,7 +18,7 @@ import type { RefObject } from 'react';
 import { useSyncExternalStore } from 'react';
 
 import { CONFIG } from '@/engine/config';
-import { createGameRuntime, BIOME_AUTO } from '@/engine/runtime';
+import { createGameRuntime } from '@/engine/runtime';
 import type { GameRuntime, HudSnapshot, RuntimeMode } from '@/engine/runtime';
 import { LATERAL } from '@/engine/detectors/lateral';
 import type { RunSummary, StageSelection } from '@/engine/types';
@@ -70,7 +70,6 @@ export interface GameRuntimeRefs {
 
 export interface UseGameRuntimeOptions {
   character?: string;
-  biome?: string;
   /** 'pose' skips the renderer and the reducer -- see RuntimeMode. */
   mode?: RuntimeMode;
   stage?: StageSelection | null;
@@ -89,7 +88,7 @@ export interface GameActions {
 }
 
 export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOptions = {}) {
-  const { character, biome, mode = 'game', stage = null } = options;
+  const { character, mode = 'game', stage = null } = options;
 
   // Destructured to primitives on purpose. A caller that rebuilds the stage
   // object every render would otherwise restart the run every render; depending
@@ -113,13 +112,13 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
     // baked in during a server render would not match the client's.
     const seed = Math.floor(Math.random() * 2 ** 32) >>> 0;
 
-    // Character and biome are deliberately left at their defaults here. The
-    // two preference effects below run immediately after this one and apply the
-    // player's actual choices, which keeps this effect free of those deps and
+    // Character is deliberately left at its default here. The preference
+    // effect below runs immediately after this one and applies the player's
+    // actual choice, which keeps this effect free of those deps and
     // stops a character change from rebuilding the whole scene.
     const instance = createGameRuntime(
       { gameCanvas, video, overlay, container },
-      { seed, biome: BIOME_AUTO, mode },
+      { seed, mode },
     );
 
     runtimeRef.current = instance;
@@ -162,10 +161,6 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
   useEffect(() => {
     if (character) void runtimeRef.current?.setCharacter(character);
   }, [character]);
-
-  useEffect(() => {
-    if (biome) runtimeRef.current?.setBiome(biome);
-  }, [biome]);
 
   useEffect(() => {
     if (mode !== 'game') return;

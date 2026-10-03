@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { CONFIG } from '@/engine/config';
 import { trailEdgeReach, trailEdgeOffsetAt } from '@/engine/render/world/trailEdge';
-import { trailHalfWidth } from '@/engine/render/world/ground';
+import { EDGE_BREAKUP_INSET, trailHalfWidth } from '@/engine/render/world/ground';
 
 const game = CONFIG.game;
 /** x of the outermost lane's outer boundary -- the edge must never cross this. */
@@ -45,6 +45,18 @@ test('trail edge: a lane never ends up on grass, anywhere along the run', () => 
   );
 });
 
+test('trail edge: the broken-up grass line plus the wander still clears the lanes', () => {
+  // Arrange
+  const margin = trailHalfWidth(game) - laneEdge;
+  const reach = trailEdgeReach(game.trailEdge);
+
+  // Assert
+  assert.ok(
+    margin > reach + EDGE_BREAKUP_INSET,
+    `dirt margin ${margin.toFixed(2)} must exceed wander ${reach.toFixed(2)} + grass inset ${EDGE_BREAKUP_INSET.toFixed(2)}`,
+  );
+});
+
 test('trail edge: both sides wander, and not identically', () => {
   const samples = [];
   for (let z = -400; z <= 0; z += 3) {
@@ -82,4 +94,14 @@ test('scenery clearance rejects intersecting footprints across layers and the re
     const wrap = (z: number) => -300 + ((z + 300 + offset) % 320);
     assert.equal(hasSceneryClearance({ x: 8, z: wrap(19), radius: 1 }, [{ ...tree, z: wrap(tree.z) }], 320), false);
   }
+});
+
+test('scenery recycles inside full fog, so nothing visibly pops in', async () => {
+  const { GOLDEN_FOREST } = await import('@/engine/render/world/palette');
+  // Scatter spans [startZ - span, startZ] with startZ = 20; the far end is where props reappear.
+  const seamDistance = game.camera.z - (20 - game.scenery.span);
+  assert.ok(
+    seamDistance >= GOLDEN_FOREST.fog.far,
+    `recycle seam at ${seamDistance} m must be at or beyond fog far ${GOLDEN_FOREST.fog.far} m`,
+  );
 });

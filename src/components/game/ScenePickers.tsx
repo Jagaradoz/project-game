@@ -1,60 +1,20 @@
-import { Leaf, Mountain, Shuffle, Sun, Trees, type LucideIcon } from 'lucide-react';
+import { Trees } from 'lucide-react';
 
 import { CONFIG } from '@/engine/config';
-import { BIOME_AUTO } from '@/engine/runtime';
-import { BIOMES } from '@/engine/render/world/biomes';
 import type { CharacterDef, CharacterRoster } from '@/engine/types';
-
-/**
- * A glyph per biome. `<option>` cannot host an SVG, so the icon is shown beside
- * the select rather than inside the list -- it tracks the current value, and the
- * option text still names every choice.
- */
-const BIOME_ICONS: Record<string, LucideIcon> = {
-  forest: Trees,
-  autumn: Leaf,
-  highlands: Mountain,
-  oasis: Sun,
-};
 
 const roster = CONFIG.game.characters as unknown as CharacterRoster;
 
 interface ScenePickersProps {
   character: string;
-  biome: string;
   onCharacterChange: (id: string) => void;
-  onBiomeChange: (id: string) => void;
 }
 
-/**
- * Developer scenery controls for /play. The biome list is generated from BIOMES,
- * so adding a biome does not also mean remembering to edit the markup.
- */
-export function ScenePickers({
-  character,
-  biome,
-  onCharacterChange,
-  onBiomeChange,
-}: ScenePickersProps) {
-  const BiomeIcon = biome === BIOME_AUTO ? Shuffle : (BIOME_ICONS[biome] ?? Trees);
-
+/** Developer scene controls for /play. */
+export function ScenePickers({ character, onCharacterChange }: ScenePickersProps) {
   return (
     <div className="mx-auto flex w-full max-w-[calc(80vh*3/4)] flex-wrap items-center justify-between gap-3 rounded-none border-2 border-ink bg-surface px-3 py-2 sm:px-3.5">
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Label htmlFor="biomeSelect" icon={<BiomeIcon size={14} />}>
-            Biome
-          </Label>
-          <Select id="biomeSelect" value={biome} onChange={onBiomeChange} aria-label="Select biome">
-            <option value={BIOME_AUTO}>Auto (by distance)</option>
-            {BIOMES.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {entry.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-
         <div className="flex items-center gap-2">
           <Label htmlFor="charSelect">Character</Label>
           <Select
@@ -86,21 +46,12 @@ export function ScenePickers({
   );
 }
 
-function Label({
-  htmlFor,
-  icon,
-  children,
-}: {
-  htmlFor: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
+function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
   return (
     <label
       htmlFor={htmlFor}
       className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.08em] text-accent-text uppercase"
     >
-      {icon && <span aria-hidden className="flex">{icon}</span>}
       {children}
     </label>
   );
