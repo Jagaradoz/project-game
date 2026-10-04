@@ -1,0 +1,15 @@
+{
+  "file": "D:\\Engineering Works\\project-game\\public\\assets\\models\\blender\\environment\\root_obstacle_tree.blend",
+  "triangles": 10662,
+  "mesh_count": 77,
+  "wood_connected_components": 1,
+  "asset_dimensions_m": [
+    15.74,
+    11.78,
+    15.69
+  ],
+  "closed_finite_meshes": true,
+  "errors": [],
+  "root_crest_m": 0.8,
+  "preview_separate": true
+}

@@ -1,6 +1,6 @@
 {
   "name": "webcam-exercise-game",
-  "version": "2.7.0-alpha.2",
+  "version": "2.7.1-alpha.4",
   "private": true,
   "description": "Webcam-based exercise game website - pose-driven exergame (Next.js frontend)",
   "scripts": {
