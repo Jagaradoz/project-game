@@ -6,7 +6,7 @@
 
 import type * as THREE_NS from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { repaintKitModel } from '@/engine/render/world/palette';
+import { ENVIRONMENT_MODEL_DIR } from '@/engine/render/world/catalog';
 
 import type { Palette } from '@/engine/render/world/palette';
 import type { GameConfig, ThreeModule } from '@/engine/types';
@@ -17,16 +17,16 @@ export async function addLandmarks(
   THREE: ThreeModule,
   scene: THREE_NS.Scene,
   config: GameConfig,
-  palette: Palette,
+  _palette: Palette,
   { span = 320, startZ = 20 }: { span?: number; startZ?: number } = {},
 ) {
   const farZ = startZ - span;
   const heightAt = createHeightSampler(config);
   const loader = new GLTFLoader();
-  const treeModels = await Promise.all(['tree_oak', 'tree_pineRoundD'].map(async (name) => {
+  const treeModels = await Promise.all(['tree_oak', 'tree_pineRoundD', 'tree_root_oak'].map(async (name) => {
     try {
-      const gltf = await loader.loadAsync(`/assets/models/nature/${name}.glb`);
-      repaintKitModel(THREE, gltf.scene, palette.kit);
+      const gltf = await loader.loadAsync(`${ENVIRONMENT_MODEL_DIR}/${name}.glb`);
+      gltf.scene.name = name;
       return gltf.scene;
     } catch (error) {
       console.warn(`landmarks: could not load ${name}`, error);
@@ -73,9 +73,15 @@ function buildForestLandmark(
   variant: number,
   treeModels: THREE_NS.Group[],
 ) {
-  // Compact kit trees frame the path without the dense foliage of the old landmark.
+  // Exported catalog materials and geometry remain intact.
   for (const side of treeModels.length ? [-1, 1] : []) {
-    const tree = treeModels[(variant + (side > 0 ? 1 : 0)) % treeModels.length]!.clone(true);
+    // The large root oak is a single memorable beat; ordinary landmarks stay compact.
+    const rootOak = treeModels.find((model) => model.name === 'tree_root_oak');
+    const compact = treeModels.filter((model) => model.name !== 'tree_root_oak');
+    const source = variant === 0 && side < 0 && rootOak ? rootOak :
+      compact[(variant + (side > 0 ? 1 : 0)) % compact.length];
+    if (!source) continue;
+    const tree = source.clone(true);
     const bounds = new THREE.Box3().setFromObject(tree);
     const size = bounds.getSize(new THREE.Vector3());
     const scale = (8.5 + variant * 0.35) / size.y;

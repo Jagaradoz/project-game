@@ -1,0 +1,435 @@
+{
+  "source": "blender/environment/environment_resource_catalog.blend",
+  "assets": [
+    {
+      "name": "flower_purpleB",
+      "url": "/assets/models/environment/flower_purpleB.glb",
+      "triangles": 276,
+      "materials": 9,
+      "size": [
+        0.468344,
+        0.55,
+        0.383468
+      ]
+    },
+    {
+      "name": "flower_redA",
+      "url": "/assets/models/environment/flower_redA.glb",
+      "triangles": 118,
+      "materials": 7,
+      "size": [
+        0.391934,
+        0.55,
+        0.282925
+      ]
+    },
+    {
+      "name": "flower_yellowB",
+      "url": "/assets/models/environment/flower_yellowB.glb",
+      "triangles": 256,
+      "materials": 9,
+      "size": [
+        0.531435,
+        0.55,
+        0.545382
+      ]
+    },
+    {
+      "name": "grass",
+      "url": "/assets/models/environment/grass.glb",
+      "triangles": 180,
+      "materials": 4,
+      "size": [
+        0.612295,
+        0.38,
+        0.701088
+      ]
+    },
+    {
+      "name": "mushroom_red",
+      "url": "/assets/models/environment/mushroom_red.glb",
+      "triangles": 316,
+      "materials": 7,
+      "size": [
+        0.428567,
+        0.4,
+        0.388984
+      ]
+    },
+    {
+      "name": "mushroom_redGroup",
+      "url": "/assets/models/environment/mushroom_redGroup.glb",
+      "triangles": 556,
+      "materials": 7,
+      "size": [
+        0.446308,
+        0.4,
+        0.385342
+      ]
+    },
+    {
+      "name": "mushroom_tanTall",
+      "url": "/assets/models/environment/mushroom_tanTall.glb",
+      "triangles": 276,
+      "materials": 7,
+      "size": [
+        0.226804,
+        0.4,
+        0.20272
+      ]
+    },
+    {
+      "name": "plant_bush",
+      "url": "/assets/models/environment/plant_bush.glb",
+      "triangles": 168,
+      "materials": 4,
+      "size": [
+        1.88015,
+        0.65,
+        1.868797
+      ]
+    },
+    {
+      "name": "plant_bushLarge",
+      "url": "/assets/models/environment/plant_bushLarge.glb",
+      "triangles": 218,
+      "materials": 4,
+      "size": [
+        1.000869,
+        0.65,
+        1.010513
+      ]
+    },
+    {
+      "name": "plant_flatTall",
+      "url": "/assets/models/environment/plant_flatTall.glb",
+      "triangles": 138,
+      "materials": 4,
+      "size": [
+        0.414704,
+        0.5,
+        0.495034
+      ]
+    },
+    {
+      "name": "rock_largeA",
+      "url": "/assets/models/environment/rock_largeA.glb",
+      "triangles": 82,
+      "materials": 6,
+      "size": [
+        2.147014,
+        0.48158,
+        2.4
+      ],
+      "plateauY": 0.48158,
+      "plateauRadius": 0.819979
+    },
+    {
+      "name": "rock_largeB",
+      "url": "/assets/models/environment/rock_largeB.glb",
+      "triangles": 82,
+      "materials": 6,
+      "size": [
+        2.4,
+        0.781165,
+        2.243021
+      ],
+      "plateauY": 0.781165,
+      "plateauRadius": 0.837147
+    },
+    {
+      "name": "rock_largeC",
+      "url": "/assets/models/environment/rock_largeC.glb",
+      "triangles": 82,
+      "materials": 6,
+      "size": [
+        2.334698,
+        0.327005,
+        2.4
+      ],
+      "plateauY": 0.327005,
+      "plateauRadius": 0.832365
+    },
+    {
+      "name": "rock_largeD",
+      "url": "/assets/models/environment/rock_largeD.glb",
+      "triangles": 82,
+      "materials": 6,
+      "size": [
+        2.4,
+        1.084398,
+        2.300816
+      ],
+      "plateauY": 1.084398,
+      "plateauRadius": 0.845748
+    },
+    {
+      "name": "rock_smallA",
+      "url": "/assets/models/environment/rock_smallA.glb",
+      "triangles": 82,
+      "materials": 6,
+      "size": [
+        2.4,
+        0.516793,
+        2.375404
+      ],
+      "plateauY": 0.516793,
+      "plateauRadius": 0.845901
+    },
+    {
+      "name": "rock_smallG",
+      "url": "/assets/models/environment/rock_smallG.glb",
+      "triangles": 82,
+      "materials": 6,
+      "size": [
+        2.4,
+        0.377019,
+        2.344553
+      ],
+      "plateauY": 0.377019,
+      "plateauRadius": 0.860806
+    },
+    {
+      "name": "stone_bigA",
+      "url": "/assets/models/environment/stone_bigA.glb",
+      "triangles": 44,
+      "materials": 3,
+      "size": [
+        0.805598,
+        0.486274,
+        0.900001
+      ]
+    },
+    {
+      "name": "stone_bigB",
+      "url": "/assets/models/environment/stone_bigB.glb",
+      "triangles": 40,
+      "materials": 3,
+      "size": [
+        0.9,
+        0.352916,
+        0.658846
+      ]
+    },
+    {
+      "name": "stone_bigC",
+      "url": "/assets/models/environment/stone_bigC.glb",
+      "triangles": 44,
+      "materials": 3,
+      "size": [
+        0.9,
+        0.620274,
+        0.859461
+      ]
+    },
+    {
+      "name": "stone_bigDuo",
+      "url": "/assets/models/environment/stone_bigDuo.glb",
+      "triangles": 106,
+      "materials": 3,
+      "size": [
+        0.9,
+        0.328179,
+        0.621247
+      ]
+    },
+    {
+      "name": "stone_bigGroup",
+      "url": "/assets/models/environment/stone_bigGroup.glb",
+      "triangles": 190,
+      "materials": 3,
+      "size": [
+        0.9,
+        0.323397,
+        0.614673
+      ]
+    },
+    {
+      "name": "stone_leaning",
+      "url": "/assets/models/environment/stone_leaning.glb",
+      "triangles": 74,
+      "materials": 3,
+      "size": [
+        0.9,
+        0.4542,
+        0.467138
+      ]
+    },
+    {
+      "name": "stone_mediumA",
+      "url": "/assets/models/environment/stone_mediumA.glb",
+      "triangles": 36,
+      "materials": 3,
+      "size": [
+        0.463061,
+        0.333803,
+        0.5
+      ]
+    },
+    {
+      "name": "stone_mediumPair",
+      "url": "/assets/models/environment/stone_mediumPair.glb",
+      "triangles": 74,
+      "materials": 3,
+      "size": [
+        0.5,
+        0.214667,
+        0.344054
+      ]
+    },
+    {
+      "name": "stone_mediumTrio",
+      "url": "/assets/models/environment/stone_mediumTrio.glb",
+      "triangles": 102,
+      "materials": 3,
+      "size": [
+        0.5,
+        0.184182,
+        0.449209
+      ]
+    },
+    {
+      "name": "stone_smallPair",
+      "url": "/assets/models/environment/stone_smallPair.glb",
+      "triangles": 52,
+      "materials": 3,
+      "size": [
+        0.25,
+        0.087277,
+        0.148313
+      ]
+    },
+    {
+      "name": "stone_smallPile",
+      "url": "/assets/models/environment/stone_smallPile.glb",
+      "triangles": 134,
+      "materials": 3,
+      "size": [
+        0.25,
+        0.062138,
+        0.215932
+      ]
+    },
+    {
+      "name": "stump_old",
+      "url": "/assets/models/environment/stump_old.glb",
+      "triangles": 431,
+      "materials": 19,
+      "size": [
+        0.88727,
+        0.6,
+        0.932719
+      ]
+    },
+    {
+      "name": "stump_round",
+      "url": "/assets/models/environment/stump_round.glb",
+      "triangles": 320,
+      "materials": 12,
+      "size": [
+        0.998376,
+        0.6,
+        1.026488
+      ]
+    },
+    {
+      "name": "tree_oak",
+      "url": "/assets/models/environment/tree_oak.glb",
+      "triangles": 3690,
+      "materials": 8,
+      "size": [
+        1.846603,
+        2.0,
+        1.8069
+      ]
+    },
+    {
+      "name": "tree_palmBend",
+      "url": "/assets/models/environment/tree_palmBend.glb",
+      "triangles": 466,
+      "materials": 7,
+      "size": [
+        2.017886,
+        2.0,
+        2.048271
+      ]
+    },
+    {
+      "name": "tree_palmTall",
+      "url": "/assets/models/environment/tree_palmTall.glb",
+      "triangles": 466,
+      "materials": 7,
+      "size": [
+        2.226124,
+        2.0,
+        1.977627
+      ]
+    },
+    {
+      "name": "tree_pineRoundD",
+      "url": "/assets/models/environment/tree_pineRoundD.glb",
+      "triangles": 272,
+      "materials": 7,
+      "size": [
+        1.099725,
+        2.0,
+        1.069874
+      ]
+    },
+    {
+      "name": "tree_pineSmallB",
+      "url": "/assets/models/environment/tree_pineSmallB.glb",
+      "triangles": 224,
+      "materials": 7,
+      "size": [
+        1.116819,
+        2.0,
+        1.097332
+      ]
+    },
+    {
+      "name": "tree_plateau",
+      "url": "/assets/models/environment/tree_plateau.glb",
+      "triangles": 3846,
+      "materials": 8,
+      "size": [
+        2.090658,
+        2.0,
+        1.501778
+      ]
+    },
+    {
+      "name": "tree_root_oak",
+      "url": "/assets/models/environment/tree_root_oak.glb",
+      "triangles": 10662,
+      "materials": 9,
+      "size": [
+        3.22168,
+        3.2,
+        2.182228
+      ]
+    },
+    {
+      "name": "tree_simple",
+      "url": "/assets/models/environment/tree_simple.glb",
+      "triangles": 3688,
+      "materials": 8,
+      "size": [
+        1.311943,
+        2.0,
+        1.226555
+      ]
+    },
+    {
+      "name": "tree_thin",
+      "url": "/assets/models/environment/tree_thin.glb",
+      "triangles": 3222,
+      "materials": 8,
+      "size": [
+        1.388601,
+        2.0,
+        1.305405
+      ]
+    }
+  ]
+}

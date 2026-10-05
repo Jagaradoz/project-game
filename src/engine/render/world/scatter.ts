@@ -3,9 +3,8 @@
  *
  * The old scatter cloned every prop into its own Object3D, which cost roughly
  * 450 draw calls for a forest that still looked sparse. Kenney's models are a
- * handful of untextured primitives each, so they instance cleanly: one
- * InstancedMesh per (model, primitive) collapses the same forest -- at several
- * times the density -- into a couple of dozen calls.
+ * untextured primitives, so they instance cleanly: one InstancedMesh per
+ * (model, primitive, quality/shadow policy) shares ground and top decorations.
  *
  * Recycling writes the z translation straight into the instance matrix buffer.
  * Everything else about an instance (x, rotation, scale) is baked once at build
@@ -37,23 +36,24 @@ interface ScatterLayer {
    * every prop would dominate load time.
    */
   overlap?: boolean;
+  /** Small low props can occupy the dirt shoulder outside the physical lanes. */
+  shoulder?: boolean;
 }
 
 type ScatterLayers = Record<string, ScatterLayer>;
 
 interface ModelPart {
   geometry: THREE_NS.BufferGeometry;
-  material: THREE_NS.Material;
+  material: THREE_NS.Material | THREE_NS.Material[];
   matrix: THREE_NS.Matrix4;
 }
 
-interface Placement {
-  model: string;
-  x: number;
-  y: number;
-  z: number;
-  rotationY: number;
-  scale: number;
+type Placement = SceneryPlacement;
+
+interface ModelSource {
+  parts: ModelPart[];
+  radius: number;
+  plateau?: Plateau;
 }
 
 interface ScatterMeshEntry {
@@ -73,10 +73,13 @@ export interface ScatterOptions {
 }
 
 import { createRng, range } from '@/engine/render/world/rng';
-import { repaintKitModel } from '@/engine/render/world/palette';
-import { createHeightSampler } from '@/engine/render/world/ground';
+import { createHeightSampler, trailHalfWidth } from '@/engine/render/world/ground';
+import {
+  ENVIRONMENT_MODEL_DIR, BROADLEAF_TREES, DISTANT_TREES, PALM_TREES,
+  SMALL_STONES, BIG_STONES, TOP_MODELS, readPlateau, planPlateauDecorations, wrappedSceneryZ,
+  type Plateau, type SceneryPlacement,
+} from '@/engine/render/world/catalog';
 
-const MODEL_DIR = '/assets/models/nature';
 
 /**
  * Share of a detail layer drawn at each quality level. Placements are random,
@@ -102,123 +105,59 @@ export function isLandmarkZone(z: number, farZ: number, span: number, radius = 1
 }
 
 /**
- * Layers are ordered by distance from the trail. Only the two nearest cast
- * shadows: an InstancedMesh is culled as a single unit, so every instance of a
+ * Nearby substantial props cast shadows: an InstancedMesh is culled as a
+ * single unit, so every instance of a
  * shadow-casting layer is drawn into the shadow map whether or not it is inside
  * the light frustum. Distant canopy would pay that cost for no visible gain.
  */
-const FOREST_LAYERS = {
-  /**
-   * Keep enough grass to break the ground silhouette, but leave broad quiet
-   * shapes so the trail reads like the site's poster-style panels.
-   */
+const FOREST_LAYERS: ScatterLayers = {
   groundcover: {
-    count: 480,
-    band: [5.6, 24],
-    scale: [1.8, 3.0],
-    castShadow: false,
-    models: ['grass', 'plant_flatTall'],
-    clusterSize: 14,
-    clusterSpread: 9,
+    count: 480, band: [5.6, 24], scale: [1.8, 3.0], castShadow: false,
+    models: ['grass', 'plant_flatTall'], clusterSize: 14, clusterSpread: 9,
   },
   flowers: {
-    count: 70,
-    band: [5.7, 9],
-    scale: [1.6, 2.6],
-    castShadow: false,
+    count: 70, band: [5.7, 9], scale: [1.2, 1.9], castShadow: false,
     models: ['flower_redA', 'flower_yellowB', 'flower_purpleB'],
   },
+  shoulder: {
+    count: 85, band: [0, 0], scale: [0.45, 0.8], castShadow: false, shoulder: true,
+    models: ['stone_smallPair', 'stone_smallPile', 'grass'],
+  },
   verge: {
-    count: 60,
-    band: [5.2, 9.5],
-    scale: [1.2, 2.1],
-    castShadow: false,
-    models: [
-      'flower_redA', 'flower_yellowB', 'flower_purpleB',
-      'mushroom_red', 'mushroom_redGroup', 'mushroom_tanTall',
-      'rock_smallA', 'rock_smallG', 'stone_smallB',
-    ],
-    clusterSize: 10,
-    clusterSpread: 6,
+    count: 60, band: [5.2, 9.5], scale: [1.2, 2.1], castShadow: false,
+    models: ['flower_redA', 'flower_yellowB', 'flower_purpleB',
+      'mushroom_red', 'mushroom_redGroup', 'mushroom_tanTall', ...SMALL_STONES],
+    clusterSize: 10, clusterSpread: 6,
   },
   understory: {
-    count: 65,
-    band: [6, 12],
-    scale: [1.6, 2.5],
-    castShadow: true,
-    models: [
-      'plant_bush', 'plant_bushLarge',
-      'log', 'stump_old', 'stump_round', 'rock_smallA',
-    ],
-    clusterSize: 7,
-    clusterSpread: 8,
+    count: 65, band: [6, 12], scale: [1.6, 2.5], castShadow: true,
+    models: ['plant_bush', 'plant_bushLarge', 'stump_old', 'stump_round'],
+    clusterSize: 7, clusterSpread: 8,
   },
-  /**
-   * A handful of big stones near the path: a mid-height silhouette between
-   * the bushes and the trees, and a landmark to measure speed against.
-   */
   boulders: {
-    count: 12,
-    band: [6.5, 14],
-    scale: [3.2, 4.6],
-    castShadow: true,
-    models: ['rock_largeB', 'rock_largeC', 'rock_largeD', 'stone_largeB', 'stone_largeD'],
-    clusterSize: 3,
-    clusterSpread: 5,
+    count: 18, band: [6.5, 14], scale: [2.0, 3.0], castShadow: true,
+    models: BIG_STONES, clusterSize: 3, clusterSpread: 5,
   },
   midground: {
-    count: 65,
-    band: [7, 17],
-    scale: [2.2, 3.4],
-    castShadow: true,
-    models: [
-      'tree_pineTallC', 'tree_pineTallD', 'tree_simple',
-      'tree_thin', 'tree_oak',
-      'rock_largeA', 'rock_tallA', 'stone_largeA', 'stone_tallC',
-    ],
-    clusterSize: 5,
-    clusterSpread: 10,
+    count: 65, band: [7, 17], scale: [2.2, 3.4], castShadow: true,
+    models: BROADLEAF_TREES, clusterSize: 5, clusterSpread: 10,
+  },
+  palms: {
+    count: 16, band: [17, 35], scale: [2.5, 3.6], castShadow: false,
+    models: PALM_TREES, clusterSize: 4, clusterSpread: 6,
   },
   canopy: {
-    count: 70,
-    band: [15, 48],
-    scale: [2.8, 4.2],
-    castShadow: false,
-    models: [
-      'tree_pineRoundA', 'tree_pineRoundD', 'tree_pineTallA',
-      'tree_pineTallB', 'tree_pineDefaultA', 'tree_plateau',
-      'tree_pineTallC', 'tree_pineTallD',
-    ],
-    clusterSize: 6,
-    clusterSpread: 13,
+    count: 70, band: [15, 48], scale: [2.8, 4.2], castShadow: false,
+    models: [...BROADLEAF_TREES, 'tree_pineRoundD', 'tree_pineSmallB'],
+    clusterSize: 6, clusterSpread: 13,
   },
-  /**
-   * Fills the flat ground out to where the fog takes over, so the forest reads
-   * as continuous instead of a strip along the path. Simplest kit trees, no
-   * shadows, and thinned by quality: this is the first thing a slow device loses.
-   */
   farForest: {
-    count: 300,
-    band: [40, 100],
-    scale: [3.0, 4.6],
-    castShadow: false,
-    models: [
-      'tree_pineRoundA', 'tree_pineRoundD', 'tree_pineTallA',
-      'tree_pineDefaultA', 'tree_simple', 'tree_cone',
-    ],
-    clusterSize: 8,
-    clusterSpread: 16,
-    detail: true,
+    count: 300, band: [40, 100], scale: [3.0, 4.6], castShadow: false,
+    models: DISTANT_TREES, clusterSize: 8, clusterSpread: 16, detail: true,
   },
-  /** Grass across the open ground between the trees, out to the fog. */
   meadow: {
-    count: 1500,
-    band: [20, 95],
-    scale: [2.2, 3.6],
-    castShadow: false,
-    models: ['grass', 'grass_large', 'plant_flatTall'],
-    detail: true,
-    overlap: true,
+    count: 1500, band: [20, 95], scale: [2.2, 3.6], castShadow: false,
+    models: ['grass', 'plant_flatTall'], detail: true, overlap: true,
   },
 };
 
@@ -226,7 +165,7 @@ export async function addScatter(
   THREE: ThreeModule,
   scene: THREE_NS.Scene,
   config: GameConfig,
-  palette: Palette,
+  _palette: Palette,
   loader: GLTFLoader | null,
   options: ScatterOptions = {},
 ) {
@@ -235,8 +174,8 @@ export async function addScatter(
 
   if (!loader) return emptyScatter(span, farZ);
 
-  const names = [...new Set(Object.values(layers).flatMap((layer) => layer.models))];
-  const sources = await loadModels(THREE, loader, names, palette);
+  const names = [...new Set([...Object.values(layers).flatMap((layer) => layer.models), ...TOP_MODELS])];
+  const sources = await loadModels(THREE, loader, names);
   const heightAt = createHeightSampler(config);
 
   const group = new THREE.Group();
@@ -245,15 +184,34 @@ export async function addScatter(
   const rng = createRng(seed);
   const occupied: Footprint[] = [];
 
-  // Reserve the largest silhouettes first, across every layer.
-  for (const [layerName, layer] of Object.entries(layers).reverse()) {
-    const placements = planPlacements(rng, layer, span, farZ, heightAt, sources, occupied);
-    for (const [modelName, forModel] of groupByModel(placements)) {
-      const source = sources.get(modelName);
-      if (!source) continue;
-      for (const part of source.parts) {
-        meshes.push(buildInstancedMesh(THREE, group, part, forModel, layer, layerName));
+  // Complete planning first, including platform tops, so shared models share batches.
+  const batches = new Map<string, { model: string; placements: Placement[]; layer: ScatterLayer }>();
+  const gather = (placements: Placement[], layer: ScatterLayer) => {
+    for (const placement of placements) {
+      const key = `${placement.model}:${Boolean(layer.detail)}:${layer.castShadow}`;
+      if (!batches.has(key)) batches.set(key, { model: placement.model, placements: [], layer });
+      batches.get(key)!.placements.push(placement);
+    }
+  };
+  // Outcrops reserve their full footprint before ordinary vegetation is planned.
+  const ordered = Object.entries(layers).reverse().sort(([, a], [, b]) =>
+    Number(b.models.some((name) => sources.get(name)?.plateau)) -
+    Number(a.models.some((name) => sources.get(name)?.plateau)));
+  for (const [, layer] of ordered) {
+    const placements = planPlacements(rng, layer, span, farZ, heightAt, sources, occupied, config);
+    gather(placements, layer);
+    for (const platform of placements) {
+      const plateau = sources.get(platform.model)?.plateau;
+      if (!plateau) continue;
+      const decorations = planPlateauDecorations(rng, platform, plateau, sources);
+      for (const decoration of decorations) {
+        gather([decoration], { ...layer, detail: false, castShadow: decoration.model.startsWith('tree_') });
       }
+    }
+  }
+  for (const { model, placements, layer } of batches.values()) {
+    for (const part of sources.get(model)!.parts) {
+      meshes.push(buildInstancedMesh(THREE, group, part, placements, layer, model));
     }
   }
 
@@ -270,12 +228,10 @@ export async function addScatter(
     },
     /** One float per instance per frame; see the module note. */
     scroll(distance: number) {
-      const offset = distance % span;
       for (const entry of meshes) {
         const array = entry.mesh.instanceMatrix.array as Float32Array;
         for (let index = 0; index < entry.mesh.count; index += 1) {
-          const shifted = entry.baseZ[index]! - farZ + offset;
-          array[index * 16 + Z_TRANSLATION_OFFSET] = farZ + (shifted % span) + entry.zOffset[index]!;
+          array[index * 16 + Z_TRANSLATION_OFFSET] = wrappedSceneryZ(entry.baseZ[index]!, distance, farZ, span) + entry.zOffset[index]!;
         }
         entry.mesh.instanceMatrix.needsUpdate = true;
       }
@@ -298,20 +254,23 @@ async function loadModels(
   THREE: ThreeModule,
   loader: GLTFLoader,
   names: string[],
-  palette: Palette,
-) {
+): Promise<Map<string, ModelSource>> {
   const entries = await Promise.all(
     names.map(async (name) => {
       try {
-        const gltf = await loader.loadAsync(`${MODEL_DIR}/${name}.glb`);
-        repaintKitModel(THREE, gltf.scene, palette.kit);
-        if (name === 'grass') thickenGrass(THREE, gltf.scene);
+        const gltf = await loader.loadAsync(`${ENVIRONMENT_MODEL_DIR}/${name}.glb`);
+        let plateau: Plateau | undefined;
+        gltf.scene.traverse((node) => {
+          plateau ??= readPlateau(node.userData);
+          const mesh = node as THREE_NS.Mesh;
+          if (mesh.isMesh) plateau ??= readPlateau(mesh.geometry.userData);
+        });
         const bounds = new THREE.Box3().setFromObject(gltf.scene);
         const radius = Math.hypot(
           Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x)),
           Math.max(Math.abs(bounds.min.z), Math.abs(bounds.max.z)),
         );
-        return [name, { parts: collectParts(THREE, gltf.scene), radius }] as const;
+        return [name, { parts: collectParts(gltf.scene), radius, plateau }] as const;
       } catch (error) {
         console.warn(`scatter: could not load ${name}.glb`, error);
         return null;
@@ -323,14 +282,14 @@ async function loadModels(
 }
 
 /** One entry per primitive, carrying its transform relative to the model root. */
-function collectParts(THREE: ThreeModule, root: THREE_NS.Object3D): ModelPart[] {
+function collectParts(root: THREE_NS.Object3D): ModelPart[] {
   root.updateWorldMatrix(true, true);
   const parts: ModelPart[] = [];
 
   root.traverse((child) => {
     const mesh = child as THREE_NS.Mesh;
     if (!mesh.isMesh) return;
-    const material = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE_NS.MeshStandardMaterial;
+    const material = mesh.material;
     parts.push({
       geometry: mesh.geometry,
       material,
@@ -352,7 +311,7 @@ export function hasSceneryClearance(candidate: Footprint, occupied: Footprint[],
   });
 }
 
-function planPlacements(
+export function planPlacements(
   rng: Rng,
   layer: ScatterLayer,
   span: number,
@@ -360,10 +319,15 @@ function planPlacements(
   heightAt: (x: number) => number,
   sources: Map<string, { radius: number }>,
   occupied: Footprint[],
+  config: GameConfig,
 ): Placement[] {
-  const [minDist = 0, maxDist = 0] = layer.band;
+  const laneHalf = config.laneCount * config.laneWidth / 2;
+  const dirtHalf = trailHalfWidth(config);
+  const [minDist = 0, maxDist = 0] = layer.shoulder ? [laneHalf + 0.3, dirtHalf - 0.4] : layer.band;
   const [minScale = 1, maxScale = 1] = layer.scale;
   const placements: Placement[] = [];
+  let cluster: { x: number; z: number } | undefined;
+  let clusteredCount = -1;
   // Rejection sampling leaves space when a band is full; never force an overlap.
   for (let attempt = 0; attempt < layer.count * 40 && placements.length < layer.count; attempt += 1) {
     const model = layer.models[Math.floor(rng() * layer.models.length)]!;
@@ -371,9 +335,18 @@ function planPlacements(
     if (!source) continue;
     const scale = range(rng, minScale, maxScale);
     const radius = source.radius * scale;
-    const x = (rng() < 0.5 ? -1 : 1) * range(rng, Math.max(minDist, 5.4 + radius), maxDist);
-    if (Math.abs(x) > maxDist) continue;
-    const z = farZ + rng() * span;
+    const inner = Math.max(minDist, (layer.shoulder ? laneHalf + 0.3 : dirtHalf + 0.5) + radius);
+    const outer = maxDist - (layer.shoulder ? radius : 0);
+    if (inner > outer) continue;
+    if (layer.clusterSize && (clusteredCount !== Math.floor(placements.length / layer.clusterSize) || attempt % 40 === 0)) {
+      clusteredCount = Math.floor(placements.length / layer.clusterSize);
+      cluster = { x: (rng() < 0.5 ? -1 : 1) * range(rng, inner, outer), z: farZ + rng() * span };
+    }
+    const spread = layer.clusterSpread ?? 5;
+    const x = cluster ? cluster.x + range(rng, -spread / 2, spread / 2) :
+      (rng() < 0.5 ? -1 : 1) * range(rng, inner, outer);
+    if (Math.abs(x) < inner || Math.abs(x) > outer) continue;
+    const z = cluster ? wrappedSceneryZ(cluster.z + range(rng, -spread, spread), 0, farZ, span) : farZ + rng() * span;
     // Reserve complete landmark silhouettes, including the prop's own radius.
     const nearLandmarks = Math.abs(x) - radius < LANDMARK_REACH_X;
     if (nearLandmarks && isLandmarkZone(z, farZ, span, 7 + radius)) continue;
@@ -385,15 +358,6 @@ function planPlacements(
     placements.push({ model, x, y: heightAt(x) - 0.03, z, rotationY: rng() * Math.PI * 2, scale });
   }
   return placements;
-}
-
-function groupByModel(placements: Placement[]): Map<string, Placement[]> {
-  const byModel = new Map<string, Placement[]>();
-  for (const placement of placements) {
-    if (!byModel.has(placement.model)) byModel.set(placement.model, []);
-    byModel.get(placement.model)!.push(placement);
-  }
-  return byModel;
 }
 
 function buildInstancedMesh(
@@ -429,43 +393,13 @@ function buildInstancedMesh(
     composed.multiplyMatrices(placement, part.matrix);
 
     mesh.setMatrixAt(index, composed);
-    baseZ[index] = entry.z;
+    baseZ[index] = entry.anchorZ ?? entry.z;
     // Whatever z the part contributes on top of the placement, preserved so the
     // per-frame write can rebuild the full translation from the wrapped value.
-    zOffset[index] = composed.elements[Z_TRANSLATION_OFFSET] - entry.z;
+    zOffset[index] = composed.elements[Z_TRANSLATION_OFFSET] - baseZ[index]!;
   });
 
   mesh.instanceMatrix.needsUpdate = true;
   group.add(mesh);
   return { mesh, baseZ, zOffset, fullCount: placements.length, detail: Boolean(layer.detail) };
-}
-
-/** Curved, tapered blades in one geometry keep each tuft to a single draw batch. */
-function thickenGrass(THREE: ThreeModule, root: THREE_NS.Group) {
-  const rng = createRng(0x6a55);
-  root.traverse((node) => {
-    const mesh = node as THREE_NS.Mesh;
-    if (!mesh.isMesh) return;
-    const positions: number[] = [];
-    for (let blade = 0; blade < 11; blade += 1) {
-      const angle = rng() * Math.PI * 2;
-      const height = 0.18 + rng() * 0.25;
-      const x = (rng() - 0.5) * 0.24, z = (rng() - 0.5) * 0.24;
-      const point = (step: number, side: number) => {
-        const t = step / 3;
-        const width = 0.024 * (1 - t);
-        return [x + Math.cos(angle) * height * t * t * 0.55 + Math.sin(angle) * width * side,
-          height * t, z + Math.sin(angle) * height * t * t * 0.55 - Math.cos(angle) * width * side];
-      };
-      for (let segment = 0; segment < 3; segment += 1) {
-        positions.push(...point(segment, -1), ...point(segment, 1), ...point(segment + 1, 1),
-          ...point(segment, -1), ...point(segment + 1, 1), ...point(segment + 1, -1));
-      }
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.computeVertexNormals();
-    mesh.geometry = geometry;
-    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material.side = THREE.DoubleSide;
-  });
 }
