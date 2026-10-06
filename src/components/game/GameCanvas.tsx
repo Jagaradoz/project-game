@@ -203,6 +203,7 @@ export default function GameCanvas() {
               <span>Camera-free dev mode</span>
               <span>← / → or A / D to change lane</span>
               <span>Hold Space or the fire button to attack</span>
+              <span>↑ / W / J to jump</span>
             </>
           ) : (
             <>
@@ -215,9 +216,19 @@ export default function GameCanvas() {
                 Jog in place to attack
               </span>
               <span className="text-subtle">Arrow keys also work</span>
+              <span>Jump with both feet to clear roots</span>
             </>
           )}
         </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button type="button" onClick={actions.jump} disabled={snapshot.isOver || !snapshot.isSceneReady}
+            className="border-2 border-ink bg-primary px-4 py-2 text-sm font-black text-ink disabled:opacity-40">
+            Jump · ↑ / W / J
+          </button>
+          {snapshot.isCameraRunning && <span className="text-xs text-muted" role="status">
+            {!snapshot.feetVisible ? 'Step back until both feet are visible' : !snapshot.isJumpCalibrated ? 'Stand still to calibrate jumping' : 'Jump tracking ready'}
+          </span>}
+        </div>
 
         {snapshot.error && snapshot.isCameraRunning && (
           <Notice tone="error">{snapshot.error}</Notice>

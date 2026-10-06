@@ -9,6 +9,7 @@
 
 import type * as THREE_NS from 'three';
 import type { GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 import type { Palette } from '@/engine/render/world/palette';
 import type { CharacterDef, CharacterRoster, GameConfig, ThreeModule } from '@/engine/types';
@@ -191,11 +192,14 @@ export async function addPlayer(
       if (token !== loadToken) return false;
 
       if (playerObj.mixer) playerObj.mixer.stopAllAction();
+      const previousModel = modelContainer.children[0];
+      if (previousModel) playerObj.mixer?.uncacheRoot(previousModel);
+      if (!playerObj.fallbackVisible) playerObj.materials.forEach(material => material.dispose());
       while (modelContainer.children.length > 0) {
         modelContainer.remove(modelContainer.children[0]);
       }
 
-      const model = gltf.scene;
+      const model = clone(gltf.scene);
       const materials: THREE_NS.Material[] = [];
 
       model.traverse((node) => {

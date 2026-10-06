@@ -99,6 +99,15 @@ export const CONFIG = {
     maxCadenceSpm: 300,
   },
 
+  jump: {
+    calibrationMs: 900,
+    hipRise: 0.18,
+    footRise: 0.16,
+    confirmMs: 35,
+    landingMs: 180,
+    missingResetMs: 300,
+  },
+
   fps: {
     /** EMA weight for the new frame delta. */
     smoothing: 0.1,
@@ -258,6 +267,16 @@ export const CONFIG = {
     /** Enough meshes for the worst case; the pool is never grown at runtime. */
     enemyPoolSize: 24,
 
+    jump: { durationMs: 800, height: 1.65, clearance: 0.8 },
+    obstacle: { firstMs: 8500, intervalMs: 8500, radius: 0.45, poolSize: 4 },
+    boss: { triggerKills: 12, holdZ: -20, attackIntervalMs: 2800, telegraphMs: 1100 },
+    enemyTypes: {
+      weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, height: 1.8, radius: 0.6, color: '#9bdd66' },
+      normal: { name: 'Bramble Skeleton', path: '/assets/models/enemies/animated/BrambleSkeleton.glb', hp: 2, approachSpeed: 2, height: 2.1, radius: 0.65, color: '#e5d7b1' },
+      tank: { name: 'Shroom Brute', path: '/assets/models/enemies/animated/ShroomBrute.glb', hp: 6, approachSpeed: -3, height: 2.7, radius: 0.9, color: '#e9a15b' },
+      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 40, approachSpeed: 0, height: 5, radius: 1.4, color: '#df7650' },
+    },
+
     enemy: {
       path: '/assets/models/characters/Skeleton_Minion.glb',
       scale: 1.15,
@@ -318,31 +337,32 @@ export const CONFIG = {
         animations: {
           run: 'Run',
           shoot: 'Attack',
+          hit: 'Hit', death: 'Death', jump: 'Jump', idle: 'Idle',
         },
       },
       druid: {
         id: 'druid', name: 'Druid',
         path: '/assets/models/characters/animated/Druid.glb',
         scale: 1.25, rotationY: Math.PI, offsetY: 0,
-        animations: { run: 'Run', shoot: 'Attack' },
+        animations: { run: 'Run', shoot: 'Attack', hit: 'Hit', death: 'Death', jump: 'Jump', idle: 'Idle' },
       },
       skeletonMage: {
         id: 'skeletonMage', name: 'Skeleton Mage',
         path: '/assets/models/characters/animated/SkeletonMage.glb',
         scale: 1.25, rotationY: Math.PI, offsetY: 0,
-        animations: { run: 'Run', shoot: 'Attack' },
+        animations: { run: 'Run', shoot: 'Attack', hit: 'Hit', death: 'Death', jump: 'Jump', idle: 'Idle' },
       },
       witch: {
         id: 'witch', name: 'Witch',
         path: '/assets/models/characters/animated/Witch.glb',
         scale: 1.25, rotationY: Math.PI, offsetY: 0,
-        animations: { run: 'Run', shoot: 'Attack' },
+        animations: { run: 'Run', shoot: 'Attack', hit: 'Hit', death: 'Death', jump: 'Jump', idle: 'Idle' },
       },
       magicalGirl: {
         id: 'magicalGirl', name: 'Magical Girl',
         path: '/assets/models/characters/animated/MagicalGirl.glb',
         scale: 1.25, rotationY: Math.PI, offsetY: 0,
-        animations: { run: 'Run', shoot: 'Attack' },
+        animations: { run: 'Run', shoot: 'Attack', hit: 'Hit', death: 'Death', jump: 'Jump', idle: 'Idle' },
       },
     },
     defaultCharacter: 'mage',

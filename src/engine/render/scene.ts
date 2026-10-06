@@ -14,16 +14,17 @@ import { CONFIG } from '@/engine/config';
 import type { GameConfig, ShadowQuality, ThreeModule } from '@/engine/types';
 import type { CloudOptions } from '@/engine/render/world/clouds';
 import type { Palette } from '@/engine/render/world/palette';
-import type { ProjectileSource } from '@/engine/render/actors/player';
 import { GOLDEN_FOREST } from '@/engine/render/world/palette';
 import { addSky } from '@/engine/render/world/sky';
 import { configureRenderer, addLighting, SHADOW_QUALITY } from '@/engine/render/world/lighting';
-import { addGround, trailHalfWidth, TRAIL_Y } from '@/engine/render/world/ground';
+import { addGround, trailHalfWidth } from '@/engine/render/world/ground';
 import { addScatter } from '@/engine/render/world/scatter';
 import { addLandmarks } from '@/engine/render/world/landmarks';
 import { createTrailEdge } from '@/engine/render/world/trailEdge';
 import { addClouds } from '@/engine/render/world/clouds';
 import { addEnemyPool } from '@/engine/render/actors/enemies';
+import { addSpellPool } from '@/engine/render/actors/spells';
+import { addObstaclePool } from '@/engine/render/actors/obstacles';
 import { addPlayer } from '@/engine/render/actors/player';
 import { createEffects } from '@/engine/render/actors/effects';
 
@@ -68,7 +69,8 @@ export async function createScene(
   const clouds = addClouds(THREE, scene, palette, cloudOptions);
   const player = await addPlayer(THREE, scene, config, palette, loader);
   const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
-  const bulletPool = addBulletPool(THREE, scene, config, palette);
+  const bulletPool = await addSpellPool(THREE, scene, config, loader);
+  const obstaclePool = await addObstaclePool(THREE, scene, config, loader);
   const effects = createEffects(THREE, scene, palette);
 
   // Short, damped camera impulses give hits and kills physical weight while
@@ -138,8 +140,10 @@ export async function createScene(
     player,
     enemyPool,
     bulletPool,
+    obstaclePool,
     effects,
     cameraFeedback,
+    lastEventsMs: -1,
     trailEdge,
     setQuality,
     get quality() {
@@ -149,6 +153,8 @@ export async function createScene(
     render,
     dispose() {
       cameraFeedback.dispose();
+      enemyPool.dispose();
+      bulletPool.dispose();
       const resources = new Set<{ dispose(): void }>();
       scene.traverse((object) => {
         const mesh = object as THREE_NS.Mesh;
@@ -237,56 +243,5 @@ function addMotes(THREE: ThreeModule, scene: THREE_NS.Scene, palette: Palette) {
     items,
     span: MOTE_SPAN,
     startZ,
-  };
-}
-
-/**
- * Projectiles. The default is a glowing bolt; a character that carries a weapon
- * swaps its own blade in via setProjectile, so what the player throws always
- * matches who they are.
- */
-function addBulletPool(
-  THREE: ThreeModule,
-  scene: THREE_NS.Scene,
-  config: GameConfig,
-  palette: Palette,
-) {
-  const boltGeometry = new THREE.BoxGeometry(
-    config.bulletRadius * 2,
-    config.bulletRadius * 2,
-    config.bulletRadius * 8,
-  );
-  const boltMaterial = new THREE.MeshStandardMaterial({
-    color: palette.accents.bullet,
-    emissive: new THREE.Color(palette.accents.bullet).multiplyScalar(0.4),
-    roughness: 0.4,
-  });
-
-  const items = Array.from({ length: config.bulletPoolSize }, () => {
-    const pivot = new THREE.Group();
-    // Widened deliberately: the blade's geometry and material are swapped for
-    // the character's own weapon whenever one is available.
-    const mesh: THREE_NS.Mesh = new THREE.Mesh(boltGeometry, boltMaterial);
-    mesh.castShadow = true;
-    pivot.add(mesh);
-    pivot.position.y = TRAIL_Y + config.playerRadius;
-    pivot.visible = false;
-    scene.add(pivot);
-    return { mesh: pivot, blade: mesh };
-  });
-
-  return {
-    items,
-    setProjectile(source: ProjectileSource | null | undefined) {
-      for (const entry of items) {
-        entry.blade.geometry = source?.geometry ?? boltGeometry;
-        entry.blade.material = source?.material ?? boltMaterial;
-        // A weapon model points along its own axis and sits at hand height;
-        // laid flat and nose-forward it reads as a thrown blade.
-        entry.blade.rotation.set(source ? -Math.PI / 2 : 0, 0, 0);
-        entry.blade.position.set(0, 0, source ? config.bulletRadius * 2 : 0);
-        entry.blade.scale.setScalar(source ? 1.1 : 1);
-      }
-    },
   };
 }

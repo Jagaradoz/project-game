@@ -30,6 +30,7 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   let lastPoseLabel: LateralLabel | null = null;
   let hasPose = false;
   let devFire = false;
+  let pendingJump = false;
   let detachKeyboard: () => void = () => {};
 
   /** `label` is null when no body is tracked. */
@@ -48,6 +49,7 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
 
   /** No body tracked: hold the last lane and hold fire. The march continues. */
   function clearPose(): void {
+    pendingJump = false;
     hasPose = true;
     isFiring = false;
     lastPoseLabel = null;
@@ -65,7 +67,13 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
       const key = event as KeyboardEvent;
       const focusedControl = key.target instanceof HTMLElement
         && key.target.closest('button, input, select, textarea, a');
-      if (key.key === ' ' && !focusedControl) {
+      if (focusedControl) return;
+      if (['ArrowUp', 'w', 'W', 'j', 'J'].includes(key.key)) {
+        if (!key.repeat) pendingJump = true;
+        key.preventDefault();
+        return;
+      }
+      if (key.key === ' ') {
         devFire = true;
         key.preventDefault();
         return;
@@ -84,6 +92,7 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
     };
     const onBlur = () => {
       devFire = false;
+      pendingJump = false;
     };
 
     target.addEventListener('keydown', onKeyDown);
@@ -99,10 +108,13 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   }
 
   function read(): GameInput {
-    return { lane, isFiring: isFiring || devFire };
+    const jump = pendingJump;
+    pendingJump = false;
+    return { lane, isFiring: isFiring || devFire, ...(jump ? { jump: true } : {}) };
   }
 
   function reset(): void {
+    pendingJump = false;
     lane = clampLane((config.laneCount - 1) / 2, config);
     lastPoseLabel = null;
     devFire = false;
@@ -110,6 +122,7 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   }
 
   return {
+    requestJump: () => { pendingJump = true; },
     setPose, clearPose, attachKeyboard, detach: () => detachKeyboard(), read, reset, step,
     setDevFire: (active) => { devFire = active; },
   };

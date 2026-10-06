@@ -54,10 +54,11 @@ export default function CalibrationPanel() {
    */
   const hasLeaned = snapshot.lateralChangeCount > 0;
   const hasJogged = snapshot.stepCount > 0;
+  const hasJumped = snapshot.jumpCount > 0;
 
   const checks = useMemo(
-    () => buildChecks(snapshot, { hasLeaned, hasJogged }),
-    [snapshot, hasLeaned, hasJogged],
+    () => buildChecks(snapshot, { hasLeaned, hasJogged, hasJumped }),
+    [snapshot, hasLeaned, hasJogged, hasJumped],
   );
   const isReady = checks.every((check) => check.isPassing);
 

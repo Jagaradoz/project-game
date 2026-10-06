@@ -116,7 +116,7 @@ export default function PracticePanel() {
                 label="Total movements"
                 icon={<Activity size={16} />}
                 value={formatNumber(snapshot.movementCount)}
-                detail="Jog steps plus sideways steps"
+                detail="Jog steps, sideways steps and jumps"
               />
               <StatTile
                 label="Jog steps"
@@ -130,6 +130,7 @@ export default function PracticePanel() {
                 detail={`${movingShare}% of the session`}
               />
               <StatTile label="Total time" value={formatDuration(sessionMs)} />
+              <StatTile label="Jumps" value={formatNumber(snapshot.jumpCount)} detail={snapshot.feetVisible ? 'Both feet tracked' : 'Keep both feet in frame'} />
               <StatTile
                 label="Current cadence"
                 icon={<Gauge size={16} />}

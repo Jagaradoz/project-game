@@ -20,12 +20,15 @@ export interface CalibrationCheck {
  */
 export function buildChecks(
   snapshot: HudSnapshot,
-  rehearsal: { hasLeaned: boolean; hasJogged: boolean },
+  rehearsal: { hasLeaned: boolean; hasJogged: boolean; hasJumped?: boolean },
 ): CalibrationCheck[] {
   const lighting = classifyLighting(snapshot.luma);
   const distance = classifyDistance(snapshot.shoulderWidth);
 
   return [
+    { id: 'feet', label: 'Both feet visible', detail: 'Step back so your full body and both feet stay inside the frame', isPassing: snapshot.feetVisible },
+    { id: 'jumpCalibration', label: 'Jump baseline captured', detail: snapshot.isJumpCalibrated ? 'Standing height captured' : 'Stand still with both feet on the floor', isPassing: snapshot.isJumpCalibrated },
+    { id: 'jump', label: 'Jump tested', detail: rehearsal.hasJumped ? 'Two-foot jump detected' : 'Make a small jump with both feet, then land', isPassing: Boolean(rehearsal.hasJumped) },
     {
       id: 'camera',
       label: 'Camera is on',

@@ -8,21 +8,13 @@
  * instance buffer rather than moving Object3Ds.
  */
 
-import type * as THREE_NS from 'three';
 
 import type { createScene } from '@/engine/render/scene';
-import type { EnemyPool } from '@/engine/render/actors/enemies';
 import type { PlayerRefs } from '@/engine/render/actors/player';
-import type { GameBody, GameConfig, GameState, ScrollLayer } from '@/engine/types';
+import type { GameConfig, GameState, ScrollLayer } from '@/engine/types';
 
 /** Everything createScene hands back. The sync layer only ever reads from it. */
 export type SceneRefs = Awaited<ReturnType<typeof createScene>>;
-
-/** A pooled bullet: a pivot that moves, and a blade that tumbles inside it. */
-interface BulletSlot {
-  mesh: THREE_NS.Object3D;
-  blade: THREE_NS.Mesh;
-}
 
 /** Motes add drift on top of the shared recycling contract. */
 interface MoteLayer extends ScrollLayer {
@@ -31,6 +23,7 @@ interface MoteLayer extends ScrollLayer {
 
 import { CONFIG } from '@/engine/config';
 import { laneToX, isInvulnerable } from '@/engine/core/state';
+import { TRAIL_Y } from '@/engine/render/world/ground';
 
 /** Blink cycle while the grace window is open. */
 const BLINK_PERIOD_MS = 160;
@@ -45,8 +38,9 @@ export function syncScene(
   actorsVisible = true,
 ): void {
   const dtSec = Math.min(dtMs / 1000, 0.1);
+  const newEvents = sceneRefs.lastEventsMs !== state.elapsedMs;
 
-  if (state.justHit) sceneRefs.cameraFeedback?.hit();
+  if (newEvents && state.justHit) sceneRefs.cameraFeedback?.hit();
   sceneRefs.cameraFeedback?.update(dtSec);
 
   if (sceneRefs.player) {
@@ -54,12 +48,13 @@ export function syncScene(
   }
 
   if (actorsVisible) {
-    syncPlayer(sceneRefs.player, state, dtSec, config);
-    syncEnemies(sceneRefs.enemyPool, state.enemies, state.elapsedMs, dtSec, config);
-    stageKills(sceneRefs, state, config);
+    syncPlayer(sceneRefs.player, newEvents ? state : { ...state, justHit: false, justFired: false }, dtSec, config);
+    sceneRefs.enemyPool?.sync(state.enemies, state.elapsedMs, dtSec, state.bossWarningLane !== null);
+    sceneRefs.obstaclePool?.sync(state.obstacles, state.elapsedMs);
+    if (newEvents) stageKills(sceneRefs, state, config);
     sceneRefs.enemyPool?.updateCorpses(dtSec, state.speed);
     sceneRefs.effects?.update(dtSec, state.speed);
-    syncBullets(sceneRefs.bulletPool?.items, state.bullets, state.elapsedMs, config);
+    sceneRefs.bulletPool?.sync(state, dtSec, sceneRefs.player?.characterId ?? config.defaultCharacter);
   } else {
     if (sceneRefs.enemyPool) {
       for (const slot of sceneRefs.enemyPool.items) slot.group.visible = false;
@@ -68,6 +63,8 @@ export function syncScene(
     if (sceneRefs.bulletPool) {
       for (const slot of sceneRefs.bulletPool.items) slot.mesh.visible = false;
     }
+    sceneRefs.obstaclePool?.hide();
+    sceneRefs.bulletPool?.hide();
   }
 
   sceneRefs.trailEdge?.update(state.distance);
@@ -76,6 +73,7 @@ export function syncScene(
   sceneRefs.landmarks?.scroll(state.distance);
   syncMotes(sceneRefs.motes as unknown as MoteLayer, state.distance, state.elapsedMs);
   sceneRefs.clouds?.scroll(state.distance, state.elapsedMs);
+  sceneRefs.lastEventsMs = state.elapsedMs;
 }
 
 function syncPlayer(
@@ -91,6 +89,7 @@ function syncPlayer(
 
   player.group.position.x += (targetX - currentX) * LANE_LERP;
   player.group.position.z = config.playerZ;
+  player.group.position.y = TRAIL_Y + state.jumpHeight;
 
   // Bank into a lane change, then settle back upright.
   const deltaX = targetX - currentX;
@@ -100,7 +99,7 @@ function syncPlayer(
   player.group.rotation.y += (targetYaw - player.group.rotation.y) * 0.2;
 
   const isBlinkOn = Math.floor(state.elapsedMs / BLINK_PERIOD_MS) % 2 === 1;
-  const opacity = isInvulnerable(state) && isBlinkOn ? BLINK_OPACITY : 1;
+  const opacity = !state.isOver && isInvulnerable(state) && isBlinkOn ? BLINK_OPACITY : 1;
   if (player.materials) {
     for (const material of player.materials) material.opacity = opacity;
   }
@@ -119,93 +118,23 @@ function syncPlayer(
 /** Each actual shot starts a fresh attack; rapid shots cut off the prior swing. */
 export function updatePlayerAnimation(
   player: PlayerRefs,
-  state: Pick<GameState, 'isOver' | 'isFiring' | 'justFired'>,
+  state: Pick<GameState, 'isOver' | 'isFiring' | 'justFired'> & Partial<Pick<GameState, 'isCleared' | 'justHit' | 'jumpStartedMs'>>,
   dtSec: number,
 ): void {
   if (state.isOver) {
-    player.playAnimation('death', 0.2, false);
+    player.playAnimation(state.isCleared ? 'idle' : 'death', 0.2, Boolean(state.isCleared));
+  } else if (state.justHit) {
+    player.playAnimation('hit', .04, false, true);
+  } else if (player.currentActionName === 'hit' && player.currentAction?.isRunning()) {
+    // Complete recoil even when the jogging detector keeps firing.
+  } else if (state.jumpStartedMs != null) {
+    player.playAnimation('jump', .06, false);
   } else if (state.justFired) {
     player.playAnimation('shoot', 0.06, false, true);
   } else if (player.currentActionName !== 'shoot' || !player.currentAction?.isRunning()) {
     player.playAnimation('run', 0.1, true);
   }
   player.mixer?.update(dtSec);
-}
-
-/**
- * Enemies are skinned meshes, so the work is capped: the pool is walked in order
- * and only the first few close enough to read get their mixer stepped. Anything
- * further away holds its pose.
- */
-function syncEnemies(
-  pool: EnemyPool | null | undefined,
-  enemies: GameBody[],
-  elapsedMs: number,
-  dtSec: number,
-  config: GameConfig,
-): void {
-  if (!pool) return;
-
-  let animated = 0;
-
-  for (let index = 0; index < pool.items.length; index += 1) {
-    const slot = pool.items[index]!;
-    const enemy = enemies[index];
-
-    if (!enemy) {
-      slot.group.visible = false;
-      continue;
-    }
-
-    slot.group.visible = true;
-    slot.group.position.x = laneToX(enemy.lane, config);
-    slot.group.position.z = enemy.z;
-
-    if (slot.aura) {
-      // Threats become louder as they approach without changing collision rules.
-      const proximity = Math.min(1, Math.max(0, (enemy.z + 55) / 55));
-      const pulse = 1 + Math.sin(elapsedMs * 0.009 + index * 1.7) * 0.12;
-      slot.aura.scale.setScalar(pulse * (0.82 + proximity * 0.28));
-    }
-
-    if (!pool.isRigged) {
-      // The stand-in has nothing to animate, so it tumbles instead.
-      if (!slot.spin) continue;
-      slot.spin.rotation.y = elapsedMs * 0.003 + index;
-      slot.spin.rotation.x = elapsedMs * 0.002 + index;
-      continue;
-    }
-
-    if (slot.mixer && animated < pool.animatedCount && enemy.z > pool.animateBeyondZ) {
-      slot.mixer.update(dtSec);
-      animated += 1;
-    }
-  }
-}
-
-function syncBullets(
-  pool: BulletSlot[] | null | undefined,
-  bullets: GameBody[],
-  elapsedMs: number,
-  config: GameConfig,
-): void {
-  if (!pool) return;
-
-  for (let index = 0; index < pool.length; index += 1) {
-    const { mesh } = pool[index]!;
-    const bullet = bullets[index];
-
-    if (!bullet) {
-      mesh.visible = false;
-      continue;
-    }
-
-    mesh.visible = true;
-    mesh.position.x = laneToX(bullet.lane, config);
-    mesh.position.z = bullet.z;
-    // Tumbling, so a thrown blade does not slide through the air rigid.
-    mesh.rotation.z = elapsedMs * 0.02 + index;
-  }
 }
 
 /**
@@ -220,7 +149,7 @@ function stageKills(sceneRefs: SceneRefs, state: GameState, config: GameConfig):
 
   for (const kill of state.justKilled) {
     const x = laneToX(kill.lane, config);
-    sceneRefs.enemyPool?.spawnDeath(x, kill.z);
+    sceneRefs.enemyPool?.spawnDeath(x, kill.z, kill.kind);
     sceneRefs.effects?.burst(x, config.enemyRadius + 0.6, kill.z);
   }
 }

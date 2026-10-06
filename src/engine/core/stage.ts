@@ -87,6 +87,7 @@ export function resolveStageRules(
 
   return {
     ...game,
+    requireBoss: true,
     spawnIntervalMs,
     // The floor must stay a floor. Scaling both by the same factor keeps that
     // true; scaling only one could invert them and make the ramp go backwards.

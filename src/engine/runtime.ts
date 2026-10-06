@@ -19,6 +19,7 @@ import { createGameState, restartGame, updateGame } from '@/engine/core/state';
 import { DEFAULT_DIFFICULTY, resolveStageRules } from '@/engine/core/stage';
 import { createInput } from '@/engine/core/input';
 import { createJogState, updateJog } from '@/engine/detectors/jog';
+import { createJumpState, updateJump } from '@/engine/detectors/jump';
 import {
   LATERAL,
   createLateralState,
@@ -95,6 +96,15 @@ export interface RuntimeOptions {
 }
 
 export interface HudSnapshot {
+  jumpCount: number;
+  feetVisible: boolean;
+  isJumpCalibrated: boolean;
+  isAirborne: boolean;
+  obstacleDistance: number | null;
+  bossHp: number | null;
+  bossMaxHp: number;
+  bossDefeated: boolean;
+  bossWarningLane: number | null;
   score: number;
   hp: number;
   maxHp: number;
@@ -108,7 +118,7 @@ export interface HudSnapshot {
   elapsedMs: number;
 
   /**
-   * What TOR 3 calls จำนวนการเคลื่อนไหว: jog steps plus lane changes. The system
+   * What TOR 3 calls จำนวนการเคลื่อนไหว: jog steps, lane changes and jumps. The system
    * detected these -- it is not a calibrated energy figure, and
    * src/types/api.ts keeps that distinction too.
    */
@@ -160,6 +170,7 @@ const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
 ];
 
 export interface GameRuntime {
+  jump(): void;
   start(): void;
   startCamera(): Promise<void>;
   stopCamera(): void;
@@ -192,6 +203,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let game: GameState = createGameState(options.seed ?? 1, rules);
   let lateral: LateralState = createLateralState();
   let jog: JogState = createJogState();
+  let jump = createJumpState();
   const input = createInput();
 
   let sceneRefs: SceneRefs | null = null;
@@ -267,6 +279,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   function buildSnapshot(): HudSnapshot {
     return {
       score: game.score,
+      jumpCount: jump.jumpCount,
+      feetVisible: jump.feetVisible,
+      isJumpCalibrated: jump.isCalibrated,
+      isAirborne: game.jumpStartedMs !== null,
+      obstacleDistance: game.obstacles.filter(o => o.z < rules.playerZ && !o.cleared).reduce<number | null>((near, o) => near === null ? -o.z : Math.min(near, -o.z), null),
+      bossHp: game.enemies.find(e => e.kind === 'boss')?.hp ?? null,
+      bossMaxHp: rules.enemyTypes.boss.hp,
+      bossDefeated: game.bossDefeated,
+      bossWarningLane: game.bossWarningLane,
       hp: game.hp,
       maxHp: rules.maxHp,
       distance: game.distance,
@@ -276,7 +297,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       goalKills: Number.isFinite(rules.goalKills) ? rules.goalKills : null,
       isCleared: game.isCleared,
       elapsedMs: game.elapsedMs,
-      movementCount: jog.stepCount + lateralChangeCount,
+      movementCount: jog.stepCount + lateralChangeCount + jump.jumpCount,
       lateralChangeCount,
       movementMs,
 
@@ -418,6 +439,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     lateral = updateLateral(lateral, landmarks, nowMs);
     jog = updateJog(jog, landmarks, nowMs);
+    jump = updateJump(jump, landmarks, nowMs);
 
     trackCalibrationReadouts(landmarks as PoseLandmarks | null, nowMs);
     trackMovement(nowMs);
@@ -427,6 +449,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       input.clearPose();
     } else {
       input.setPose(lateral.label, jog.isJogging);
+      if (jump.justJumped) input.requestJump();
     }
 
     if (ctx) {
@@ -509,7 +532,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     if (!sceneRefs) return;
     await sceneRefs.player.loadCharacter(pendingCharacter);
     if (isDisposed) return;
-    sceneRefs.bulletPool.setProjectile(sceneRefs.player.projectile);
+    sceneRefs.bulletPool.setCharacter(charId);
   }
 
   /* ------------------------------------------------------- test hook ------ */
@@ -566,15 +589,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
        * drives the actual game logic, so what gets photographed is a state the
        * game can really be in.
        */
-      simulate(seconds: number, simOptions: { lane?: number; firing?: boolean } = {}) {
+      simulate(seconds: number, simOptions: { lane?: number; firing?: boolean; jump?: boolean } = {}) {
         const stepMs = 1000 / 60;
         const steps = Math.max(0, Math.round(((Number(seconds) || 0) * 1000) / stepMs));
         for (let step = 0; step < steps; step += 1) {
           game = updateGame(
             game,
-            { lane: simOptions.lane ?? game.lane, isFiring: simOptions.firing !== false },
-            stepMs,
-          );
+            { lane: simOptions.lane ?? game.lane, isFiring: simOptions.firing !== false, jump: step === 0 && simOptions.jump },
+              stepMs,
+              rules,
+            );
           // Sync the view too, or per-frame visuals the reducer only reports
           // once -- deaths, hit bursts -- are stepped straight past. Only for
           // the tail: syncScene walks every scatter instance.
@@ -587,6 +611,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         const player = sceneRefs?.player;
         return {
           dist: Math.round(game.distance),
+          elapsedMs: game.elapsedMs,
+          isOver: game.isOver,
+          isCleared: game.isCleared,
+          enemies: game.enemies.map(e => ({ id: e.id, kind: e.kind, hp: e.hp, z: e.z, lane: e.lane })),
+          roots: game.obstacles.map(o => ({ side: o.side, z: o.z, cleared: o.cleared })),
+          jumpHeight: game.jumpHeight,
+          jumpCount: game.jumpCount,
+          bossDefeated: game.bossDefeated,
+          bossWarningLane: game.bossWarningLane,
           hp: game.hp,
           score: game.score,
           calls: info?.calls ?? null,
@@ -651,7 +684,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
         isPoseRunning = true;
         isCameraSkipped = false;
-        setStatus('Running. Stand still for a second to calibrate center.');
+        setStatus('Running. Stand still with both feet visible to calibrate centre and jumping.');
         schedulePoseFrame();
       } catch (error) {
         if (isDisposed || requestId !== cameraRequestId) return;
@@ -664,6 +697,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     stopCamera() {
+      jump = { ...createJumpState(), jumpCount: jump.jumpCount };
       cameraRequestId += 1;
       isPoseRunning = false;
       cancelPoseFrame();
@@ -688,13 +722,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     recalibrate() {
+      jump = { ...createJumpState(), jumpCount: jump.jumpCount };
       lateral = recalibrateLateral(lateral);
-      setStatus('Recalibrating center -- stand still for a second.');
+      setStatus('Recalibrating centre and jumping — stand still with both feet visible.');
     },
 
     setDevFire(active: boolean) {
       if (!isDisposed && mode === 'game') input.setDevFire(active);
     },
+
+    jump() { if (!isDisposed && mode === 'game') input.requestJump(); },
 
     restart() {
       game = restartGame(game, rules);
@@ -728,7 +765,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         enemiesKilled: game.killCount,
         durationMs: Math.round(game.elapsedMs),
         distanceM: Math.round(game.distance),
-        movementCount: jog.stepCount + lateralChangeCount,
+        movementCount: jog.stepCount + lateralChangeCount + jump.jumpCount,
         isCleared: game.isCleared,
       };
     },
@@ -782,6 +819,10 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   };
 
   function resetMovementTallies(): void {
+    sceneRefs?.enemyPool.reset();
+    sceneRefs?.bulletPool.reset();
+    if (sceneRefs) sceneRefs.lastEventsMs = -1;
+    jump = { ...jump, jumpCount: 0, justJumped: false };
     lateralChangeCount = 0;
     lastCountedLateral = LATERAL.CENTER;
     movementMs = 0;

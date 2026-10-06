@@ -25,6 +25,9 @@ import type { RunSummary, StageSelection } from '@/engine/types';
 
 /** Stable reference, so a render before the engine exists cannot loop. */
 const IDLE_SNAPSHOT: HudSnapshot = {
+  jumpCount: 0, feetVisible: false, isJumpCalibrated: false, isAirborne: false,
+  obstacleDistance: null, bossHp: null, bossMaxHp: CONFIG.game.enemyTypes.boss.hp,
+  bossDefeated: false, bossWarningLane: null,
   score: 0,
   hp: CONFIG.game.maxHp,
   maxHp: CONFIG.game.maxHp,
@@ -77,6 +80,7 @@ export interface UseGameRuntimeOptions {
 
 /** Stable action surface, so components never depend on the runtime existing. */
 export interface GameActions {
+  jump: () => void;
   startCamera: () => Promise<void>;
   stopCamera: () => void;
   skipCamera: () => void;
@@ -175,6 +179,7 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
 
   const actions = useMemo<GameActions>(
     () => ({
+      jump: () => runtimeRef.current?.jump(),
       startCamera: () => runtimeRef.current?.startCamera() ?? Promise.resolve(),
       stopCamera: () => runtimeRef.current?.stopCamera(),
       skipCamera: () => runtimeRef.current?.skipCamera(),

@@ -33,6 +33,10 @@ const LCG_MODULUS = 2 ** 32;
 
 export function createGameState(seed = 1, config: RunConfig = CONFIG.game): GameState {
   return {
+    nextId: 1, obstacles: [], nextObstacleMs: config.obstacle.firstMs,
+    jumpStartedMs: null, jumpHeight: 0, jumpHeld: false, jumpCount: 0,
+    hitAtMs: -Infinity, justImpacts: [], bossSpawned: false, bossDefeated: false,
+    bossWarningLane: null, bossAttackAtMs: null, nextBossAttackMs: 0, justBossAttack: false,
     lane: centreLane(config),
     hp: config.maxHp,
     score: 0,
@@ -88,8 +92,8 @@ export function updateGame(
   config: RunConfig = CONFIG.game,
 ): GameState {
   if (state.isOver) {
-    if (!state.justHit && !state.justFired && state.justKilled.length === 0) return state;
-    return { ...state, justHit: false, justFired: false, justKilled: [] };
+    if (!state.justHit && !state.justFired && state.justKilled.length === 0 && !state.justImpacts.length && !state.justBossAttack) return state;
+    return { ...state, justHit: false, justFired: false, justKilled: [], justImpacts: [], justBossAttack: false };
   }
 
   const stepMs = Math.min(Math.max(dtMs, 0), config.maxFrameMs);
@@ -101,10 +105,49 @@ export function updateGame(
   const distance = state.distance + speed * stepSec;
   const lane = clampLane(input.lane, config);
 
-  const movedEnemies = state.enemies.map((enemy) => advance(enemy, speed * stepSec));
+  const wantsJump = Boolean(input.jump);
+  const tookOff = wantsJump && !state.jumpHeld && state.jumpStartedMs === null;
+  let jumpStartedMs = tookOff ? elapsedMs : state.jumpStartedMs;
+  if (jumpStartedMs !== null && elapsedMs - jumpStartedMs >= config.jump.durationMs) jumpStartedMs = null;
+  const jumpPhase = jumpStartedMs === null ? 0 : (elapsedMs - jumpStartedMs) / config.jump.durationMs;
+  const jumpHeight = jumpStartedMs === null ? 0 : Math.sin(Math.PI * jumpPhase) * config.jump.height;
+  const movedEnemies = state.enemies.map((enemy) => {
+    const extra = enemy.kind ? config.enemyTypes[enemy.kind].approachSpeed : 0;
+    const moved = advance(enemy, Math.max(2, speed + extra) * stepSec);
+    if (enemy.kind === 'boss') moved.z = Math.min(config.boss.holdZ, moved.z);
+    return moved;
+  });
   const movedBullets = state.bullets.map((bullet) => advance(bullet, -config.bulletSpeed * stepSec));
 
-  const shots = resolveShots(movedBullets, movedEnemies, config);
+  const shots = resolveShots(movedBullets, movedEnemies, config, elapsedMs);
+
+  const obstacles = state.obstacles.map(o => ({ ...o, previousZ: o.z, z: o.z + speed * stepSec }));
+  let rootHit = false;
+  for (const root of obstacles) {
+    const reach = config.playerRadius + config.obstacle.radius;
+    if (!root.cleared && root.z >= config.playerZ - reach && root.previousZ <= config.playerZ + reach) {
+      root.cleared = true;
+      rootHit ||= jumpHeight < config.jump.clearance;
+    }
+  }
+  const liveBoss = shots.enemies.find(e => e.kind === 'boss');
+  const bossDefeated = state.bossDefeated || shots.killed.some(e => e.kind === 'boss');
+  let bossWarningLane = liveBoss ? state.bossWarningLane : null;
+  let bossAttackAtMs = liveBoss ? state.bossAttackAtMs : null;
+  let nextBossAttackMs = state.nextBossAttackMs;
+  let bossHit = false;
+  let justBossAttack = false;
+  if (liveBoss && liveBoss.z >= config.boss.holdZ) {
+    if (bossAttackAtMs !== null && elapsedMs >= bossAttackAtMs) {
+      bossHit = lane === bossWarningLane;
+      justBossAttack = true;
+      bossWarningLane = null; bossAttackAtMs = null;
+      nextBossAttackMs = elapsedMs + config.boss.attackIntervalMs;
+    } else if (bossAttackAtMs === null && elapsedMs >= nextBossAttackMs) {
+      bossWarningLane = lane;
+      bossAttackAtMs = elapsedMs + config.boss.telegraphMs;
+    }
+  }
 
   // While the grace window is open, enemies pass straight through instead of
   // being consumed -- being hit must never clear the road for free.
@@ -112,11 +155,11 @@ export function updateGame(
   const survivors = isGraced
     ? shots.enemies
     : shots.enemies.filter((enemy) => !isHit(enemy, lane, config));
-  const hitCount = shots.enemies.length - survivors.length;
+  const hitCount = isGraced ? 0 : shots.enemies.length - survivors.length + Number(rootHit || bossHit);
 
   const spawned = spawnDue(
     { enemies: survivors.filter((enemy) => enemy.z <= config.despawnZ), seed: state.seed },
-    { elapsedMs, nextSpawnMs: state.nextSpawnMs, progress },
+    { elapsedMs, nextSpawnMs: state.nextSpawnMs, progress, nextId: state.nextId },
     config,
   );
 
@@ -133,10 +176,32 @@ export function updateGame(
   // The stage goal, if this run has one. `goalKills` is absent for an endless
   // run, and a run with no goal can never be cleared -- only ended.
   const killCount = state.killCount + shots.kills;
-  const isCleared = config.goalKills !== undefined && killCount >= config.goalKills;
+  const isCleared = config.goalKills !== undefined && killCount >= config.goalKills && (!config.requireBoss || bossDefeated);
+  let nextId = spawned.nextId;
+  const trigger = config.requireBoss && config.goalKills !== undefined ? Math.max(0, config.goalKills - 1) : config.boss.triggerKills;
+  const shouldSpawnBoss = !state.bossSpawned && killCount >= trigger;
+  if (shouldSpawnBoss) {
+    spawned.enemies = spawned.enemies.filter(e => e.z > -30);
+    spawned.enemies.push({ id: nextId++, kind: 'boss', hp: config.enemyTypes.boss.hp, lane: 1, z: config.spawnZ, previousZ: config.spawnZ });
+  } else if (state.bossSpawned && !bossDefeated) {
+    spawned.enemies = spawned.enemies.filter(e => e.kind === 'boss' || e.z > -30);
+  }
+  let nextObstacleMs = state.nextObstacleMs;
+  const retainedRoots = obstacles.filter(o => o.z <= config.despawnZ);
+  if (elapsedMs >= nextObstacleMs && retainedRoots.length < config.obstacle.poolSize && !liveBoss && !shouldSpawnBoss) {
+    const roll = random(spawned.seed); spawned.seed = roll.seed;
+    retainedRoots.push({ id: nextId++, side: roll.value < .5 ? -1 : 1, z: config.spawnZ, previousZ: config.spawnZ });
+    spawned.enemies = spawned.enemies.filter(e => e.z > config.spawnZ + 12);
+    nextObstacleMs = elapsedMs + config.obstacle.intervalMs;
+  }
 
   return {
     ...state,
+    nextId, obstacles: retainedRoots, nextObstacleMs, jumpStartedMs, jumpHeight,
+    jumpHeld: wantsJump, jumpCount: state.jumpCount + Number(tookOff),
+    hitAtMs: hitCount > 0 ? elapsedMs : state.hitAtMs, justImpacts: shots.impacts,
+    bossSpawned: state.bossSpawned || shouldSpawnBoss, bossDefeated,
+    bossWarningLane, bossAttackAtMs, nextBossAttackMs, justBossAttack,
     lane,
     hp,
     score: state.score + shots.kills,
@@ -201,42 +266,49 @@ function approach(current: number, target: number, stepMs: number, lerpMs: numbe
  */
 function isHit(enemy: GameBody, lane: number, config: RunConfig): boolean {
   if (enemy.lane !== lane) return false;
-  const reach = config.playerRadius + config.enemyRadius;
+  const reach = config.playerRadius + (enemy.kind ? config.enemyTypes[enemy.kind].radius : config.enemyRadius);
   return enemy.z >= config.playerZ - reach && enemy.previousZ <= config.playerZ + reach;
 }
 
 /**
  * Bullets against enemies. Both are swept over the step, because a bullet covers
- * more ground per frame than an enemy is wide. One bullet kills one enemy: the
- * pair is removed together and the kill scores.
+ * more ground per frame than an enemy is wide. Each bullet damages one enemy;
+ * only the final hit removes that enemy and awards a kill.
  */
 function resolveShots(
   bullets: GameBody[],
   enemies: GameBody[],
   config: RunConfig,
-): { bullets: GameBody[]; enemies: GameBody[]; kills: number; killed: KillMark[] } {
-  const reach = config.enemyRadius + config.bulletRadius;
+  elapsedMs: number,
+): { bullets: GameBody[]; enemies: GameBody[]; kills: number; killed: KillMark[]; impacts: KillMark[] } {
+  const updated = enemies.map(e => ({ ...e }));
+  const impacts: KillMark[] = [];
   const deadEnemies = new Set<number>();
   const spentBullets = new Set<number>();
 
   bullets.forEach((bullet, bulletIndex) => {
-    const targetIndex = enemies.findIndex(
+    const targetIndex = updated.findIndex(
       (enemy, enemyIndex) =>
         !deadEnemies.has(enemyIndex) &&
         enemy.lane === bullet.lane &&
-        bullet.z - reach <= enemy.z &&
-        bullet.previousZ + reach >= enemy.z,
+        bullet.z - ((enemy.kind ? config.enemyTypes[enemy.kind].radius : config.enemyRadius) + config.bulletRadius) <= enemy.z &&
+        bullet.previousZ + ((enemy.kind ? config.enemyTypes[enemy.kind].radius : config.enemyRadius) + config.bulletRadius) >= enemy.previousZ,
     );
     if (targetIndex === -1) return;
-    deadEnemies.add(targetIndex);
+    const target = updated[targetIndex]!;
+    target.hp = (target.hp ?? 1) - 1;
+    target.lastHitMs = elapsedMs;
+    impacts.push({ lane: target.lane, z: target.z, kind: target.kind });
+    if (target.hp <= 0) deadEnemies.add(targetIndex);
     spentBullets.add(bulletIndex);
   });
 
   return {
     bullets: bullets.filter((_, index) => !spentBullets.has(index)),
-    enemies: enemies.filter((_, index) => !deadEnemies.has(index)),
+    enemies: updated.filter((_, index) => !deadEnemies.has(index)),
+    impacts,
     kills: deadEnemies.size,
-    killed: [...deadEnemies].map((index) => ({ lane: enemies[index]!.lane, z: enemies[index]!.z })),
+    killed: [...deadEnemies].map((index) => ({ lane: enemies[index]!.lane, z: enemies[index]!.z, ...(enemies[index]!.kind ? { kind: enemies[index]!.kind } : {}) })),
   };
 }
 
@@ -258,21 +330,23 @@ function fireDue(
 
 function spawnDue(
   { enemies, seed }: { enemies: GameBody[]; seed: number },
-  { elapsedMs, nextSpawnMs, progress }: { elapsedMs: number; nextSpawnMs: number; progress: number },
+  { elapsedMs, nextSpawnMs, progress, nextId }: { elapsedMs: number; nextSpawnMs: number; progress: number; nextId: number },
   config: RunConfig,
-): { enemies: GameBody[]; seed: number; nextSpawnMs: number } {
-  if (elapsedMs < nextSpawnMs) return { enemies, seed, nextSpawnMs };
+): { enemies: GameBody[]; seed: number; nextSpawnMs: number; nextId: number } {
+  if (elapsedMs < nextSpawnMs || enemies.length >= config.enemyPoolSize - 2) return { enemies, seed, nextSpawnMs, nextId };
 
   const row = pickRow(seed, progress, config);
-  const spawnedEnemies = row.lanes.map((lane) => ({
-    lane,
-    z: config.spawnZ,
-    previousZ: config.spawnZ,
-  }));
+  let liveSeed = row.seed;
+  const spawnedEnemies = row.lanes.map((lane) => {
+    const roll = random(liveSeed); liveSeed = roll.seed;
+    const kind = roll.value < .5 ? 'weak' : roll.value < .85 ? 'normal' : 'tank';
+    return { id: nextId++, kind, hp: config.enemyTypes[kind].hp, lane, z: config.spawnZ, previousZ: config.spawnZ } as GameBody;
+  });
 
   return {
     enemies: [...enemies, ...spawnedEnemies],
-    seed: row.seed,
+    seed: liveSeed,
+    nextId,
     nextSpawnMs: elapsedMs + spawnIntervalAt(progress, config),
   };
 }

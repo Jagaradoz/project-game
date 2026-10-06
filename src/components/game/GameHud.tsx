@@ -16,6 +16,22 @@ export function GameHud({ snapshot }: GameHudProps) {
     <>
       <div className="pointer-events-none absolute inset-x-3 top-3 z-[1] flex flex-col items-center gap-2">
         <GoalBar snapshot={snapshot} />
+        {snapshot.bossHp !== null && (
+          <div className="w-full max-w-[320px] border-2 border-surface bg-ink px-3 py-2 text-white">
+            <div className="flex justify-between text-xs font-black uppercase"><span>Elder Treant</span><span>{snapshot.bossHp}/{snapshot.bossMaxHp}</span></div>
+            <progress className="mt-1 h-2 w-full accent-orange-500" max={snapshot.bossMaxHp} value={snapshot.bossHp} aria-label="Elder Treant health" />
+          </div>
+        )}
+        {snapshot.bossWarningLane !== null && (
+          <div role="status" className="border-2 border-white bg-red-700 px-3 py-2 text-sm font-black text-white">
+            Move away from the {['left', 'centre', 'right'][snapshot.bossWarningLane]} lane!
+          </div>
+        )}
+        {snapshot.obstacleDistance !== null && snapshot.obstacleDistance < 35 && (
+          <div role="status" className="border-2 border-ink bg-primary px-3 py-2 text-sm font-black text-ink">
+            {snapshot.isAirborne ? 'Jumping' : 'Root ahead — jump!'} · {Math.ceil(snapshot.obstacleDistance)} m
+          </div>
+        )}
 
         <div
           key={snapshot.hp}
@@ -91,7 +107,7 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
         />
       </div>
       <span className="text-[10px] font-bold tracking-wide text-white/80 uppercase">
-        {remaining === 0 ? 'Objective complete' : `${remaining} remaining`}
+        {snapshot.isCleared ? 'Objective complete' : remaining === 0 ? 'Defeat the Elder Treant to finish' : `${remaining} remaining · includes the boss`}
       </span>
     </div>
   );

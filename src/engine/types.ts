@@ -13,6 +13,7 @@ export type CameraConfig = AppConfig['camera'];
 export type PoseConfig = AppConfig['pose'];
 export type LateralConfig = AppConfig['lateral'];
 export type JogConfig = AppConfig['jog'];
+export type JumpConfig = AppConfig['jump'];
 export type DrawConfig = AppConfig['draw'];
 export type GameConfig = AppConfig['game'];
 export type StageConfig = AppConfig['stage'];
@@ -24,14 +25,14 @@ export type DifficultyPreset = StageConfig['difficulty']['normal'];
  * takes a GameConfig, so carrying `goalKills` on the same object is what lets
  * the reducer decide `isCleared` without learning about stages at all.
  */
-export type StageRules = GameConfig & { goalKills: number };
+export type StageRules = GameConfig & { goalKills: number; requireBoss?: boolean };
 
 /**
  * What the reducer runs under. `goalKills` is optional on purpose: without it
  * the runner is endless, which is both the original behaviour and what the
  * control-group mode needs. StageRules satisfies it with the goal filled in.
  */
-export type RunConfig = GameConfig & { goalKills?: number };
+export type RunConfig = GameConfig & { goalKills?: number; requireBoss?: boolean };
 
 /**
  * Starting difficulty, chosen by the player -- TOR 3
@@ -137,9 +138,30 @@ export interface JogState {
 }
 
 /* ---------------------------------------------------------------- game ---- */
+export type EnemyKind = 'weak' | 'normal' | 'tank' | 'boss';
+
+export interface JumpState {
+  isCalibrated: boolean;
+  feetVisible: boolean;
+  justJumped: boolean;
+  jumpCount: number;
+  airborne: boolean;
+  baseline: { hip: number; left: number; right: number; torso: number } | null;
+  calibrationStartMs: number | null;
+  candidateMs: number | null;
+  landedMs: number | null;
+  lastSeenMs: number | null;
+  needsLanding: boolean;
+}
+
+export interface RootObstacle { id: number; side: -1 | 1; z: number; previousZ: number; cleared?: boolean }
 
 /** An enemy or a bullet. `previousZ` is what makes collision a swept test. */
 export interface GameBody {
+  id?: number;
+  kind?: EnemyKind;
+  hp?: number;
+  lastHitMs?: number;
   lane: number;
   z: number;
   previousZ: number;
@@ -147,11 +169,27 @@ export interface GameBody {
 
 /** Where an enemy died this frame, so the view can play a death animation. */
 export interface KillMark {
+  kind?: EnemyKind;
   lane: number;
   z: number;
 }
 
 export interface GameState {
+  nextId: number;
+  obstacles: RootObstacle[];
+  nextObstacleMs: number;
+  jumpStartedMs: number | null;
+  jumpHeight: number;
+  jumpHeld: boolean;
+  jumpCount: number;
+  hitAtMs: number;
+  justImpacts: KillMark[];
+  bossSpawned: boolean;
+  bossDefeated: boolean;
+  bossWarningLane: number | null;
+  bossAttackAtMs: number | null;
+  nextBossAttackMs: number;
+  justBossAttack: boolean;
   lane: number;
   hp: number;
   score: number;
@@ -177,6 +215,7 @@ export interface GameState {
 
 /** What the reducer needs from the player each frame. */
 export interface GameInput {
+  jump?: boolean;
   lane: number;
   isFiring: boolean;
 }
@@ -186,6 +225,7 @@ export interface GameInput {
  * updates and key events push into it, the loop pulls a snapshot out.
  */
 export interface InputHandle {
+  requestJump(): void;
   setPose(label: LateralLabel | null, isJogging: boolean): void;
   clearPose(): void;
   attachKeyboard(target?: EventTarget): () => void;
