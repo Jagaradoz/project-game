@@ -34,6 +34,7 @@ export interface PlayerRefs {
   actions: Record<string, THREE_NS.AnimationAction>;
   currentAction: THREE_NS.AnimationAction | null;
   currentActionName: string | null;
+  lastJumpStartedMs: number | null;
   characterId: string;
   fallbackVisible: boolean;
   modelContainer: THREE_NS.Group;
@@ -93,6 +94,7 @@ export async function addPlayer(
     actions: {},
     currentAction: null,
     currentActionName: null,
+    lastJumpStartedMs: null,
     characterId: config.defaultCharacter,
     fallbackVisible: true,
     modelContainer,
@@ -115,7 +117,7 @@ export async function addPlayer(
     if (!playerObj.mixer || playerObj.fallbackVisible) return;
     if (!restart && playerObj.currentActionName === name && (
       playerObj.currentAction?.isRunning() ||
-      (name === 'death' && playerObj.currentAction?.paused)
+      ((name === 'death' || name === 'jump') && playerObj.currentAction?.paused)
     )) return;
 
     const targetAction =
@@ -159,6 +161,7 @@ export async function addPlayer(
   playerObj.loadCharacter = async function loadCharacter(charId: string): Promise<boolean> {
     const token = loadToken += 1;
     playerObj.characterId = charId;
+    playerObj.lastJumpStartedMs = null;
 
     if (charId === 'orb' || !loader) {
       modelContainer.visible = false;

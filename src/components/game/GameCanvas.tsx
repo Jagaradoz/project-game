@@ -216,7 +216,7 @@ export default function GameCanvas() {
                 Jog in place to attack
               </span>
               <span className="text-subtle">Arrow keys also work</span>
-              <span>Jump with both feet to clear roots</span>
+              <span>Jump over logs, stones, and rivers</span>
             </>
           )}
         </p>

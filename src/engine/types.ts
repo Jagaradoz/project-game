@@ -154,7 +154,19 @@ export interface JumpState {
   needsLanding: boolean;
 }
 
-export interface RootObstacle { id: number; side: -1 | 1; z: number; previousZ: number; cleared?: boolean }
+interface HazardBody {
+  id: number;
+  z: number;
+  previousZ: number;
+  status: 'approaching' | 'crossing' | 'cleared';
+  /** A solid hazard can charge contact only once, including during grace. */
+  hit?: boolean;
+}
+export type TrailHazard = HazardBody & (
+  | { kind: 'log' | 'stones'; startLane: 0 | 1; laneCount: 2 }
+  | { kind: 'log' | 'stones' | 'river'; startLane: 0; laneCount: 3 }
+);
+export type DeathReason = 'damage' | 'drowned';
 
 /** An enemy or a bullet. `previousZ` is what makes collision a swept test. */
 export interface GameBody {
@@ -176,7 +188,7 @@ export interface KillMark {
 
 export interface GameState {
   nextId: number;
-  obstacles: RootObstacle[];
+  obstacles: TrailHazard[];
   nextObstacleMs: number;
   jumpStartedMs: number | null;
   jumpHeight: number;
@@ -210,6 +222,7 @@ export interface GameState {
   /** The stage goal was met. Always false when the run has no goal. */
   isCleared: boolean;
   isOver: boolean;
+  deathReason: DeathReason | null;
   seed: number;
 }
 

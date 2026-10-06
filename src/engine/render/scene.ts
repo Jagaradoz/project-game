@@ -25,6 +25,8 @@ import { addClouds } from '@/engine/render/world/clouds';
 import { addEnemyPool } from '@/engine/render/actors/enemies';
 import { addSpellPool } from '@/engine/render/actors/spells';
 import { addObstaclePool } from '@/engine/render/actors/obstacles';
+import { createDrowningSplash } from '@/engine/render/actors/rivers';
+import { createRiverMask } from '@/engine/render/world/riverMask';
 import { addPlayer } from '@/engine/render/actors/player';
 import { createEffects } from '@/engine/render/actors/effects';
 
@@ -70,7 +72,8 @@ export async function createScene(
   const player = await addPlayer(THREE, scene, config, palette, loader);
   const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
   const bulletPool = await addSpellPool(THREE, scene, config, loader);
-  const obstaclePool = await addObstaclePool(THREE, scene, config, loader);
+  const obstaclePool = await addObstaclePool(THREE, scene, config, loader, palette);
+  const drowningSplash = createDrowningSplash(THREE, scene, palette);
   const effects = createEffects(THREE, scene, palette);
 
   // Short, damped camera impulses give hits and kills physical weight while
@@ -82,6 +85,7 @@ export async function createScene(
   // what an encroached path edge looks like, and moving the props in lockstep
   // with the edge would read as more machined, not less.
   trailEdge.patchObject(ground.valley.mesh);
+  const riverMask = createRiverMask(THREE, ground.valley.mesh, config);
 
   function resize() {
     const width = canvas.clientWidth || 1;
@@ -141,6 +145,8 @@ export async function createScene(
     enemyPool,
     bulletPool,
     obstaclePool,
+    riverMask,
+    drowningSplash,
     effects,
     cameraFeedback,
     lastEventsMs: -1,
@@ -159,6 +165,7 @@ export async function createScene(
       scene.traverse((object) => {
         const mesh = object as THREE_NS.Mesh;
         if (!mesh.isMesh) return;
+        if ((mesh as THREE_NS.InstancedMesh).isInstancedMesh) resources.add(mesh as THREE_NS.InstancedMesh);
         resources.add(mesh.geometry);
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           resources.add(material);

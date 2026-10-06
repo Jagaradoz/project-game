@@ -27,6 +27,7 @@ import type { RunSummary, StageSelection } from '@/engine/types';
 const IDLE_SNAPSHOT: HudSnapshot = {
   jumpCount: 0, feetVisible: false, isJumpCalibrated: false, isAirborne: false,
   obstacleDistance: null, bossHp: null, bossMaxHp: CONFIG.game.enemyTypes.boss.hp,
+  obstacleKind: null, obstacleOpenLane: null, deathReason: null, endPresentationComplete: true,
   bossDefeated: false, bossWarningLane: null,
   score: 0,
   hp: CONFIG.game.maxHp,

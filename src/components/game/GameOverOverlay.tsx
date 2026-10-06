@@ -22,7 +22,7 @@ export function GameOverOverlay({
   onSeeResult,
   isSubmitting,
 }: GameOverOverlayProps) {
-  if (!snapshot.isOver) return null;
+  if (!snapshot.isOver || !snapshot.endPresentationComplete) return null;
 
   return (
     <div className="absolute inset-0 z-[3] grid content-end justify-items-stretch bg-black/75 p-4 pb-8 text-left sm:content-center sm:justify-items-center sm:text-center">
@@ -30,7 +30,7 @@ export function GameOverOverlay({
         <span className="eyebrow">{snapshot.isCleared ? 'Cleared' : 'Complete'}</span>
 
         <h2 className="m-0 text-3xl font-black tracking-tight sm:text-4xl">
-          {snapshot.isCleared ? 'Stage cleared' : 'Run complete'}
+          {snapshot.isCleared ? 'Stage cleared' : snapshot.deathReason === 'drowned' ? 'River crossing missed' : 'Run complete'}
         </h2>
 
         <p className="m-0 text-sm tabular-nums text-muted">
@@ -40,7 +40,12 @@ export function GameOverOverlay({
           )}
         </p>
 
-        {!snapshot.isCleared && snapshot.goalKills !== null && (
+        {snapshot.deathReason === 'drowned' && (
+          <p className="m-0 max-w-xs text-sm leading-relaxed text-muted">
+            Jump across the river to stay safe. You can try again straight away.
+          </p>
+        )}
+        {!snapshot.isCleared && snapshot.deathReason !== 'drowned' && snapshot.goalKills !== null && (
           <p className="m-0 max-w-xs text-sm leading-relaxed text-muted">
             You did not reach this stage&rsquo;s target. Go again straight away, or pick a difficulty
             that suits you better.

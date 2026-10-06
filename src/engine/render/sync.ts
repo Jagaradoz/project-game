@@ -24,6 +24,8 @@ interface MoteLayer extends ScrollLayer {
 import { CONFIG } from '@/engine/config';
 import { laneToX, isInvulnerable } from '@/engine/core/state';
 import { TRAIL_Y } from '@/engine/render/world/ground';
+import { createDrowningPresentation } from '@/engine/core/drowning';
+import type { DrowningPresentation } from '@/engine/core/drowning';
 
 /** Blink cycle while the grace window is open. */
 const BLINK_PERIOD_MS = 160;
@@ -36,8 +38,9 @@ export function syncScene(
   dtMs = 16.67,
   config: GameConfig = CONFIG.game,
   actorsVisible = true,
+  drowning: DrowningPresentation = createDrowningPresentation(),
 ): void {
-  const dtSec = Math.min(dtMs / 1000, 0.1);
+  const dtSec = Math.min(Math.max(dtMs, 0), config.maxFrameMs) / 1000;
   const newEvents = sceneRefs.lastEventsMs !== state.elapsedMs;
 
   if (newEvents && state.justHit) sceneRefs.cameraFeedback?.hit();
@@ -48,9 +51,12 @@ export function syncScene(
   }
 
   if (actorsVisible) {
-    syncPlayer(sceneRefs.player, newEvents ? state : { ...state, justHit: false, justFired: false }, dtSec, config);
+    syncPlayer(sceneRefs.player, newEvents ? state : { ...state, justHit: false, justFired: false }, dtSec, config, drowning);
     sceneRefs.enemyPool?.sync(state.enemies, state.elapsedMs, dtSec, state.bossWarningLane !== null);
-    sceneRefs.obstaclePool?.sync(state.obstacles, state.elapsedMs);
+    sceneRefs.obstaclePool?.sync(state.obstacles, state.elapsedMs + drowning.elapsedMs);
+    sceneRefs.riverMask?.sync(state.obstacles);
+    const waterZ = drowningRiverZ(state, config);
+    sceneRefs.drowningSplash?.update(drowning.active, drowning.elapsedMs / config.obstacle.drowningMs, laneToX(state.lane, config), waterZ);
     if (newEvents) stageKills(sceneRefs, state, config);
     sceneRefs.enemyPool?.updateCorpses(dtSec, state.speed);
     sceneRefs.effects?.update(dtSec, state.speed);
@@ -64,11 +70,17 @@ export function syncScene(
       for (const slot of sceneRefs.bulletPool.items) slot.mesh.visible = false;
     }
     sceneRefs.obstaclePool?.hide();
+    sceneRefs.riverMask?.hide();
+    sceneRefs.drowningSplash?.update(false, 0, 0, 0);
     sceneRefs.bulletPool?.hide();
   }
 
   sceneRefs.trailEdge?.update(state.distance);
   syncRecycled(sceneRefs.markers as unknown as ScrollLayer, state.distance);
+  for (const marker of sceneRefs.markers?.items ?? []) {
+    marker.mesh.visible = !actorsVisible || !state.obstacles.some(hazard =>
+      hazard.kind === 'river' && Math.abs(marker.mesh.position.z - hazard.z) < config.obstacle.riverRadius + .35);
+  }
   sceneRefs.scatter?.scroll(state.distance);
   sceneRefs.landmarks?.scroll(state.distance);
   syncMotes(sceneRefs.motes as unknown as MoteLayer, state.distance, state.elapsedMs);
@@ -76,11 +88,18 @@ export function syncScene(
   sceneRefs.lastEventsMs = state.elapsedMs;
 }
 
+function drowningRiverZ(state: GameState, config: GameConfig): number {
+  const river = state.obstacles.filter(o => o.kind === 'river').reduce<(typeof state.obstacles)[number] | null>(
+    (nearest, o) => !nearest || Math.abs(o.z - config.playerZ) < Math.abs(nearest.z - config.playerZ) ? o : nearest, null);
+  return river ? Math.max(river.z - .25, Math.min(river.z + .25, config.playerZ)) : config.playerZ;
+}
+
 function syncPlayer(
   player: PlayerRefs | null | undefined,
   state: GameState,
   dtSec: number,
   config: GameConfig,
+  drowning: DrowningPresentation,
 ): void {
   if (!player) return;
 
@@ -90,6 +109,12 @@ function syncPlayer(
   player.group.position.x += (targetX - currentX) * LANE_LERP;
   player.group.position.z = config.playerZ;
   player.group.position.y = TRAIL_Y + state.jumpHeight;
+  if (drowning.active) {
+    const progress = drowning.elapsedMs / config.obstacle.drowningMs;
+    player.group.position.z = drowningRiverZ(state, config);
+    player.group.position.y -= progress * 2.3;
+    player.group.visible = !drowning.complete;
+  }
 
   // Bank into a lane change, then settle back upright.
   const deltaX = targetX - currentX;
@@ -104,7 +129,7 @@ function syncPlayer(
     for (const material of player.materials) material.opacity = opacity;
   }
 
-  updatePlayerAnimation(player, state, dtSec);
+  updatePlayerAnimation(player, state, dtSec, config);
 
   if (player.fallbackVisible) {
     if (player.ring) player.ring.rotation.z = state.elapsedMs * 0.003;
@@ -115,20 +140,43 @@ function syncPlayer(
   }
 }
 
-/** Each actual shot starts a fresh attack; rapid shots cut off the prior swing. */
+/** Flight follows reducer time; landing completes before shots resume the run. */
 export function updatePlayerAnimation(
   player: PlayerRefs,
-  state: Pick<GameState, 'isOver' | 'isFiring' | 'justFired'> & Partial<Pick<GameState, 'isCleared' | 'justHit' | 'jumpStartedMs'>>,
+  state: Pick<GameState, 'isOver' | 'isFiring' | 'justFired'> & Partial<Pick<GameState, 'isCleared' | 'justHit' | 'jumpStartedMs' | 'elapsedMs' | 'deathReason'>>,
   dtSec: number,
+  config: GameConfig = CONFIG.game,
 ): void {
+  const airborne = !state.isOver && state.jumpStartedMs != null;
+  if (!airborne && player.lastJumpStartedMs !== null) {
+    if (player.currentActionName === 'jump' && player.currentAction) {
+      player.currentAction.time = player.currentAction.getClip().duration * config.jump.landingPose;
+      player.currentAction.paused = false;
+    }
+    player.lastJumpStartedMs = null;
+  }
+
   if (state.isOver) {
-    player.playAnimation(state.isCleared ? 'idle' : 'death', 0.2, Boolean(state.isCleared));
+    player.playAnimation(state.isCleared || state.deathReason === 'drowned' ? 'idle' : 'death', 0.2, Boolean(state.isCleared || state.deathReason === 'drowned'));
+  } else if (airborne) {
+    const restart = player.lastJumpStartedMs !== state.jumpStartedMs;
+    player.playAnimation('jump', .06, false, restart);
+    player.lastJumpStartedMs = state.jumpStartedMs!;
+    if (player.currentActionName === 'jump' && player.currentAction) {
+      const ageMs = (state.elapsedMs ?? state.jumpStartedMs!) - state.jumpStartedMs!;
+      const phase = Math.min(1, Math.max(0, ageMs / config.jump.durationMs));
+      const { takeoffPose, landingPose } = config.jump;
+      player.currentAction.time = player.currentAction.getClip().duration *
+        (takeoffPose + phase * (landingPose - takeoffPose));
+      // Mixer time can advance fades, but cannot advance or finish this pose.
+      player.currentAction.paused = true;
+    }
   } else if (state.justHit) {
     player.playAnimation('hit', .04, false, true);
   } else if (player.currentActionName === 'hit' && player.currentAction?.isRunning()) {
     // Complete recoil even when the jogging detector keeps firing.
-  } else if (state.jumpStartedMs != null) {
-    player.playAnimation('jump', .06, false);
+  } else if (player.currentActionName === 'jump' && player.currentAction?.isRunning()) {
+    // Finish the grounded landing even when jogging continues to fire shots.
   } else if (state.justFired) {
     player.playAnimation('shoot', 0.06, false, true);
   } else if (player.currentActionName !== 'shoot' || !player.currentAction?.isRunning()) {

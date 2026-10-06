@@ -18,9 +18,9 @@ test('a tank survives a projectile and reports a hit instead of a kill', () => {
   expect(next.justImpacts).toHaveLength(1);
 });
 
-test('jump clears a road root while grounded contact costs one health', () => {
+test('jump clears a road log while grounded contact costs one health', () => {
   const state = { ...createGameState(3),
-    obstacles: [{ id: 7, side: -1 as const, z: -1, previousZ: -1 }],
+    obstacles: [{ id: 7, kind: 'log' as const, startLane: 0 as const, laneCount: 3 as const, status: 'approaching' as const, z: -1, previousZ: -1 }],
   };
   const grounded = updateGame(state, idle, 50);
   expect(grounded.hp).toBe(2);
@@ -29,10 +29,10 @@ test('jump clears a road root while grounded contact costs one health', () => {
   expect(airborne.jumpHeight).toBeGreaterThan(0.8);
 });
 
-test('roots do not damage or stop enemies', () => {
+test('hazards do not damage or stop enemies outside their crossing window', () => {
   const state = { ...createGameState(3),
     enemies: [{ id: 1, kind: 'tank' as const, hp: 5, lane: 0, z: -10, previousZ: -10 }],
-    obstacles: [{ id: 2, side: 1 as const, z: -10, previousZ: -10 }],
+    obstacles: [{ id: 2, kind: 'stones' as const, startLane: 0 as const, laneCount: 3 as const, status: 'approaching' as const, z: -40, previousZ: -40 }],
   };
   const next = updateGame(state, idle, 50);
   expect(next.enemies[0].hp).toBe(5);

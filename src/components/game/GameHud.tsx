@@ -29,7 +29,10 @@ export function GameHud({ snapshot }: GameHudProps) {
         )}
         {snapshot.obstacleDistance !== null && snapshot.obstacleDistance < 35 && (
           <div role="status" className="border-2 border-ink bg-primary px-3 py-2 text-sm font-black text-ink">
-            {snapshot.isAirborne ? 'Jumping' : 'Root ahead — jump!'} · {Math.ceil(snapshot.obstacleDistance)} m
+            {snapshot.isAirborne ? 'Jumping' : snapshot.obstacleKind === 'river'
+              ? 'River ahead — jump! Missing it ends the run.'
+              : `${snapshot.obstacleKind === 'log' ? 'Log' : 'Stones'} ahead — ${snapshot.obstacleOpenLane === null ? 'jump!' : `jump or use the ${snapshot.obstacleOpenLane === 0 ? 'left' : 'right'} lane!`}`}
+            {' '}· {Math.ceil(snapshot.obstacleDistance)} m
           </div>
         )}
 

@@ -66,6 +66,15 @@ def add_clip(rig, label, source, frame_start=None, frame_end=None):
         for curve in list(curves):
             if curve.data_path == 'location':
                 curves.remove(curve)
+            elif label == 'Jump' and curve.data_path == 'pose.bones["root"].location':
+                # The runtime supplies the airborne arc. Keep the authored lift
+                # in the catalog, but export the copy with a stationary root.
+                initial = curve.evaluate(source.frame_range[0])
+                for key in curve.keyframe_points:
+                    key.co.y = initial
+                    key.handle_left.y = initial
+                    key.handle_right.y = initial
+                curve.update()
     start, end = source.frame_range
     strip.action_frame_start = frame_start if frame_start is not None else start
     strip.action_frame_end = frame_end if frame_end is not None else end
@@ -88,7 +97,7 @@ def export_selection(path, objects, animation_mode='NLA_TRACKS', fps=24):
     return validate_glb(path)
 
 
-def validate_glb(path, expected_clips=None, max_triangles=None):
+def validate_glb(path, expected_clips=None, max_triangles=None, in_place_jump=False):
     blob = path.read_bytes()
     assert blob[:4] == b'glTF', path
     length = struct.unpack_from('<I', blob, 12)[0]
@@ -132,9 +141,44 @@ def validate_glb(path, expected_clips=None, max_triangles=None):
         assert clips == set(expected_clips), (path.name, clips, expected_clips)
     if max_triangles is not None:
         assert triangles <= max_triangles, (path.name, triangles, max_triangles)
-    return {'bytes': len(blob), 'clips': sorted(clips), 'skins': skins,
+    result = {'bytes': len(blob), 'clips': sorted(clips), 'skins': skins,
             'meshes': len(doc.get('meshes', [])), 'materials': len(doc.get('materials', [])),
             'triangles': triangles, 'durations': durations}
+    if in_place_jump:
+        jump = next(a for a in doc['animations'] if a['name'] == 'Jump')
+        roots = [i for i, node in enumerate(doc['nodes']) if node.get('name') == 'root']
+        assert len(roots) == 1, (path.name, 'missing or ambiguous root')
+        root_channels = [c for c in jump['channels']
+                         if c['target']['node'] == roots[0] and c['target']['path'] == 'translation']
+        # A completely constant transform may be omitted by the exporter.
+        spread = 0.0
+        for channel in root_channels:
+            samples = list(values(jump['samplers'][channel['sampler']]['output']))
+            spread = max(spread, *(max(samples[axis::3]) - min(samples[axis::3]) for axis in range(3)))
+        assert spread < 1e-6, (path.name, 'Jump root translation', spread)
+        parents = {child: index for index, node in enumerate(doc['nodes'])
+                   for child in node.get('children', [])}
+        weapons = [i for i, node in enumerate(doc['nodes'])
+                   if any(word in node.get('name', '').lower() for word in ('staff', 'wand', 'broom'))]
+        assert weapons, (path.name, 'missing weapon')
+        for weapon in weapons:
+            ancestor = parents.get(weapon)
+            chain = []
+            while ancestor is not None:
+                chain.append(doc['nodes'][ancestor].get('name'))
+                ancestor = parents.get(ancestor)
+            assert 'handslot.r' in chain or 'handslot.l' in chain, (path.name, 'detached weapon', chain)
+            for animation in doc['animations']:
+                for channel in animation['channels']:
+                    if channel['target']['node'] != weapon:
+                        continue
+                    sampler = animation['samplers'][channel['sampler']]
+                    samples = list(values(sampler['output']))
+                    width = 4 if channel['target']['path'] == 'rotation' else 3
+                    assert all(max(samples[axis::width]) - min(samples[axis::width]) < 1e-6
+                               for axis in range(width)), (path.name, 'moving weapon attachment')
+        result.update(jumpRootSpread=spread, attachedWeapons=len(weapons))
+    return result
 
 
 def rig_children(rig):
@@ -233,6 +277,8 @@ def validate_weapon_attachment(rig):
 def export_players():
     clip_sources = ('Attack', 'Running', 'GetAttacked', 'Death', 'Jump', 'Idle')
     for output_name, row in PLAYERS.items():
+        path = CHAR_OUT / f'{output_name}.glb'
+        previous = validate_glb(path) if path.exists() else None
         rig = bpy.data.objects[f'{row}_Attack_Rig']
         sources = {}
         for action_row, label in zip(clip_sources, ('Attack', 'Run', 'Hit', 'Death', 'Jump', 'Idle')):
@@ -255,10 +301,12 @@ def export_players():
             child.hide_viewport = False
         bpy.context.view_layer.update()
         attachments = validate_weapon_attachment(rig)
-        path = CHAR_OUT / f'{output_name}.glb'
-        stats = export_selection(path, [rig] + rig_children(rig))
+        export_selection(path, [rig] + rig_children(rig))
+        stats = validate_glb(path, in_place_jump=True)
         assert stats['clips'] == ['Attack', 'Death', 'Hit', 'Idle', 'Jump', 'Run'], stats
         assert stats['skins'] >= 1, (path.name, stats)
+        if previous:
+            assert stats['durations'] == previous['durations'], (path.name, 'changed clip durations')
         print('PLAYER', output_name, stats, 'attachments', attachments, flush=True)
 
 
@@ -544,7 +592,10 @@ def main():
         export_enemies()
     if not args or '--orbs' in args:
         export_orbs()
-    validate_outputs(write_record=True)
+    # Partial exports validate their own assets above without rewriting the
+    # complete export record or inspecting unrelated enemies and spells.
+    if not args:
+        validate_outputs(write_record=True)
 
 
 if __name__ == '__main__':

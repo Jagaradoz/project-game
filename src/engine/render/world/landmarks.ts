@@ -23,7 +23,7 @@ export async function addLandmarks(
   const farZ = startZ - span;
   const heightAt = createHeightSampler(config);
   const loader = new GLTFLoader();
-  const treeModels = await Promise.all(['tree_oak', 'tree_pineRoundD', 'tree_root_oak'].map(async (name) => {
+  const treeModels = await Promise.all(['tree_oak', 'tree_pineRoundD'].map(async (name) => {
     try {
       const gltf = await loader.loadAsync(`${ENVIRONMENT_MODEL_DIR}/${name}.glb`);
       gltf.scene.name = name;
@@ -75,11 +75,7 @@ function buildForestLandmark(
 ) {
   // Exported catalog materials and geometry remain intact.
   for (const side of treeModels.length ? [-1, 1] : []) {
-    // The large root oak is a single memorable beat; ordinary landmarks stay compact.
-    const rootOak = treeModels.find((model) => model.name === 'tree_root_oak');
-    const compact = treeModels.filter((model) => model.name !== 'tree_root_oak');
-    const source = variant === 0 && side < 0 && rootOak ? rootOak :
-      compact[(variant + (side > 0 ? 1 : 0)) % compact.length];
+    const source = treeModels[(variant + (side > 0 ? 1 : 0)) % treeModels.length];
     if (!source) continue;
     const tree = source.clone(true);
     const bounds = new THREE.Box3().setFromObject(tree);

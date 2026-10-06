@@ -18,12 +18,14 @@
  */
 
 import { CONFIG } from '@/engine/config';
+import { advanceHazards, hasSafeHazardArrival } from '@/engine/core/hazards';
 import type {
   GameBody,
   GameInput,
   GameState,
   KillMark,
   RunConfig,
+  TrailHazard,
 } from '@/engine/types';
 
 /** Deterministic 32-bit LCG (Numerical Recipes constants). */
@@ -61,6 +63,7 @@ export function createGameState(seed = 1, config: RunConfig = CONFIG.game): Game
     killCount: 0,
     isCleared: false,
     isOver: false,
+    deathReason: null,
     seed: seed >>> 0,
   };
 }
@@ -107,29 +110,23 @@ export function updateGame(
 
   const wantsJump = Boolean(input.jump);
   const tookOff = wantsJump && !state.jumpHeld && state.jumpStartedMs === null;
-  let jumpStartedMs = tookOff ? elapsedMs : state.jumpStartedMs;
+  const flightStartedMs = tookOff ? elapsedMs : state.jumpStartedMs;
+  let jumpStartedMs = flightStartedMs;
   if (jumpStartedMs !== null && elapsedMs - jumpStartedMs >= config.jump.durationMs) jumpStartedMs = null;
   const jumpPhase = jumpStartedMs === null ? 0 : (elapsedMs - jumpStartedMs) / config.jump.durationMs;
   const jumpHeight = jumpStartedMs === null ? 0 : Math.sin(Math.PI * jumpPhase) * config.jump.height;
+  const crossed = advanceHazards(state.obstacles, lane, speed * stepSec, state.elapsedMs, elapsedMs, flightStartedMs, config);
   const movedEnemies = state.enemies.map((enemy) => {
     const extra = enemy.kind ? config.enemyTypes[enemy.kind].approachSpeed : 0;
     const moved = advance(enemy, Math.max(2, speed + extra) * stepSec);
     if (enemy.kind === 'boss') moved.z = Math.min(config.boss.holdZ, moved.z);
     return moved;
-  });
+  }).filter(enemy => hasSafeHazardArrival(enemy, crossed.obstacles, speed, config));
   const movedBullets = state.bullets.map((bullet) => advance(bullet, -config.bulletSpeed * stepSec));
 
   const shots = resolveShots(movedBullets, movedEnemies, config, elapsedMs);
 
-  const obstacles = state.obstacles.map(o => ({ ...o, previousZ: o.z, z: o.z + speed * stepSec }));
-  let rootHit = false;
-  for (const root of obstacles) {
-    const reach = config.playerRadius + config.obstacle.radius;
-    if (!root.cleared && root.z >= config.playerZ - reach && root.previousZ <= config.playerZ + reach) {
-      root.cleared = true;
-      rootHit ||= jumpHeight < config.jump.clearance;
-    }
-  }
+  const obstacles = crossed.obstacles;
   const liveBoss = shots.enemies.find(e => e.kind === 'boss');
   const bossDefeated = state.bossDefeated || shots.killed.some(e => e.kind === 'boss');
   let bossWarningLane = liveBoss ? state.bossWarningLane : null;
@@ -155,7 +152,7 @@ export function updateGame(
   const survivors = isGraced
     ? shots.enemies
     : shots.enemies.filter((enemy) => !isHit(enemy, lane, config));
-  const hitCount = isGraced ? 0 : shots.enemies.length - survivors.length + Number(rootHit || bossHit);
+  const hitCount = isGraced ? 0 : shots.enemies.length - survivors.length + Number(crossed.hit || bossHit);
 
   const spawned = spawnDue(
     { enemies: survivors.filter((enemy) => enemy.z <= config.despawnZ), seed: state.seed },
@@ -171,15 +168,16 @@ export function updateGame(
 
   // A hit costs exactly one HP no matter how many enemies land on the same
   // frame; the grace window then covers the rest of the pile-up.
-  const hp = Math.max(0, state.hp - (hitCount > 0 ? 1 : 0));
+  const hp = crossed.drowned ? 0 : Math.max(0, state.hp - (hitCount > 0 ? 1 : 0));
 
   // The stage goal, if this run has one. `goalKills` is absent for an endless
   // run, and a run with no goal can never be cleared -- only ended.
   const killCount = state.killCount + shots.kills;
-  const isCleared = config.goalKills !== undefined && killCount >= config.goalKills && (!config.requireBoss || bossDefeated);
+  const isCleared = !crossed.drowned && config.goalKills !== undefined && killCount >= config.goalKills && (!config.requireBoss || bossDefeated);
   let nextId = spawned.nextId;
   const trigger = config.requireBoss && config.goalKills !== undefined ? Math.max(0, config.goalKills - 1) : config.boss.triggerKills;
-  const shouldSpawnBoss = !state.bossSpawned && killCount >= trigger;
+  const bossDue = !state.bossSpawned && killCount >= trigger;
+  const shouldSpawnBoss = bossDue && !crossed.drowned && obstacles.every(o => o.status === 'cleared');
   if (shouldSpawnBoss) {
     spawned.enemies = spawned.enemies.filter(e => e.z > -30);
     spawned.enemies.push({ id: nextId++, kind: 'boss', hp: config.enemyTypes.boss.hp, lane: 1, z: config.spawnZ, previousZ: config.spawnZ });
@@ -187,17 +185,27 @@ export function updateGame(
     spawned.enemies = spawned.enemies.filter(e => e.kind === 'boss' || e.z > -30);
   }
   let nextObstacleMs = state.nextObstacleMs;
-  const retainedRoots = obstacles.filter(o => o.z <= config.despawnZ);
-  if (elapsedMs >= nextObstacleMs && retainedRoots.length < config.obstacle.poolSize && !liveBoss && !shouldSpawnBoss) {
-    const roll = random(spawned.seed); spawned.seed = roll.seed;
-    retainedRoots.push({ id: nextId++, side: roll.value < .5 ? -1 : 1, z: config.spawnZ, previousZ: config.spawnZ });
-    spawned.enemies = spawned.enemies.filter(e => e.z > config.spawnZ + 12);
+  const retainedHazards = obstacles.filter(o => o.z <= config.despawnZ);
+  if (hp > 0 && !isCleared && elapsedMs >= nextObstacleMs && retainedHazards.length < config.obstacle.poolSize && !liveBoss && !bossDue && !(state.bossSpawned && !bossDefeated)) {
+    const typeRoll = random(spawned.seed);
+    const widthRoll = random(typeRoll.seed);
+    const sideRoll = random(widthRoll.seed);
+    spawned.seed = sideRoll.seed;
+    const total = config.obstacle.logWeight + config.obstacle.stoneWeight + config.obstacle.riverWeight;
+    const kind: TrailHazard['kind'] = typeRoll.value * total < config.obstacle.logWeight ? 'log' :
+      typeRoll.value * total < config.obstacle.logWeight + config.obstacle.stoneWeight ? 'stones' : 'river';
+    const body = { id: nextId++, kind, z: config.spawnZ, previousZ: config.spawnZ, status: 'approaching' as const };
+    const hazard: TrailHazard = kind === 'river' || widthRoll.value >= .5
+      ? { ...body, startLane: 0, laneCount: 3 }
+      : { ...body, kind, startLane: sideRoll.value < .5 ? 0 : 1, laneCount: 2 };
+    retainedHazards.push(hazard);
     nextObstacleMs = elapsedMs + config.obstacle.intervalMs;
   }
+  spawned.enemies = spawned.enemies.filter(enemy => hasSafeHazardArrival(enemy, retainedHazards, speed, config));
 
   return {
     ...state,
-    nextId, obstacles: retainedRoots, nextObstacleMs, jumpStartedMs, jumpHeight,
+    nextId, obstacles: retainedHazards, nextObstacleMs, jumpStartedMs, jumpHeight,
     jumpHeld: wantsJump, jumpCount: state.jumpCount + Number(tookOff),
     hitAtMs: hitCount > 0 ? elapsedMs : state.hitAtMs, justImpacts: shots.impacts,
     bossSpawned: state.bossSpawned || shouldSpawnBoss, bossDefeated,
@@ -222,6 +230,7 @@ export function updateGame(
     // Clearing the goal ends the run just as surely as running out of HP --
     // one is a win and one is a loss, and /result tells them apart by isCleared.
     isOver: hp === 0 || isCleared,
+    deathReason: crossed.drowned ? 'drowned' : hp === 0 ? 'damage' : null,
     seed: spawned.seed,
   };
 }

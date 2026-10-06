@@ -16,6 +16,7 @@
 
 import { CONFIG } from '@/engine/config';
 import { createGameState, restartGame, updateGame } from '@/engine/core/state';
+import { createDrowningPresentation, updateDrowningPresentation } from '@/engine/core/drowning';
 import { DEFAULT_DIFFICULTY, resolveStageRules } from '@/engine/core/stage';
 import { createInput } from '@/engine/core/input';
 import { createJogState, updateJog } from '@/engine/detectors/jog';
@@ -48,6 +49,8 @@ import type {
   ShadowQuality,
   StageRules,
   StageSelection,
+  DeathReason,
+  TrailHazard,
 } from '@/engine/types';
 
 /**
@@ -101,6 +104,10 @@ export interface HudSnapshot {
   isJumpCalibrated: boolean;
   isAirborne: boolean;
   obstacleDistance: number | null;
+  obstacleKind: TrailHazard['kind'] | null;
+  obstacleOpenLane: number | null;
+  deathReason: DeathReason | null;
+  endPresentationComplete: boolean;
   bossHp: number | null;
   bossMaxHp: number;
   bossDefeated: boolean;
@@ -162,6 +169,7 @@ const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
   'hp',
   'isOver',
   'isCleared',
+  'endPresentationComplete',
   'killCount',
   'isCameraRunning',
   'isSceneReady',
@@ -201,6 +209,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let rules: StageRules = rulesFor(stage);
 
   let game: GameState = createGameState(options.seed ?? 1, rules);
+  let drowning = createDrowningPresentation();
+  let previewPaused = false;
   let lateral: LateralState = createLateralState();
   let jog: JogState = createJogState();
   let jump = createJumpState();
@@ -277,13 +287,19 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let snapshot: HudSnapshot = buildSnapshot();
 
   function buildSnapshot(): HudSnapshot {
+    const nearest = game.obstacles.filter(o => o.status !== 'cleared').reduce<TrailHazard | null>(
+      (near, o) => !near || o.z > near.z ? o : near, null);
     return {
       score: game.score,
       jumpCount: jump.jumpCount,
       feetVisible: jump.feetVisible,
       isJumpCalibrated: jump.isCalibrated,
       isAirborne: game.jumpStartedMs !== null,
-      obstacleDistance: game.obstacles.filter(o => o.z < rules.playerZ && !o.cleared).reduce<number | null>((near, o) => near === null ? -o.z : Math.min(near, -o.z), null),
+      obstacleDistance: nearest && !game.isOver ? Math.max(0, rules.playerZ - nearest.z) : null,
+      obstacleKind: nearest?.kind ?? null,
+      obstacleOpenLane: nearest?.laneCount === 2 ? nearest.startLane === 0 ? 2 : 0 : null,
+      deathReason: game.deathReason,
+      endPresentationComplete: drowning.complete,
       bossHp: game.enemies.find(e => e.kind === 'boss')?.hp ?? null,
       bossMaxHp: rules.enemyTypes.boss.hp,
       bossDefeated: game.bossDefeated,
@@ -368,13 +384,14 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     // still paints behind the dialog and remains available to tools/shot.mjs.
     const isPlaying = isPoseRunning || isCameraSkipped;
     const stepMs = isPlaying ? dtMs : 0;
-    if (isPlaying) {
+    if (isPlaying && !previewPaused) {
       sampleQuality(dtMs);
       game = updateGame(game, input.read(), dtMs, rules);
     }
 
+    drowning = updateDrowningPresentation(drowning, game.deathReason, previewPaused ? 0 : dtMs, rules.obstacle.drowningMs);
     if (sceneRefs) {
-      syncScene(sceneRefs, game, stepMs, rules, actorsVisible);
+      syncScene(sceneRefs, game, previewPaused ? 0 : stepMs, rules, actorsVisible, drowning);
       sceneRefs.render();
     }
 
@@ -558,6 +575,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         game = { ...game, distance: Number(distance) || 0 };
       },
       restart() {
+        previewPaused = false;
         game = restartGame(game, rules);
         input.reset();
         resetMovementTallies();
@@ -565,6 +583,21 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         if (!actorsVisible && sceneRefs?.player) {
           sceneRefs.player.group.visible = false;
         }
+        publish();
+      },
+      /** Deterministic fixture for visual regression, gated to development. */
+      previewHazard(kind: TrailHazard['kind'], startLane: 0 | 1 = 0, laneCount: 2 | 3 = 3, z = -12) {
+        if (!['log', 'stones', 'river'].includes(kind)) return;
+        const body = { id: 70, kind, z, previousZ: z, status: 'approaching' as const };
+        const obstacle: TrailHazard = kind === 'river' || laneCount === 3
+          ? { ...body, startLane: 0, laneCount: 3 }
+          : { ...body, kind, startLane, laneCount: 2 };
+        game = { ...createGameState(game.seed, rules), speed: rules.walkSpeed, obstacles: [obstacle], nextSpawnMs: Infinity, nextObstacleMs: Infinity };
+        input.reset();
+        resetMovementTallies();
+        previewPaused = true;
+        actorsVisible = true;
+        if (sceneRefs) syncScene(sceneRefs, game, 0, rules, actorsVisible, drowning);
         publish();
       },
       setActorsVisible(visible: boolean) {
@@ -599,12 +632,14 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
               stepMs,
               rules,
             );
+          drowning = updateDrowningPresentation(drowning, game.deathReason, stepMs, rules.obstacle.drowningMs);
           // Sync the view too, or per-frame visuals the reducer only reports
           // once -- deaths, hit bursts -- are stepped straight past. Only for
           // the tail: syncScene walks every scatter instance.
           const remainingMs = (steps - step) * stepMs;
-          if (sceneRefs && remainingMs < SIM_SYNC_TAIL_MS) syncScene(sceneRefs, game, stepMs, rules, actorsVisible);
+          if (sceneRefs && remainingMs < SIM_SYNC_TAIL_MS) syncScene(sceneRefs, game, stepMs, rules, actorsVisible, drowning);
         }
+        publish();
       },
       summary() {
         const info = sceneRefs?.renderer?.info?.render;
@@ -615,8 +650,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           isOver: game.isOver,
           isCleared: game.isCleared,
           enemies: game.enemies.map(e => ({ id: e.id, kind: e.kind, hp: e.hp, z: e.z, lane: e.lane })),
-          roots: game.obstacles.map(o => ({ side: o.side, z: o.z, cleared: o.cleared })),
+          hazards: game.obstacles.map(o => ({ id: o.id, kind: o.kind, startLane: o.startLane, laneCount: o.laneCount, z: o.z, status: o.status })),
+          deathReason: game.deathReason,
+          endPresentationComplete: drowning.complete,
+          drowningElapsedMs: drowning.elapsedMs,
+          splashVisible: sceneRefs?.drowningSplash?.group.visible ?? false,
+          playerVisible: player?.group.visible ?? false,
+          playerY: player?.group.position.y ?? null,
           jumpHeight: game.jumpHeight,
+          jumpStartedMs: game.jumpStartedMs,
           jumpCount: game.jumpCount,
           bossDefeated: game.bossDefeated,
           bossWarningLane: game.bossWarningLane,
@@ -628,6 +670,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           corpses: sceneRefs?.enemyPool?.corpses?.filter((c) => c.group.visible).length ?? 0,
           character: player?.characterId ?? null,
           anim: player?.currentActionName ?? null,
+          animTime: player?.currentAction?.time ?? null,
+          animDuration: player?.currentAction?.getClip().duration ?? null,
           animRunning: Boolean(player?.currentAction?.isRunning?.()),
           clips: Object.keys(player?.actions ?? {}),
         };
@@ -734,6 +778,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     jump() { if (!isDisposed && mode === 'game') input.requestJump(); },
 
     restart() {
+      previewPaused = false;
       game = restartGame(game, rules);
       input.reset();
       resetMovementTallies();
@@ -746,6 +791,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     setStage(next: StageSelection | null) {
+      previewPaused = false;
       stage = next;
       rules = rulesFor(next);
       // Difficulty changes HP and spawn rate, which cannot be applied to a run
@@ -819,6 +865,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   };
 
   function resetMovementTallies(): void {
+    drowning = createDrowningPresentation();
+    sceneRefs?.riverMask.hide();
+    sceneRefs?.drowningSplash.update(false, 0, 0, 0);
     sceneRefs?.enemyPool.reset();
     sceneRefs?.bulletPool.reset();
     if (sceneRefs) sceneRefs.lastEventsMs = -1;

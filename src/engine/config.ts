@@ -267,8 +267,17 @@ export const CONFIG = {
     /** Enough meshes for the worst case; the pool is never grown at runtime. */
     enemyPoolSize: 24,
 
-    jump: { durationMs: 800, height: 1.65, clearance: 0.8 },
-    obstacle: { firstMs: 8500, intervalMs: 8500, radius: 0.45, poolSize: 4 },
+    jump: {
+      durationMs: 800, height: 1.65, clearance: 0.8,
+      // Source Jump frames 4-13 contain flight; 13-19 absorb landing.
+      takeoffPose: 4 / 19, landingPose: 13 / 19,
+    },
+    obstacle: {
+      firstMs: 8500, intervalMs: 8500, radius: 0.45, poolSize: 4,
+      riverRadius: 0.8,
+      logWeight: 0.4, stoneWeight: 0.4, riverWeight: 0.2,
+      drowningMs: 650,
+    },
     boss: { triggerKills: 12, holdZ: -20, attackIntervalMs: 2800, telegraphMs: 1100 },
     enemyTypes: {
       weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, height: 1.8, radius: 0.6, color: '#9bdd66' },
