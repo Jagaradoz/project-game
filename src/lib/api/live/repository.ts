@@ -56,7 +56,6 @@ const runSchema = z.object({
   durationMs: z.number(),
   distanceM: z.number(),
   movementCount: z.number(),
-  difficulty: z.enum(['easy', 'normal', 'hard']),
   isCleared: z.boolean(),
   completedAt: z.string(),
 });

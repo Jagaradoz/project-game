@@ -9,7 +9,7 @@
  * When the backend lands this whole directory is deleted.
  */
 
-import type { Difficulty, RunResult } from '@/types/api';
+import type { RunResult } from '@/types/api';
 
 export const STORAGE_KEY = 'trail_runner_mock_v1';
 const SCHEMA_VERSION = 1;
@@ -137,8 +137,6 @@ function isAccount(value: unknown): value is MockAccount {
   );
 }
 
-const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
-
 function isRun(value: unknown): value is StoredRun {
   if (!isRecord(value)) return false;
   return (
@@ -153,7 +151,6 @@ function isRun(value: unknown): value is StoredRun {
     Number.isFinite(value.distanceM) &&
     Number.isFinite(value.movementCount) &&
     typeof value.isCleared === 'boolean' &&
-    typeof value.completedAt === 'string' &&
-    DIFFICULTIES.includes(value.difficulty as Difficulty)
+    typeof value.completedAt === 'string'
   );
 }

@@ -2,16 +2,17 @@
  * The biome and stage catalogue.
  *
  * Derived from the engine's BIOMES rather than restated, so adding a biome to
- * the renderer also adds it to /stages and to progress -- there is no second
+ * the renderer also adds it to progress -- there is no second
  * list to remember. Importing it here is safe: biomes.ts and palette.ts import
  * `three` only as a type, so nothing pulls WebGL into a page or a test.
  *
- * TOR 3 (ระบบ Biome และ Stage): each biome is 10 stages, cleared in order.
+ * The game is Training mode only: one forest biome with a single stage. The
+ * biome/stage shape stays in the API contract so the backend need not change.
  */
 
 import { BIOMES } from '@/engine/render/world/biomes';
 
-export const STAGES_PER_BIOME = 10;
+export const STAGES_PER_BIOME = 1;
 
 export interface BiomeCatalogEntry {
   biomeId: string;

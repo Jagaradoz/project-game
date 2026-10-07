@@ -59,7 +59,6 @@ function runInput(overrides: Partial<SubmitRunInput> = {}): SubmitRunInput {
     durationMs: 60_000,
     distanceM: 400,
     movementCount: 120,
-    difficulty: 'normal',
     isCleared: true,
     ...overrides,
   };
@@ -222,40 +221,27 @@ test('a guest keeps their runs when they register', async () => {
 
 /* ------------------------------------------------------------ progress ---- */
 
-test('only the first stage of the first biome starts unlocked', async () => {
+test('the Training stage starts unlocked and uncleared', async () => {
   const repo = createMockRepository();
   const biomes = await repo.getBiomes();
 
   assert.equal(biomes.length, BIOME_CATALOG.length);
   assert.equal(biomes[0]!.isUnlocked, true);
+  assert.equal(biomes[0]!.stages.length, STAGES_PER_BIOME);
   assert.equal(biomes[0]!.stages[0]!.isUnlocked, true);
-  assert.equal(biomes[0]!.stages[1]!.isUnlocked, false);
+  assert.equal(biomes[0]!.stages[0]!.isCleared, false);
 });
 
-test('clearing a stage unlocks the next one, and failing it does not', async () => {
+test('a cleared Training run marks the stage cleared, and a failed one does not', async () => {
   const repo = createMockRepository();
 
   await repo.submitRun(runInput({ stageNumber: 1, isCleared: false }));
   let biomes = await repo.getBiomes();
   assert.equal(biomes[0]!.stages[0]!.isCleared, false);
-  assert.equal(biomes[0]!.stages[1]!.isUnlocked, false);
 
   await repo.submitRun(runInput({ stageNumber: 1, isCleared: true }));
   biomes = await repo.getBiomes();
   assert.equal(biomes[0]!.stages[0]!.isCleared, true);
-  assert.equal(biomes[0]!.stages[1]!.isUnlocked, true);
-  assert.equal(biomes[0]!.stages[2]!.isUnlocked, false);
-});
-
-test('clearing all ten stages completes the biome', async () => {
-  const repo = createMockRepository();
-
-  for (let stageNumber = 1; stageNumber <= STAGES_PER_BIOME; stageNumber += 1) {
-    await repo.submitRun(runInput({ stageNumber, isCleared: true }));
-  }
-
-  const biomes = await repo.getBiomes();
-  assert.equal(biomes[0]!.stages.every((stage) => stage.isCleared), true);
 });
 
 test('bestScore per stage is the highest of that stage, not the latest', async () => {
@@ -413,7 +399,7 @@ test('a stored database from a future shape is coerced, not trusted', () => {
   assert.deepEqual(db.runs, []);
 });
 
-test('a run with an unrecognised difficulty is dropped on read', () => {
+test('a run stored by an older build with a difficulty field still loads', () => {
   storage.setItem(
     STORAGE_KEY,
     JSON.stringify({
@@ -440,5 +426,5 @@ test('a run with an unrecognised difficulty is dropped on read', () => {
     }),
   );
 
-  assert.deepEqual(readDb().runs, []);
+  assert.equal(readDb().runs.length, 1);
 });

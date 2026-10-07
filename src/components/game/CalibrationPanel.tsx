@@ -54,11 +54,12 @@ export default function CalibrationPanel() {
    */
   const hasLeaned = snapshot.lateralChangeCount > 0;
   const hasJogged = snapshot.stepCount > 0;
-  const hasJumped = snapshot.jumpCount > 0;
+  const hasRaisedArms = snapshot.armRaiseCount > 0;
+  const hasHeldHips = snapshot.hipsHoldCount > 0;
 
   const checks = useMemo(
-    () => buildChecks(snapshot, { hasLeaned, hasJogged, hasJumped }),
-    [snapshot, hasLeaned, hasJogged, hasJumped],
+    () => buildChecks(snapshot, { hasLeaned, hasJogged, hasRaisedArms, hasHeldHips }),
+    [snapshot, hasLeaned, hasJogged, hasRaisedArms, hasHeldHips],
   );
   const isReady = checks.every((check) => check.isPassing);
 
@@ -118,7 +119,7 @@ export default function CalibrationPanel() {
 
           {isReady ? (
             <Notice tone="ok" title="You are ready to play">
-              The system can see you clearly and has detected both kinds of movement.
+              The system can see you clearly and has detected every movement.
             </Notice>
           ) : (
             <Notice tone="info">
@@ -128,7 +129,7 @@ export default function CalibrationPanel() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <LinkButton
-              href="/stages"
+              href="/play"
               variant="primary"
               icon={<Map size={18} />}
               className={`flex-1 ${isReady ? '' : 'pointer-events-none opacity-50'}`}
@@ -137,7 +138,7 @@ export default function CalibrationPanel() {
               // so it is removed from the tab order rather than only greyed out.
               tabIndex={isReady ? undefined : -1}
             >
-              Choose a stage
+              Start training
             </LinkButton>
             <LinkButton href="/#how-to-play" icon={<BookOpen size={18} />} className="flex-1">
               How to play

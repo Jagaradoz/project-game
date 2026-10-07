@@ -1,10 +1,12 @@
 import {
+  ArrowBigUp,
   Footprints,
   Map,
   MonitorSmartphone,
   MoveHorizontal,
   Pause,
   Play,
+  Shield,
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
@@ -30,10 +32,10 @@ const FEATURES: {
   },
   {
     icon: Map,
-    title: 'Ten stages',
-    body: 'Clear them in order. Each one you clear opens the next.',
-    mark: '10',
-    markLabel: 'stages to clear',
+    title: 'Training mode',
+    body: 'One forest trail, five gentle moves. Paced for every age — no difficulty to pick.',
+    mark: '5',
+    markLabel: 'moves to learn',
   },
   {
     icon: MonitorSmartphone,
@@ -45,6 +47,8 @@ const FEATURES: {
 const CONTROLS = [
   { icon: MoveHorizontal, action: 'Step or lean sideways', effect: 'Switch lane — left, centre, or right' },
   { icon: Footprints, action: 'Jog in place', effect: 'Attack for as long as you keep moving' },
+  { icon: ArrowBigUp, action: 'Raise both arms', effect: 'Jump over logs, stones and rivers' },
+  { icon: Shield, action: 'Hands on hips', effect: 'Hold a shield through poison spore clouds' },
   { icon: Pause, action: 'Stand still', effect: 'Attacking stops. The runner still goes forward' },
 ];
 
@@ -143,7 +147,7 @@ export default function HomePage() {
               How to Play
             </h2>
             <p className="m-0 mx-auto mt-2 max-w-lg text-center text-sm leading-relaxed text-muted">
-              The whole game is these three. Nothing to memorise, nothing in your hands.
+              The whole game is these five. Nothing to memorise, nothing in your hands.
             </p>
 
             <ul className="m-0 mt-8 flex list-none flex-col gap-2 p-0">

@@ -127,8 +127,8 @@ function currentUser(db: MockDb): User {
  * Rebuilds the unlock tree from runs.
  *
  * Stage 1 of the first biome is always open. Stage n opens when n-1 is cleared;
- * a biome opens when every stage of the previous one is cleared -- TOR 3
- * (ผู้เล่นต้องผ่านแต่ละ Stage ตามลำดับเพื่อปลดล็อก Stage และ Biome ถัดไป).
+ * a biome opens when every stage of the previous one is cleared. With Training
+ * mode there is one biome of one stage, so this reduces to "cleared yet?".
  */
 export function deriveBiomeProgress(runs: readonly StoredRun[], userId: string): BiomeProgress[] {
   const mine = runs.filter((run) => run.userId === userId);

@@ -116,7 +116,7 @@ test('input: losing the body holds the lane and holds fire', () => {
   input.setPose(LATERAL.LEFT, true);
   input.clearPose();
 
-  assert.deepEqual(input.read(), { lane: 0, isFiring: false });
+  assert.deepEqual(input.read(), { lane: 0, isFiring: false, isShielding: false });
 });
 
 test('input: keyboard steps are clamped, and the next lean takes the lane back', () => {
@@ -378,7 +378,7 @@ test('game: no spawn row ever seals off every lane', () => {
   assert.ok(previousCount >= 0);
 });
 
-test('game: difficulty ramps speed up with distance, then stops', () => {
+test('game: speed ramps up with distance, then stops', () => {
   const early = runGame(createGameState(3), 120, constantInput(WALKING));
   const late = runGame({ ...early, distance: GAME.rampDistance * 2 }, 120, constantInput(WALKING));
 
@@ -507,7 +507,7 @@ test('game: restarting clears the kill count and the cleared flag', () => {
   assert.equal(fresh.isOver, false);
 });
 
-test('game: difficulty reaches the reducer through maxHp', () => {
+test('game: a raised maxHp reaches the reducer', () => {
   const forgiving = createGameState(1, { ...GAME, maxHp: GAME.maxHp + 1 });
   assert.equal(forgiving.hp, GAME.maxHp + 1);
 });

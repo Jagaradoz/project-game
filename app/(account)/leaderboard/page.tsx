@@ -50,7 +50,7 @@ export default function LeaderboardPage() {
       subtitle="The highest scores recorded, by username."
       width="wide"
       actions={
-        <LinkButton href="/stages" variant="primary" icon={<Map size={18} />}>
+        <LinkButton href="/play" variant="primary" icon={<Map size={18} />}>
           Play for a score
         </LinkButton>
       }
@@ -72,7 +72,7 @@ export default function LeaderboardPage() {
             title="No scores recorded yet"
             icon={<ChartColumn size={22} />}
             action={
-              <LinkButton href="/stages" variant="primary" icon={<Map size={18} />}>
+              <LinkButton href="/play" variant="primary" icon={<Map size={18} />}>
                 Play a run
               </LinkButton>
             }

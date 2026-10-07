@@ -30,6 +30,10 @@ export const MODEL_URLS = {
 export const LANDMARK = {
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
+  LEFT_ELBOW: 13,
+  RIGHT_ELBOW: 14,
+  LEFT_WRIST: 15,
+  RIGHT_WRIST: 16,
   LEFT_HIP: 23,
   RIGHT_HIP: 24,
   LEFT_KNEE: 25,
@@ -108,6 +112,39 @@ export const CONFIG = {
     missingResetMs: 300,
   },
 
+  /**
+   * Both arms raised overhead = jump. A low-impact stand-in for the body jump,
+   * so older players can clear obstacles without leaving the floor.
+   */
+  armsUp: {
+    /** Each wrist must sit this far above the shoulder line, in torso-lengths. */
+    minRise: 0.15,
+    /** Held this long before it counts, so a passing hand does not fire it. */
+    confirmMs: 120,
+    /** Both wrists must be back below the shoulders this long to rearm. */
+    rearmMs: 200,
+  },
+
+  /**
+   * Hands on hips (ท้าวเอว) = shield, held for as long as the pose is held.
+   * What separates it from arms hanging loose is the elbow: on the hips it
+   * juts out sideways, hanging it sits straight above the wrist.
+   */
+  handsOnHips: {
+    /** Wrist within this distance of its own hip, in torso-lengths. */
+    maxHipDist: 0.5,
+    /** Elbow further from the body midline than the wrist, in shoulder-widths. */
+    minElbowOut: 0.25,
+    /** Pose held this long before the shield goes up... */
+    enterMs: 300,
+    /** ...and broken this long before it drops. Hysteresis kills flicker. */
+    exitMs: 250,
+    /** Hands over the hips lower their confidence; accept arms and hips down to this. */
+    minVisibility: 0.3,
+    /** Last good hip positions are reused this long while the hands hide them. */
+    occlusionHoldMs: 1500,
+  },
+
   fps: {
     /** EMA weight for the new frame delta. */
     smoothing: 0.1,
@@ -152,58 +189,13 @@ export const CONFIG = {
   },
 
   /**
-   * Stage and difficulty, per TOR 3 (ระบบ Biome และ Stage, ระบบเกมและศัตรู).
-   *
-   * These are multipliers rather than absolute values so there is still exactly
-   * one place that says how fast the runner moves or how often enemies spawn --
-   * `game` below. A stage bends those numbers; it never restates them.
-   *
-   * `goalKills` is what turns the endless runner into a stage: clear that many
-   * enemies and the stage is passed. It grows with the stage number so stage 10
-   * is a real step up from stage 1, and with the biome so a later biome is
-   * harder at the same stage number.
+   * Training mode: the one run the game offers. A single forest stage with a
+   * kill goal and the boss at the end -- no stage ladder and no difficulty
+   * picker. How hard it gets is `game` below, nothing else.
    */
-  stage: {
-    /** Kills to clear stage 1 of the first biome. */
-    baseGoalKills: 12,
-    /** Added per stage within a biome, and per biome already travelled. */
-    goalKillsPerStage: 3,
-    goalKillsPerBiome: 6,
-
-    difficulty: {
-      easy: {
-        label: 'Easy',
-        /** Longer gaps between spawn rows. */
-        spawnIntervalScale: 1.35,
-        /** A gentler top speed. */
-        maxSpeedScale: 0.85,
-        /** Reaching the hardest settings takes longer. */
-        rampDistanceScale: 1.4,
-        /** TOR 5.1 non-punitive design: an easier run forgives more mistakes. */
-        maxHpBonus: 1,
-        goalKillsScale: 0.75,
-      },
-      normal: {
-        label: 'Normal',
-        spawnIntervalScale: 1,
-        maxSpeedScale: 1,
-        rampDistanceScale: 1,
-        maxHpBonus: 0,
-        goalKillsScale: 1,
-      },
-      hard: {
-        label: 'Hard',
-        spawnIntervalScale: 0.78,
-        maxSpeedScale: 1.15,
-        rampDistanceScale: 0.75,
-        maxHpBonus: 0,
-        goalKillsScale: 1.3,
-      },
-    },
-
-    /** Per stage within a biome, compounding: stage 10 spawns noticeably faster. */
-    spawnIntervalPerStage: 0.97,
-    maxSpeedPerStage: 1.012,
+  training: {
+    /** Kills to clear the run, the boss included. */
+    goalKills: 12,
   },
 
   game: {
@@ -286,6 +278,20 @@ export const CONFIG = {
         log: { height: 1, depth: 1.6 },
         stones: { height: 1.35, depth: 1.7 },
       },
+    },
+    /**
+     * Poison spore clouds. One fills every lane for `length` units, so the
+     * only answer is the hands-on-hips shield; standing in one unshielded costs
+     * 1 HP every `tickMs`. No enemies or trail hazards spawn while one is ahead
+     * of the player -- shielding means not shooting, and it must not be punished.
+     */
+    spore: {
+      firstMs: 30000, intervalMs: 45000,
+      length: 60, tickMs: 1500, entryGraceMs: 600,
+      /** Trail hazards must be at least this far ahead of the spawn line. */
+      spawnClearance: 25,
+      /** HUD warning starts this far before the front edge reaches the player. */
+      warnDistance: 45,
     },
     boss: { triggerKills: 12, holdZ: -20, attackIntervalMs: 2800, telegraphMs: 1100 },
     /**

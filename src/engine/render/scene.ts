@@ -29,6 +29,7 @@ import { createDrowningSplash } from '@/engine/render/actors/rivers';
 import { createRiverMask } from '@/engine/render/world/riverMask';
 import { addPlayer } from '@/engine/render/actors/player';
 import { createEffects } from '@/engine/render/actors/effects';
+import { addShieldBubble, addSporeCloud } from '@/engine/render/actors/spores';
 
 const MOTE_COUNT = 26;
 const MOTE_SPAN = 180;
@@ -75,6 +76,8 @@ export async function createScene(
   const obstaclePool = await addObstaclePool(THREE, scene, config, loader, palette);
   const drowningSplash = createDrowningSplash(THREE, scene, palette);
   const effects = createEffects(THREE, scene, palette);
+  const sporeCloud = addSporeCloud(THREE, scene, config);
+  const shield = addShieldBubble(THREE, player.group);
 
   // Short, damped camera impulses give hits and kills physical weight while
   // leaving the authored runner framing untouched between events.
@@ -148,6 +151,8 @@ export async function createScene(
     riverMask,
     drowningSplash,
     effects,
+    sporeCloud,
+    shield,
     cameraFeedback,
     lastEventsMs: -1,
     trailEdge,

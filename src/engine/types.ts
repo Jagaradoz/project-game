@@ -14,10 +14,10 @@ export type PoseConfig = AppConfig['pose'];
 export type LateralConfig = AppConfig['lateral'];
 export type JogConfig = AppConfig['jog'];
 export type JumpConfig = AppConfig['jump'];
+export type ArmsUpConfig = AppConfig['armsUp'];
+export type HandsOnHipsConfig = AppConfig['handsOnHips'];
 export type DrawConfig = AppConfig['draw'];
 export type GameConfig = AppConfig['game'];
-export type StageConfig = AppConfig['stage'];
-export type DifficultyPreset = StageConfig['difficulty']['normal'];
 
 /**
  * A stage's tuned rules: the game config it runs under, plus the goal that
@@ -35,15 +35,6 @@ export type StageRules = GameConfig & { goalKills: number; requireBoss?: boolean
 export type RunConfig = GameConfig & { goalKills?: number; requireBoss?: boolean };
 
 /**
- * Starting difficulty, chosen by the player -- TOR 3
- * (ผู้เล่นสามารถเลือกระดับความยากเริ่มต้นได้ตามตัวเลือกที่ระบบกำหนด).
- *
- * Declared here rather than in src/types/api.ts because it is a gameplay
- * concept first; the API contract imports it, not the other way round.
- */
-export type Difficulty = 'easy' | 'normal' | 'hard';
-
-/**
  * What one finished run reports. Deliberately NOT SubmitRunInput: the engine
  * knows nothing about the API contract, and src/types/api.ts already imports
  * from here. The React layer adds the idempotency key and submits it.
@@ -51,20 +42,12 @@ export type Difficulty = 'easy' | 'normal' | 'hard';
 export interface RunSummary {
   biomeId: string;
   stageNumber: number;
-  difficulty: Difficulty;
   score: number;
   enemiesKilled: number;
   durationMs: number;
   distanceM: number;
   movementCount: number;
   isCleared: boolean;
-}
-
-/** Which stage a run is playing. Set by /stages, read by the runtime. */
-export interface StageSelection {
-  biomeId: string;
-  stageNumber: number;
-  difficulty: Difficulty;
 }
 
 export type CharacterId = keyof GameConfig['characters'];
@@ -154,6 +137,28 @@ export interface JumpState {
   needsLanding: boolean;
 }
 
+export interface ArmsUpState {
+  /** True for the single frame the raise is confirmed. */
+  justRaised: boolean;
+  raiseCount: number;
+  isRaised: boolean;
+  /** Must lower both arms before the next raise counts. */
+  needsLower: boolean;
+  candidateMs: number | null;
+  loweredMs: number | null;
+  hasArms: boolean;
+}
+
+export interface HandsOnHipsState {
+  isActive: boolean;
+  holdCount: number;
+  candidateMs: number | null;
+  releaseMs: number | null;
+  /** Hips seen before the hands covered them, reused for `occlusionHoldMs`. */
+  lastHips: { left: Point2D; right: Point2D; atMs: number } | null;
+  hasArms: boolean;
+}
+
 interface HazardBody {
   id: number;
   z: number;
@@ -166,7 +171,18 @@ export type TrailHazard = HazardBody & (
   | { kind: 'log' | 'stones'; startLane: 0 | 1; laneCount: 2 }
   | { kind: 'log' | 'stones' | 'river'; startLane: 0; laneCount: 3 }
 );
-export type DeathReason = 'damage' | 'drowned';
+export type DeathReason = 'damage' | 'drowned' | 'poisoned';
+
+/**
+ * A poison spore cloud spanning every lane. `z` is the front edge (nearest the
+ * player); the cloud trails `length` units behind it.
+ */
+export interface SporeCloud {
+  id: number;
+  z: number;
+  length: number;
+  status: 'approaching' | 'inside' | 'cleared';
+}
 
 /** An enemy or a bullet. `previousZ` is what makes collision a swept test. */
 export interface GameBody {
@@ -190,6 +206,12 @@ export interface GameState {
   nextId: number;
   obstacles: TrailHazard[];
   nextObstacleMs: number;
+  spores: SporeCloud[];
+  nextSporeMs: number;
+  nextSporeTickMs: number;
+  isInSpore: boolean;
+  /** The hands-on-hips shield is up this frame. Blocks spores, stops firing. */
+  isShielding: boolean;
   jumpStartedMs: number | null;
   jumpHeight: number;
   jumpHeld: boolean;
@@ -231,6 +253,8 @@ export interface GameInput {
   jump?: boolean;
   lane: number;
   isFiring: boolean;
+  /** Level signal: the shield is up for as long as this is true. Never consumed. */
+  isShielding?: boolean;
 }
 
 /**
@@ -239,7 +263,7 @@ export interface GameInput {
  */
 export interface InputHandle {
   requestJump(): void;
-  setPose(label: LateralLabel | null, isJogging: boolean): void;
+  setPose(label: LateralLabel | null, isJogging: boolean, isShielding?: boolean): void;
   clearPose(): void;
   attachKeyboard(target?: EventTarget): () => void;
   detach(): void;

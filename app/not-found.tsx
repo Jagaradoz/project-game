@@ -21,8 +21,8 @@ export default function NotFound() {
         <LinkButton href="/" variant="primary" icon={<House size={18} />}>
           Back to home
         </LinkButton>
-        <LinkButton href="/stages" icon={<Map size={18} />}>
-          Browse stages
+        <LinkButton href="/play" icon={<Map size={18} />}>
+          Start training
         </LinkButton>
       </div>
     </main>

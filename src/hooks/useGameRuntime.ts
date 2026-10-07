@@ -21,11 +21,13 @@ import { CONFIG } from '@/engine/config';
 import { createGameRuntime } from '@/engine/runtime';
 import type { GameRuntime, HudSnapshot, RuntimeMode } from '@/engine/runtime';
 import { LATERAL } from '@/engine/detectors/lateral';
-import type { RunSummary, StageSelection } from '@/engine/types';
+import type { RunSummary } from '@/engine/types';
 
 /** Stable reference, so a render before the engine exists cannot loop. */
 const IDLE_SNAPSHOT: HudSnapshot = {
-  jumpCount: 0, feetVisible: false, isJumpCalibrated: false, isAirborne: false,
+  jumpCount: 0, armRaiseCount: 0, hipsHoldCount: 0, isHandsOnHips: false, isShielding: false,
+  sporeDistance: null, isInSpore: false,
+  feetVisible: false, isJumpCalibrated: false, isAirborne: false,
   obstacleDistance: null, bossHp: null, bossMaxHp: CONFIG.game.enemyTypes.boss.hp,
   obstacleKind: null, obstacleOpenLane: null, deathReason: null, endPresentationComplete: true,
   bossDefeated: false, bossWarningLane: null,
@@ -76,7 +78,6 @@ export interface UseGameRuntimeOptions {
   character?: string;
   /** 'pose' skips the renderer and the reducer -- see RuntimeMode. */
   mode?: RuntimeMode;
-  stage?: StageSelection | null;
 }
 
 /** Stable action surface, so components never depend on the runtime existing. */
@@ -93,14 +94,7 @@ export interface GameActions {
 }
 
 export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOptions = {}) {
-  const { character, mode = 'game', stage = null } = options;
-
-  // Destructured to primitives on purpose. A caller that rebuilds the stage
-  // object every render would otherwise restart the run every render; depending
-  // on the three values instead means the effect fires only on a real change.
-  const stageBiomeId = stage?.biomeId ?? null;
-  const stageNumber = stage?.stageNumber ?? null;
-  const stageDifficulty = stage?.difficulty ?? null;
+  const { character, mode = 'game' } = options;
 
   const runtimeRef = useRef<GameRuntime | null>(null);
   const snapshotRef = useRef<HudSnapshot>(IDLE_SNAPSHOT);
@@ -166,17 +160,6 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
   useEffect(() => {
     if (character) void runtimeRef.current?.setCharacter(character);
   }, [character]);
-
-  useEffect(() => {
-    if (mode !== 'game') return;
-
-    const hasStage = stageBiomeId !== null && stageNumber !== null && stageDifficulty !== null;
-    runtimeRef.current?.setStage(
-      hasStage
-        ? { biomeId: stageBiomeId, stageNumber, difficulty: stageDifficulty }
-        : null,
-    );
-  }, [mode, stageBiomeId, stageNumber, stageDifficulty]);
 
   const actions = useMemo<GameActions>(
     () => ({

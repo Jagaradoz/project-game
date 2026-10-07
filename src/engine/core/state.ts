@@ -19,6 +19,14 @@
 
 import { CONFIG } from '@/engine/config';
 import { advanceHazards, hasSafeHazardArrival } from '@/engine/core/hazards';
+import {
+  advanceSpores,
+  canSpawnSpore,
+  createSporeCloud,
+  hasPendingSpore,
+  isInsideSpore,
+  sporeDamage,
+} from '@/engine/core/spores';
 import type {
   GameBody,
   GameInput,
@@ -36,6 +44,7 @@ const LCG_MODULUS = 2 ** 32;
 export function createGameState(seed = 1, config: RunConfig = CONFIG.game): GameState {
   return {
     nextId: 1, obstacles: [], nextObstacleMs: config.obstacle.firstMs,
+    spores: [], nextSporeMs: config.spore.firstMs, nextSporeTickMs: 0, isInSpore: false, isShielding: false,
     jumpStartedMs: null, jumpHeight: 0, jumpHeld: false, jumpCount: 0,
     hitAtMs: -Infinity, justImpacts: [], bossSpawned: false, bossDefeated: false,
     bossWarningLane: null, bossAttackAtMs: null, nextBossAttackMs: 0, justBossAttack: false,
@@ -107,6 +116,9 @@ export function updateGame(
   const speed = approach(state.speed, speedAt(progress, config), stepMs, config.speedLerpMs);
   const distance = state.distance + speed * stepSec;
   const lane = clampLane(input.lane, config);
+  const isShielding = Boolean(input.isShielding);
+  // Hands on hips is not a jog: the shield and the gun never run together.
+  const isFiring = Boolean(input.isFiring) && !isShielding;
 
   const wantsJump = Boolean(input.jump);
   const tookOff = wantsJump && !state.jumpHeld && state.jumpStartedMs === null;
@@ -122,6 +134,10 @@ export function updateGame(
     if (enemy.kind === 'boss') moved.z = Math.min(config.boss.holdZ, moved.z);
     return moved;
   }).filter(enemy => hasSafeHazardArrival(enemy, crossed.obstacles, speed, config));
+  const spores = advanceSpores(state.spores, speed * stepSec, config);
+  const isInSpore = isInsideSpore(spores);
+  const spore = sporeDamage(state, isInSpore, isShielding, elapsedMs, config);
+  const sporePending = hasPendingSpore(spores);
   const movedBullets = state.bullets.map((bullet) => advance(bullet, -config.bulletSpeed * stepSec));
 
   const shots = resolveShots(movedBullets, movedEnemies, config, elapsedMs);
@@ -154,21 +170,27 @@ export function updateGame(
     : shots.enemies.filter((enemy) => !isHit(enemy, lane, config));
   const hitCount = isGraced ? 0 : shots.enemies.length - survivors.length + Number(crossed.hit || bossHit);
 
-  const spawned = spawnDue(
-    { enemies: survivors.filter((enemy) => enemy.z <= config.despawnZ), seed: state.seed },
-    { elapsedMs, nextSpawnMs: state.nextSpawnMs, progress, nextId: state.nextId },
-    config,
-  );
+  const liveEnemies = survivors.filter((enemy) => enemy.z <= config.despawnZ);
+  // A cloud ahead holds back new enemies until the player is through it.
+  const spawned = sporePending
+    ? { enemies: liveEnemies, seed: state.seed, nextSpawnMs: Math.max(state.nextSpawnMs, elapsedMs), nextId: state.nextId }
+    : spawnDue(
+      { enemies: liveEnemies, seed: state.seed },
+      { elapsedMs, nextSpawnMs: state.nextSpawnMs, progress, nextId: state.nextId },
+      config,
+    );
 
   const fired = fireDue(
     { bullets: shots.bullets.filter((bullet) => bullet.z >= config.spawnZ), cooldownMs: state.fireCooldownMs },
-    { lane, isFiring: Boolean(input.isFiring), stepMs },
+    { lane, isFiring, stepMs },
     config,
   );
 
   // A hit costs exactly one HP no matter how many enemies land on the same
   // frame; the grace window then covers the rest of the pile-up.
-  const hp = crossed.drowned ? 0 : Math.max(0, state.hp - (hitCount > 0 ? 1 : 0));
+  // Spores keep their own cooldown, so they stack with an enemy hit.
+  const hp = crossed.drowned ? 0 : Math.max(0, state.hp - (hitCount > 0 ? 1 : 0) - spore.damage);
+  const tookDamage = hitCount > 0 || spore.damage > 0;
 
   // The stage goal, if this run has one. `goalKills` is absent for an endless
   // run, and a run with no goal can never be cleared -- only ended.
@@ -177,7 +199,7 @@ export function updateGame(
   let nextId = spawned.nextId;
   const trigger = config.requireBoss && config.goalKills !== undefined ? Math.max(0, config.goalKills - 1) : config.boss.triggerKills;
   const bossDue = !state.bossSpawned && killCount >= trigger;
-  const shouldSpawnBoss = bossDue && !crossed.drowned && obstacles.every(o => o.status === 'cleared');
+  const shouldSpawnBoss = bossDue && !crossed.drowned && obstacles.every(o => o.status === 'cleared') && !sporePending;
   if (shouldSpawnBoss) {
     spawned.enemies = spawned.enemies.filter(e => e.z > -30);
     spawned.enemies.push({ id: nextId++, kind: 'boss', hp: config.enemyTypes.boss.hp, lane: 1, z: config.spawnZ, previousZ: config.spawnZ });
@@ -186,7 +208,8 @@ export function updateGame(
   }
   let nextObstacleMs = state.nextObstacleMs;
   const retainedHazards = obstacles.filter(o => o.z <= config.despawnZ);
-  if (hp > 0 && !isCleared && elapsedMs >= nextObstacleMs && retainedHazards.length < config.obstacle.poolSize && !liveBoss && !bossDue && !(state.bossSpawned && !bossDefeated)) {
+  const isBossPhase = Boolean(liveBoss) || bossDue || (state.bossSpawned && !bossDefeated);
+  if (hp > 0 && !isCleared && !sporePending && elapsedMs >= nextObstacleMs && retainedHazards.length < config.obstacle.poolSize && !isBossPhase) {
     const typeRoll = random(spawned.seed);
     const widthRoll = random(typeRoll.seed);
     const sideRoll = random(widthRoll.seed);
@@ -202,12 +225,16 @@ export function updateGame(
     nextObstacleMs = elapsedMs + config.obstacle.intervalMs;
   }
   spawned.enemies = spawned.enemies.filter(enemy => hasSafeHazardArrival(enemy, retainedHazards, speed, config));
+  const spawnsSpore = hp > 0 && !isCleared && canSpawnSpore(state, retainedHazards, elapsedMs, isBossPhase, config) && spores.length === 0;
+  const nextSpores = spawnsSpore ? [...spores, createSporeCloud(nextId++, config)] : spores;
+  const nextSporeMs = spawnsSpore ? elapsedMs + config.spore.intervalMs : state.nextSporeMs;
 
   return {
     ...state,
     nextId, obstacles: retainedHazards, nextObstacleMs, jumpStartedMs, jumpHeight,
+    spores: nextSpores, nextSporeMs, nextSporeTickMs: spore.nextTickMs, isInSpore, isShielding,
     jumpHeld: wantsJump, jumpCount: state.jumpCount + Number(tookOff),
-    hitAtMs: hitCount > 0 ? elapsedMs : state.hitAtMs, justImpacts: shots.impacts,
+    hitAtMs: tookDamage ? elapsedMs : state.hitAtMs, justImpacts: shots.impacts,
     bossSpawned: state.bossSpawned || shouldSpawnBoss, bossDefeated,
     bossWarningLane, bossAttackAtMs, nextBossAttackMs, justBossAttack,
     lane,
@@ -217,12 +244,12 @@ export function updateGame(
     speed,
     enemies: spawned.enemies,
     bullets: fired.bullets,
-    isFiring: Boolean(input.isFiring),
+    isFiring,
     fireCooldownMs: fired.cooldownMs,
     elapsedMs,
     nextSpawnMs: spawned.nextSpawnMs,
     invulnUntilMs: hitCount > 0 ? elapsedMs + config.invulnMs : state.invulnUntilMs,
-    justHit: hitCount > 0,
+    justHit: tookDamage,
     justFired: fired.didFire,
     justKilled: shots.killed,
     killCount,
@@ -230,7 +257,7 @@ export function updateGame(
     // Clearing the goal ends the run just as surely as running out of HP --
     // one is a win and one is a loss, and /result tells them apart by isCleared.
     isOver: hp === 0 || isCleared,
-    deathReason: crossed.drowned ? 'drowned' : hp === 0 ? 'damage' : null,
+    deathReason: crossed.drowned ? 'drowned' : hp > 0 ? null : hitCount === 0 && spore.damage > 0 ? 'poisoned' : 'damage',
     seed: spawned.seed,
   };
 }

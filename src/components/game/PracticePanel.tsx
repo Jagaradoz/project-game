@@ -116,7 +116,7 @@ export default function PracticePanel() {
                 label="Total movements"
                 icon={<Activity size={16} />}
                 value={formatNumber(snapshot.movementCount)}
-                detail="Jog steps, sideways steps and jumps"
+                detail="Jog steps, sideways steps, jumps, arm raises and hip holds"
               />
               <StatTile
                 label="Jog steps"
@@ -131,6 +131,12 @@ export default function PracticePanel() {
               />
               <StatTile label="Total time" value={formatDuration(sessionMs)} />
               <StatTile label="Jumps" value={formatNumber(snapshot.jumpCount)} detail={snapshot.feetVisible ? 'Both feet tracked' : 'Keep both feet in frame'} />
+              <StatTile label="Arm raises" value={formatNumber(snapshot.armRaiseCount)} detail="Both arms above your head" />
+              <StatTile
+                label="Hands-on-hips holds"
+                value={formatNumber(snapshot.hipsHoldCount)}
+                detail={snapshot.isHandsOnHips ? 'Holding now' : 'Hands on hips, elbows out'}
+              />
               <StatTile
                 label="Current cadence"
                 icon={<Gauge size={16} />}
@@ -142,7 +148,8 @@ export default function PracticePanel() {
 
           <Notice tone="info">
             There is no character, opponent, score or stage in this mode — it only counts movement.
-            Move at whatever pace suits you: step from side to side, and jog in place in bursts.
+            Move at whatever pace suits you: step from side to side, jog in place in bursts, raise
+            both arms overhead, and rest with your hands on your hips.
           </Notice>
         </div>
       </div>

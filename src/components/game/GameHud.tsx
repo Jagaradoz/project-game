@@ -1,4 +1,4 @@
-import { Heart } from 'lucide-react';
+import { Heart, Shield } from 'lucide-react';
 import type { HudSnapshot } from '@/engine/runtime';
 
 interface GameHudProps {
@@ -27,11 +27,12 @@ export function GameHud({ snapshot }: GameHudProps) {
             Move away from the {['left', 'centre', 'right'][snapshot.bossWarningLane]} lane!
           </div>
         )}
+        <SporeBanner snapshot={snapshot} />
         {snapshot.obstacleDistance !== null && snapshot.obstacleDistance < 35 && (
           <div role="status" className="border-2 border-ink bg-primary px-3 py-2 text-sm font-black text-ink">
             {snapshot.isAirborne ? 'Jumping' : snapshot.obstacleKind === 'river'
-              ? 'River ahead — jump! Missing it ends the run.'
-              : `${snapshot.obstacleKind === 'log' ? 'Log' : 'Stones'} ahead — ${snapshot.obstacleOpenLane === null ? 'jump!' : `jump or use the ${snapshot.obstacleOpenLane === 0 ? 'left' : 'right'} lane!`}`}
+              ? 'River ahead — raise both arms to jump! Missing it ends the run.'
+              : `${snapshot.obstacleKind === 'log' ? 'Log' : 'Stones'} ahead — ${snapshot.obstacleOpenLane === null ? 'raise both arms to jump!' : `raise both arms to jump, or use the ${snapshot.obstacleOpenLane === 0 ? 'left' : 'right'} lane!`}`}
             {' '}· {Math.ceil(snapshot.obstacleDistance)} m
           </div>
         )}
@@ -44,6 +45,9 @@ export function GameHud({ snapshot }: GameHudProps) {
           <span className="mr-1 text-[10px] font-black tracking-[0.12em] text-white uppercase">
             Health
           </span>
+          {snapshot.isShielding && (
+            <Shield size={16} aria-label="Shield up" className="ml-1 fill-sky-300/40 text-sky-300 order-last" />
+          )}
           {pips.map((isFull, index) => (
             <Heart
               key={index}
@@ -72,7 +76,32 @@ export function GameHud({ snapshot }: GameHudProps) {
 }
 
 /**
- * Stage objective progress. Absent in an endless run, which has no goal.
+ * Spore cloud warning: ahead, then inside. Only the shield gets the player
+ * through, so the copy always names the pose rather than the game action.
+ */
+function SporeBanner({ snapshot }: { snapshot: HudSnapshot }) {
+  if (snapshot.isOver) return null;
+  if (snapshot.isInSpore) {
+    return snapshot.isShielding ? (
+      <div role="status" className="border-2 border-white bg-sky-700 px-3 py-2 text-sm font-black text-white">
+        Shield up — keep your hands on your hips until the cloud passes
+      </div>
+    ) : (
+      <div role="status" className="border-2 border-white bg-purple-800 px-3 py-2 text-sm font-black text-white">
+        Poison spores! Put your hands on your hips to shield
+      </div>
+    );
+  }
+  if (snapshot.sporeDistance === null) return null;
+  return (
+    <div role="status" className="border-2 border-white bg-purple-700 px-3 py-2 text-sm font-black text-white">
+      Poison spores ahead — get ready: hands on hips! · {Math.ceil(snapshot.sporeDistance)} m
+    </div>
+  );
+}
+
+/**
+ * Training goal progress. Absent in an endless run, which has no goal.
  */
 function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
   if (snapshot.goalKills === null) return null;
@@ -86,7 +115,7 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
       <div className="flex items-end justify-between gap-3 text-white">
         <div className="min-w-0">
           <p className="m-0 text-[10px] font-black tracking-[0.12em] text-white/80 uppercase">
-            Stage objective
+            Training goal
           </p>
           <p className="m-0 truncate text-sm font-black tracking-wide uppercase">
             Defeat {snapshot.goalKills} enemies
@@ -99,7 +128,7 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
       <div
         className="h-3 overflow-hidden border border-white/50 bg-white/15"
         role="progressbar"
-        aria-label="Stage enemies defeated"
+        aria-label="Enemies defeated"
         aria-valuemin={0}
         aria-valuemax={snapshot.goalKills}
         aria-valuenow={completed}

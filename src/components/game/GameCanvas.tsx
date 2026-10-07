@@ -9,14 +9,14 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { Footprints, MoveHorizontal } from 'lucide-react';
+import { ArrowBigUp, Footprints, MoveHorizontal, Shield } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useGameRuntime } from '@/hooks/useGameRuntime';
 import { usePlayDebugTools } from '@/hooks/usePlayDebugTools';
 import { getErrorMessage, repository } from '@/lib/api';
 import { useRunStore } from '@/lib/store/run';
-import { useSettings, useStageSelection } from '@/lib/store/settings';
+import { useSettings } from '@/lib/store/settings';
 import { CameraPermissionModal } from '@/components/game/CameraPermissionModal';
 import { CameraStage } from '@/components/game/CameraStage';
 import { DetectorDebugPanel } from '@/components/game/DetectorDebugPanel';
@@ -38,7 +38,6 @@ export default function GameCanvas() {
   const character = useSettings((state) => state.character);
   const setCharacter = useSettings((state) => state.setCharacter);
   // Validated on the way out of the store: persisted preferences are untrusted.
-  const stage = useStageSelection();
   const showDebugTools = usePlayDebugTools();
 
   const setLastRun = useRunStore((state) => state.setLastRun);
@@ -50,7 +49,7 @@ export default function GameCanvas() {
       video: videoRef,
       overlay: overlayRef,
     },
-    { character, stage },
+    { character },
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -204,6 +203,7 @@ export default function GameCanvas() {
               <span>← / → or A / D to change lane</span>
               <span>Hold Space or the fire button to attack</span>
               <span>↑ / W / J to jump</span>
+              <span>Hold S or Shift to shield</span>
             </>
           ) : (
             <>
@@ -215,8 +215,15 @@ export default function GameCanvas() {
                 <Footprints aria-hidden size={15} />
                 Jog in place to attack
               </span>
+              <span className="flex items-center gap-1.5">
+                <ArrowBigUp aria-hidden size={15} />
+                Raise both arms to jump
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Shield aria-hidden size={15} />
+                Hands on hips to shield from spores
+              </span>
               <span className="text-subtle">Arrow keys also work</span>
-              <span>Jump over logs, stones, and rivers</span>
             </>
           )}
         </p>
@@ -226,7 +233,7 @@ export default function GameCanvas() {
             Jump · ↑ / W / J
           </button>
           {snapshot.isCameraRunning && <span className="text-xs text-muted" role="status">
-            {!snapshot.feetVisible ? 'Step back until both feet are visible' : !snapshot.isJumpCalibrated ? 'Stand still to calibrate jumping' : 'Jump tracking ready'}
+            {!snapshot.feetVisible || !snapshot.isJumpCalibrated ? 'Raise both arms to jump' : 'Raise both arms or hop to jump'}
           </span>}
         </div>
 

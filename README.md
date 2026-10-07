@@ -172,7 +172,7 @@ app/                              routes, one per TOR screen
 app/page.tsx                      home: briefing, safety, privacy, study entry
 app/(info)/how-to-play|consent    full instructions; study consent (gates /practice)
 app/(game)/play/page.tsx          the game; client-only boundary for the canvas
-app/(game)/calibrate|stages|result  camera setup, stage select, run summary
+app/(game)/calibrate|result        camera setup, run summary
 app/(account)/login|register|profile|profile/edit|leaderboard
 app/(study)/practice              CONTROL GROUP: same detectors, zero game elements
 
@@ -181,10 +181,13 @@ src/engine/config.ts              every tunable value, game included
 src/engine/runtime.ts             lifecycle: both loops, camera, scene, dispose()
 src/engine/types.ts               shared shapes; config types derived from CONFIG
 src/engine/core/state.ts          pure reducer: input over time -> lanes, enemies, bullets, HP, score
-src/engine/core/stage.ts          pure: (biome, stage, difficulty) -> tuned config + goalKills
-src/engine/core/input.ts          lean + keyboard -> { lane, isFiring }
+src/engine/core/stage.ts          pure: Training rules -> config + goalKills
+src/engine/core/spores.ts         pure: poison spore clouds, shield-blocked damage ticks
+src/engine/core/input.ts          lean + keyboard -> { lane, isFiring, isShielding, jump }
 src/engine/detectors/lateral.ts   pure reducer: landmarks -> LEFT/CENTER/RIGHT
 src/engine/detectors/jog.ts       pure reducer: landmarks over time -> jogging + cadence
+src/engine/detectors/armsUp.ts    pure reducer: both arms overhead -> one jump edge
+src/engine/detectors/handsOnHips.ts pure reducer: hands on hips, held -> shield
 src/engine/pose/camera.ts         getUserMedia, iOS quirks, readable errors
 src/engine/pose/pose.ts           PoseLandmarker load/detect, GPU -> CPU fallback
 src/engine/pose/draw.ts           skeleton overlay

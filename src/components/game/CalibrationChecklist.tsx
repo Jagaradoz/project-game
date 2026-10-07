@@ -20,15 +20,14 @@ export interface CalibrationCheck {
  */
 export function buildChecks(
   snapshot: HudSnapshot,
-  rehearsal: { hasLeaned: boolean; hasJogged: boolean; hasJumped?: boolean },
+  rehearsal: { hasLeaned: boolean; hasJogged: boolean; hasRaisedArms: boolean; hasHeldHips: boolean },
 ): CalibrationCheck[] {
   const lighting = classifyLighting(snapshot.luma);
   const distance = classifyDistance(snapshot.shoulderWidth);
 
   return [
-    { id: 'feet', label: 'Both feet visible', detail: 'Step back so your full body and both feet stay inside the frame', isPassing: snapshot.feetVisible },
-    { id: 'jumpCalibration', label: 'Jump baseline captured', detail: snapshot.isJumpCalibrated ? 'Standing height captured' : 'Stand still with both feet on the floor', isPassing: snapshot.isJumpCalibrated },
-    { id: 'jump', label: 'Jump tested', detail: rehearsal.hasJumped ? 'Two-foot jump detected' : 'Make a small jump with both feet, then land', isPassing: Boolean(rehearsal.hasJumped) },
+    // The body hop is optional -- raising both arms is the jump every player can do,
+    // so neither feet in frame nor a real jump gate the run.
     {
       id: 'camera',
       label: 'Camera is on',
@@ -98,6 +97,22 @@ export function buildChecks(
         ? 'Jogging rhythm detected'
         : 'Try jogging in place, lifting your knees alternately',
       isPassing: rehearsal.hasJogged,
+    },
+    {
+      id: 'armsUp',
+      label: 'Raise both arms tested',
+      detail: rehearsal.hasRaisedArms
+        ? 'Both arms raised overhead — that is your jump'
+        : 'Raise both arms above your head, then lower them',
+      isPassing: rehearsal.hasRaisedArms,
+    },
+    {
+      id: 'handsOnHips',
+      label: 'Hands on hips tested',
+      detail: rehearsal.hasHeldHips
+        ? 'Hands on hips detected — that is your shield'
+        : 'Put both hands on your hips, elbows out, and hold for a moment',
+      isPassing: rehearsal.hasHeldHips,
     },
   ];
 }

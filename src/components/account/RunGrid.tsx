@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/Badge';
 import { LinkButton } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { TrailStill } from '@/components/ui/TrailStill';
-import { difficultyLabel } from '@/engine/core/stage';
 import { biomeName } from '@/lib/api/catalog';
 import { formatDuration, formatNumber } from '@/lib/format';
 import { biomeStillSrc } from '@/lib/media/stills';
@@ -18,8 +17,8 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
         title="No runs yet"
         icon={<Map size={22} />}
         action={
-          <LinkButton href="/stages" variant="primary" icon={<Map size={18} />}>
-            Choose a stage
+          <LinkButton href="/play" variant="primary" icon={<Map size={18} />}>
+            Start training
           </LinkButton>
         }
       >
@@ -38,8 +37,7 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
         const outcome = run.isCleared ? 'cleared' : 'not cleared';
         const label = [
           name,
-          `stage ${run.stageNumber}`,
-          difficultyLabel(run.difficulty),
+          'training',
           `${formatNumber(run.score)} points`,
           formatDuration(run.durationMs),
           outcome,
@@ -51,7 +49,7 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
         return (
           <li key={run.id}>
             <Link
-              href="/stages"
+              href="/play"
               aria-label={label}
               className="relative block aspect-3/4 overflow-hidden rounded-none border-2 border-ink text-white no-underline shadow-[4px_4px_0_0_var(--color-ink)]"
             >
@@ -74,7 +72,7 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
               <span className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 p-1.5 sm:p-2">
                 <span className="text-xs font-semibold leading-tight sm:text-sm">{name}</span>
                 <span className="text-[10px] tabular-nums text-white/85 sm:text-xs">
-                  Stage {run.stageNumber} · {formatNumber(run.score)} pts
+                  Training · {formatNumber(run.score)} pts
                 </span>
               </span>
             </Link>

@@ -22,7 +22,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
 import { PageShell } from '@/components/ui/PageShell';
 import { StatGrid, StatTile } from '@/components/ui/StatTile';
-import { difficultyLabel } from '@/engine/core/stage';
 import { getErrorMessage, repository } from '@/lib/api';
 import { biomeName } from '@/lib/api/catalog';
 import { formatDelta, formatDuration, formatMetres, formatNumber } from '@/lib/format';
@@ -72,8 +71,8 @@ export default function ResultPage() {
           title="No runs yet"
           icon={<ChartColumn size={22} />}
           action={
-            <LinkButton href="/stages" variant="primary" icon={<Map size={18} />}>
-              Choose a stage
+            <LinkButton href="/play" variant="primary" icon={<Map size={18} />}>
+              Start training
             </LinkButton>
           }
         >
@@ -83,13 +82,12 @@ export default function ResultPage() {
         <>
           <Notice
             tone={run.isCleared ? 'ok' : 'info'}
-            title={run.isCleared ? 'Stage cleared' : 'Run complete'}
+            title={run.isCleared ? 'Training cleared' : 'Run complete'}
           >
-            {biomeName(run.biomeId)} &middot; Stage {run.stageNumber} &middot;{' '}
-            {difficultyLabel(run.difficulty)}
+            {biomeName(run.biomeId)} &middot; Training
             {run.isCleared
-              ? ' — the next stage is now unlocked.'
-              : ' — you did not reach the target for this stage. Try again whenever you like.'}
+              ? ' — well done, you reached the goal.'
+              : ' — you did not reach the goal this time. Try again whenever you like.'}
           </Notice>
 
           <Card title="This run" icon={<Trophy size={20} />}>
@@ -134,9 +132,6 @@ export default function ResultPage() {
               className="flex-1"
             >
               Play again
-            </LinkButton>
-            <LinkButton href="/stages" icon={<Map size={18} />} className="flex-1">
-              Choose a stage
             </LinkButton>
             <LinkButton href="/" icon={<House size={18} />} className="flex-1">
               Home

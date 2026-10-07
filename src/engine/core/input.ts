@@ -17,6 +17,7 @@ import type { GameConfig, GameInput, InputHandle, LateralLabel } from '@/engine/
 
 const KEY_LEFT = new Set(['ArrowLeft', 'a', 'A']);
 const KEY_RIGHT = new Set(['ArrowRight', 'd', 'D']);
+const KEY_SHIELD = new Set(['s', 'S', 'Shift']);
 
 const POSE_LANES: Record<LateralLabel, number> = {
   [LATERAL.LEFT]: 0,
@@ -31,12 +32,15 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   let hasPose = false;
   let devFire = false;
   let pendingJump = false;
+  let isShielding = false;
+  let devShield = false;
   let detachKeyboard: () => void = () => {};
 
   /** `label` is null when no body is tracked. */
-  function setPose(label: LateralLabel | null, isJogging: boolean): void {
+  function setPose(label: LateralLabel | null, isJogging: boolean, shielding = false): void {
     hasPose = true;
     isFiring = Boolean(isJogging);
+    isShielding = shielding;
 
     // Only a CHANGE of label takes the lane back from the keyboard, so tapping a
     // key while standing centred does not fight the detector every frame.
@@ -52,6 +56,7 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
     pendingJump = false;
     hasPose = true;
     isFiring = false;
+    isShielding = false;
     lastPoseLabel = null;
   }
 
@@ -78,6 +83,11 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
         key.preventDefault();
         return;
       }
+      if (KEY_SHIELD.has(key.key)) {
+        devShield = true;
+        key.preventDefault();
+        return;
+      }
       if (key.repeat) return;
       if (KEY_LEFT.has(key.key)) {
         step(-1);
@@ -88,10 +98,13 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
       }
     };
     const onKeyUp = (event: Event) => {
-      if ((event as KeyboardEvent).key === ' ') devFire = false;
+      const { key } = event as KeyboardEvent;
+      if (key === ' ') devFire = false;
+      if (KEY_SHIELD.has(key)) devShield = false;
     };
     const onBlur = () => {
       devFire = false;
+      devShield = false;
       pendingJump = false;
     };
 
@@ -103,6 +116,7 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
       target.removeEventListener('keyup', onKeyUp);
       target.removeEventListener('blur', onBlur);
       devFire = false;
+      devShield = false;
     };
     return detachKeyboard;
   }
@@ -110,7 +124,7 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   function read(): GameInput {
     const jump = pendingJump;
     pendingJump = false;
-    return { lane, isFiring: isFiring || devFire, ...(jump ? { jump: true } : {}) };
+    return { lane, isFiring: isFiring || devFire, isShielding: isShielding || devShield, ...(jump ? { jump: true } : {}) };
   }
 
   function reset(): void {
@@ -118,6 +132,8 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
     lane = clampLane((config.laneCount - 1) / 2, config);
     lastPoseLabel = null;
     devFire = false;
+    devShield = false;
+    isShielding = false;
     if (!hasPose) isFiring = true;
   }
 

@@ -76,6 +76,17 @@ export function DetectorDebugPanel({
             detail={`${Math.round(snapshot.cadenceSpm)} spm · ${snapshot.stepCount} steps · Δ ${snapshot.kneeDelta.toFixed(2)}`}
           />
           <StatTile
+            label="Arms up"
+            value={String(snapshot.armRaiseCount)}
+            detail="Both wrists above the shoulders"
+          />
+          <StatTile
+            label="Hands on hips"
+            value={snapshot.isHandsOnHips ? 'HOLDING' : 'NO'}
+            isHighlighted={snapshot.isHandsOnHips}
+            detail={`${snapshot.hipsHoldCount} holds`}
+          />
+          <StatTile
             label="Frame rate"
             value={snapshot.fps === null ? '--' : snapshot.fps.toFixed(0)}
             detail={

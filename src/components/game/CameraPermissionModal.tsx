@@ -67,7 +67,7 @@ export function CameraPermissionModal({ error, status, onAllow, onSkip }: Camera
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        router.push('/stages');
+        router.push('/');
         return;
       }
 
@@ -161,8 +161,8 @@ export function CameraPermissionModal({ error, status, onAllow, onSkip }: Camera
           >
             {isRequesting ? loadingLabel(status) : copy.cta}
           </Button>
-          <LinkButton href="/stages" icon={<Map size={18} />} className="flex-1">
-            Back to stages
+          <LinkButton href="/" icon={<Map size={18} />} className="flex-1">
+            Back to home
           </LinkButton>
         </div>
         {onSkip && (

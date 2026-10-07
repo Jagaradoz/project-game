@@ -17,10 +17,12 @@
 import { CONFIG } from '@/engine/config';
 import { createGameState, restartGame, updateGame } from '@/engine/core/state';
 import { createDrowningPresentation, updateDrowningPresentation } from '@/engine/core/drowning';
-import { DEFAULT_DIFFICULTY, resolveStageRules } from '@/engine/core/stage';
+import { TRAINING_STAGE_NUMBER, resolveTrainingRules } from '@/engine/core/stage';
 import { createInput } from '@/engine/core/input';
 import { createJogState, updateJog } from '@/engine/detectors/jog';
 import { createJumpState, updateJump } from '@/engine/detectors/jump';
+import { createArmsUpState, updateArmsUp } from '@/engine/detectors/armsUp';
+import { createHandsOnHipsState, updateHandsOnHips } from '@/engine/detectors/handsOnHips';
 import {
   LATERAL,
   createLateralState,
@@ -48,7 +50,6 @@ import type {
   RunSummary,
   ShadowQuality,
   StageRules,
-  StageSelection,
   DeathReason,
   TrailHazard,
 } from '@/engine/types';
@@ -93,13 +94,22 @@ export interface RuntimeOptions {
   seed?: number;
   character?: string;
   mode?: RuntimeMode;
-  /** Which stage to play. Omitted means an endless run with no goal. */
-  stage?: StageSelection;
   onError?: (message: string) => void;
 }
 
 export interface HudSnapshot {
   jumpCount: number;
+  /** Both-arms-overhead raises, each one a jump. */
+  armRaiseCount: number;
+  /** Times the hands-on-hips pose was taken up. */
+  hipsHoldCount: number;
+  /** The hands-on-hips pose is held right now (pose read, not the reducer's shield). */
+  isHandsOnHips: boolean;
+  /** The reducer's shield, which keyboard play can also raise. */
+  isShielding: boolean;
+  /** Distance to the next spore cloud's front edge, once inside warning range. */
+  sporeDistance: number | null;
+  isInSpore: boolean;
   feetVisible: boolean;
   isJumpCalibrated: boolean;
   isAirborne: boolean;
@@ -125,7 +135,8 @@ export interface HudSnapshot {
   elapsedMs: number;
 
   /**
-   * What TOR 3 calls จำนวนการเคลื่อนไหว: jog steps, lane changes and jumps. The system
+   * What TOR 3 calls จำนวนการเคลื่อนไหว: jog steps, lane changes, jumps, arm
+   * raises and hands-on-hips holds. The system
    * detected these -- it is not a calibrated energy figure, and
    * src/types/api.ts keeps that distinction too.
    */
@@ -167,6 +178,9 @@ export interface HudSnapshot {
 const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
   'score',
   'hp',
+  'isShielding',
+  'isHandsOnHips',
+  'isInSpore',
   'isOver',
   'isCleared',
   'endPresentationComplete',
@@ -187,8 +201,6 @@ export interface GameRuntime {
   setDevFire(active: boolean): void;
   restart(): void;
   setCharacter(charId: string): Promise<void>;
-  /** Retunes the run in place. Restarts it, because difficulty cannot change mid-run. */
-  setStage(stage: StageSelection | null): void;
   /** What /result submits. Read after the run ends. */
   getRunSummary(): RunSummary;
   /** Stable between changes, so it is safe for useSyncExternalStore. */
@@ -205,8 +217,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   const mode: RuntimeMode = options.mode ?? 'game';
   const exposure = createExposureSampler();
 
-  let stage: StageSelection | null = options.stage ?? null;
-  let rules: StageRules = rulesFor(stage);
+  const rules: StageRules = rulesFor(mode);
 
   let game: GameState = createGameState(options.seed ?? 1, rules);
   let drowning = createDrowningPresentation();
@@ -214,6 +225,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let lateral: LateralState = createLateralState();
   let jog: JogState = createJogState();
   let jump = createJumpState();
+  let armsUp = createArmsUpState();
+  let handsOnHips = createHandsOnHipsState();
   const input = createInput();
 
   let sceneRefs: SceneRefs | null = null;
@@ -257,21 +270,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let actorsVisible = true;
 
   /**
-   * The config this run steps under. With no stage selected the goal is absent,
-   * which is what keeps the endless runner (and /practice) working unchanged.
+   * The config this run steps under. The game plays Training; pose mode has
+   * no reducer to feed, so it keeps the goal-less endless config.
    */
-  function rulesFor(selection: StageSelection | null): StageRules {
-    if (!selection) return { ...CONFIG.game, goalKills: Number.POSITIVE_INFINITY };
-
-    // BIOMES is the unlock order, and src/lib/api/catalog.ts derives from it --
-    // reading it here rather than importing the catalogue keeps the engine free
-    // of any dependency on the app layer.
-    const index = BIOMES.findIndex((entry) => entry.id === selection.biomeId);
-    return resolveStageRules(
-      Math.max(0, index),
-      selection.stageNumber,
-      selection.difficulty ?? DEFAULT_DIFFICULTY,
-    );
+  function rulesFor(runMode: RuntimeMode): StageRules {
+    if (runMode === 'game') return resolveTrainingRules();
+    return { ...CONFIG.game, goalKills: Number.POSITIVE_INFINITY };
   }
 
   /* ---------------------------------------------------------- snapshot ---- */
@@ -286,12 +290,25 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   let snapshot: HudSnapshot = buildSnapshot();
 
+  function sporeDistanceAhead(): number | null {
+    if (game.isOver) return null;
+    const next = game.spores.find((cloud) => cloud.status === 'approaching');
+    const distance = next ? rules.playerZ - next.z : null;
+    return distance !== null && distance <= rules.spore.warnDistance ? Math.max(0, distance) : null;
+  }
+
   function buildSnapshot(): HudSnapshot {
     const nearest = game.obstacles.filter(o => o.status !== 'cleared').reduce<TrailHazard | null>(
       (near, o) => !near || o.z > near.z ? o : near, null);
     return {
       score: game.score,
       jumpCount: jump.jumpCount,
+      armRaiseCount: armsUp.raiseCount,
+      hipsHoldCount: handsOnHips.holdCount,
+      isHandsOnHips: handsOnHips.isActive,
+      isShielding: game.isShielding,
+      sporeDistance: sporeDistanceAhead(),
+      isInSpore: game.isInSpore,
       feetVisible: jump.feetVisible,
       isJumpCalibrated: jump.isCalibrated,
       isAirborne: game.jumpStartedMs !== null,
@@ -313,7 +330,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       goalKills: Number.isFinite(rules.goalKills) ? rules.goalKills : null,
       isCleared: game.isCleared,
       elapsedMs: game.elapsedMs,
-      movementCount: jog.stepCount + lateralChangeCount + jump.jumpCount,
+      movementCount: movementTotal(),
       lateralChangeCount,
       movementMs,
 
@@ -457,6 +474,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     lateral = updateLateral(lateral, landmarks, nowMs);
     jog = updateJog(jog, landmarks, nowMs);
     jump = updateJump(jump, landmarks, nowMs);
+    armsUp = updateArmsUp(armsUp, landmarks, nowMs);
+    handsOnHips = updateHandsOnHips(handsOnHips, landmarks, nowMs);
 
     trackCalibrationReadouts(landmarks as PoseLandmarks | null, nowMs);
     trackMovement(nowMs);
@@ -465,8 +484,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     if (!landmarks || !lateral.isCalibrated) {
       input.clearPose();
     } else {
-      input.setPose(lateral.label, jog.isJogging);
-      if (jump.justJumped) input.requestJump();
+      input.setPose(lateral.label, jog.isJogging, handsOnHips.isActive);
+      // Raising both arms is the low-impact jump; the body hop still works.
+      if (jump.justJumped || armsUp.justRaised) input.requestJump();
     }
 
     if (ctx) {
@@ -573,6 +593,10 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       ready: true,
       warpTo(distance: number) {
         game = { ...game, distance: Number(distance) || 0 };
+      },
+      /** Brings the next spore cloud forward to now, instead of waiting for its timer. */
+      spawnSpore() {
+        game = { ...game, nextSporeMs: game.elapsedMs };
       },
       restart() {
         previewPaused = false;
@@ -748,7 +772,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     stopCamera() {
-      jump = { ...createJumpState(), jumpCount: jump.jumpCount };
+      resetPoseHolds();
       cameraRequestId += 1;
       isPoseRunning = false;
       cancelPoseFrame();
@@ -773,7 +797,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     recalibrate() {
-      jump = { ...createJumpState(), jumpCount: jump.jumpCount };
+      resetPoseHolds();
       lateral = recalibrateLateral(lateral);
       setStatus('Recalibrating centre and jumping — stand still with both feet visible.');
     },
@@ -797,28 +821,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       return applyCharacter(charId);
     },
 
-    setStage(next: StageSelection | null) {
-      previewPaused = false;
-      stage = next;
-      rules = rulesFor(next);
-      // Difficulty changes HP and spawn rate, which cannot be applied to a run
-      // already in progress without making the result meaningless.
-      game = createGameState(game.seed, rules);
-      input.reset();
-      resetMovementTallies();
-      publish();
-    },
-
     getRunSummary(): RunSummary {
       return {
-        biomeId: stage?.biomeId ?? BIOMES[0]!.id,
-        stageNumber: stage?.stageNumber ?? 1,
-        difficulty: stage?.difficulty ?? DEFAULT_DIFFICULTY,
+        biomeId: BIOMES[0]!.id,
+        stageNumber: TRAINING_STAGE_NUMBER,
         score: game.score,
         enemiesKilled: game.killCount,
         durationMs: Math.round(game.elapsedMs),
         distanceM: Math.round(game.distance),
-        movementCount: jog.stepCount + lateralChangeCount + jump.jumpCount,
+        movementCount: movementTotal(),
         isCleared: game.isCleared,
       };
     },
@@ -871,6 +882,17 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
   };
 
+  /** จำนวนการเคลื่อนไหว: every move the detectors counted this session. */
+  function movementTotal(): number {
+    return jog.stepCount + lateralChangeCount + jump.jumpCount + armsUp.raiseCount + handsOnHips.holdCount;
+  }
+
+  function resetPoseHolds(): void {
+    jump = { ...createJumpState(), jumpCount: jump.jumpCount };
+    armsUp = { ...createArmsUpState(), raiseCount: armsUp.raiseCount };
+    handsOnHips = { ...createHandsOnHipsState(), holdCount: handsOnHips.holdCount };
+  }
+
   function resetMovementTallies(): void {
     drowning = createDrowningPresentation();
     sceneRefs?.riverMask.hide();
@@ -879,6 +901,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     sceneRefs?.bulletPool.reset();
     if (sceneRefs) sceneRefs.lastEventsMs = -1;
     jump = { ...jump, jumpCount: 0, justJumped: false };
+    armsUp = { ...armsUp, raiseCount: 0, justRaised: false };
+    handsOnHips = { ...handsOnHips, holdCount: 0 };
     lateralChangeCount = 0;
     lastCountedLateral = LATERAL.CENTER;
     movementMs = 0;

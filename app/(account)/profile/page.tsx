@@ -5,11 +5,11 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  ArrowRight,
-  Lock,
+  CircleCheck,
   LogOut,
   Map,
   Pencil,
+  Play,
   UserPlus,
 } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
@@ -21,7 +21,6 @@ import { Button, LinkButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
 import { PageShell } from '@/components/ui/PageShell';
-import { StageStrip } from '@/components/ui/ProgressBar';
 import { getErrorMessage, repository } from '@/lib/api';
 import { avatarSeedFor } from '@/lib/avatar';
 import { formatDuration, formatNumber } from '@/lib/format';
@@ -95,13 +94,10 @@ function ProfileContent() {
           <AccountTabs />
 
           {showProgress ? (
-            <BiomeProgressPanel biomes={profile.biomes} />
+            <TrainingProgressPanel biomes={profile.biomes} />
           ) : (
-            <div className="flex flex-col gap-4">
-              <BiomeChips biomes={profile.biomes} />
-              {/* TOR 3: สถิติสะสมและประวัติการเล่น. */}
-              <RunGrid runs={profile.recentRuns} />
-            </div>
+            // TOR 3: สถิติสะสมและประวัติการเล่น.
+            <RunGrid runs={profile.recentRuns} />
           )}
         </>
       )}
@@ -198,8 +194,8 @@ function ProfileHero({
             </Button>
           </>
         )}
-        <LinkButton href="/stages" size="sm" icon={<Map size={16} />}>
-          Stages
+        <LinkButton href="/play" size="sm" icon={<Play size={16} />}>
+          Train
         </LinkButton>
       </div>
     </div>
@@ -227,84 +223,32 @@ function ProfileStat({
   );
 }
 
-function BiomeChips({ biomes }: { biomes: BiomeProgress[] }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {biomes.map((biome) => {
-        const chipClass =
-          'inline-flex min-h-9 items-center gap-1.5 rounded-none border-2 border-ink bg-surface px-3 text-sm font-semibold no-underline';
-
-        if (biome.isUnlocked) {
-          return (
-            <Link key={biome.biomeId} href="/stages" className={`${chipClass} text-text hover:bg-elevated`}>
-              {biome.name}
-            </Link>
-          );
-        }
-
-        return (
-          <span key={biome.biomeId} className={`${chipClass} text-muted`}>
-            <Lock aria-hidden size={14} />
-            {biome.name}
-            <span className="sr-only"> — locked</span>
-          </span>
-        );
-      })}
-    </div>
-  );
+/** Training is one stage, so its progress is one row: cleared yet, and the best score. */
+function trainingStage(biomes: BiomeProgress[]) {
+  return biomes[0]?.stages[0] ?? null;
 }
 
-function BiomeProgressPanel({ biomes }: { biomes: BiomeProgress[] }) {
+function TrainingProgressPanel({ biomes }: { biomes: BiomeProgress[] }) {
+  const stage = trainingStage(biomes);
+  const name = biomes[0]?.name ?? 'Training';
+
   return (
-    <Card title="Biome progress" icon={<Map size={20} />}>
-      {/* TOR 3: ระบบ Biome และ Stage. */}
-      <div className="flex flex-col gap-4">
-        {biomes.map((biome) => (
-          <BiomeRow key={biome.biomeId} biome={biome} />
-        ))}
+    <Card title="Training progress" icon={<Map size={20} />}>
+      <div className="flex items-baseline justify-between gap-2 text-sm">
+        <span className="flex items-center gap-1.5 font-semibold">
+          {stage?.isCleared && <CircleCheck aria-hidden size={16} className="text-ok-text" />}
+          {name} &middot; {stage?.isCleared ? 'Cleared' : 'Not cleared yet'}
+        </span>
+        <span className="tabular-nums text-muted">
+          Best {stage?.bestScore != null ? formatNumber(stage.bestScore) : '—'}
+        </span>
       </div>
-      <Link
-        href="/stages"
-        className="flex items-center gap-1.5 text-sm font-semibold text-primary no-underline"
-      >
-        Go to stage select
-        <ArrowRight aria-hidden size={16} />
-      </Link>
     </Card>
   );
 }
 
-function BiomeRow({ biome }: { biome: BiomeProgress }) {
-  const cleared = biome.stages.filter((stage) => stage.isCleared).length;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className={`flex items-center gap-1.5 font-semibold ${biome.isUnlocked ? '' : 'text-muted'}`}>
-          {!biome.isUnlocked && <Lock aria-hidden size={14} />}
-          {biome.name}
-          {!biome.isUnlocked && <span className="sr-only"> — locked</span>}
-        </span>
-        <span className="tabular-nums text-muted">
-          {cleared}/{biome.stages.length} stages
-        </span>
-      </div>
-
-      <StageStrip
-        stages={biome.stages}
-        label={`${biome.name}: ${cleared} of ${biome.stages.length} stages cleared`}
-      />
-    </div>
-  );
-}
-
 function biomeStatusLine(biomes: BiomeProgress[]): string | null {
-  const inProgress = biomes.find(
-    (biome) => biome.isUnlocked && biome.stages.some((stage) => !stage.isCleared),
-  );
-  const current = inProgress ?? biomes.filter((biome) => biome.isUnlocked).at(-1);
-  if (!current) return null;
-
-  const cleared = current.stages.filter((stage) => stage.isCleared).length;
-  return `${current.name} · ${cleared}/${current.stages.length} stages`;
+  const stage = trainingStage(biomes);
+  if (!stage) return null;
+  return `Training · ${stage.isCleared ? 'cleared' : 'not cleared yet'}`;
 }

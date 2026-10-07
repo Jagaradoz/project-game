@@ -10,8 +10,6 @@
  * never leaves the browser, and per-frame joint positions are never stored.
  */
 
-import type { Difficulty } from '@/engine/types';
-
 /** The envelope every endpoint responds with. */
 export interface ApiResponse<T> {
   success: boolean;
@@ -79,7 +77,6 @@ export interface RunResult {
   durationMs: number;
   distanceM: number;
   movementCount: number;
-  difficulty: Difficulty;
   /**
    * Whether the stage goal was met. This is what unlocks the next stage, so it
    * is the run's outcome and not a derived nicety -- a run that ends on 0 HP
@@ -88,9 +85,6 @@ export interface RunResult {
   isCleared: boolean;
   completedAt: string;
 }
-
-/** Re-exported so pages have one import for contract types. Owned by the engine. */
-export type { Difficulty } from '@/engine/types';
 
 /**
  * What the client submits. The server assigns id, userId and completedAt.

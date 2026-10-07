@@ -26,8 +26,8 @@ test('the catalogue mirrors the engine, in order', () => {
   );
 });
 
-test('one biome of ten stages', () => {
-  assert.equal(STAGES_PER_BIOME, 10);
+test('Training is one biome with a single stage', () => {
+  assert.equal(STAGES_PER_BIOME, 1);
   assert.equal(BIOME_CATALOG.length, 1);
 });
 
@@ -47,7 +47,7 @@ test('isKnownBiome guards ids that came from storage', () => {
   assert.equal(isKnownBiome(''), false);
 });
 
-test('stage numbers are 1..10 integers, and nothing else', () => {
+test('the only valid stage number is the Training stage', () => {
   assert.equal(isValidStageNumber(1), true);
   assert.equal(isValidStageNumber(STAGES_PER_BIOME), true);
   assert.equal(isValidStageNumber(0), false);

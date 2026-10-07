@@ -30,7 +30,7 @@ export function GameOverOverlay({
         <span className="eyebrow">{snapshot.isCleared ? 'Cleared' : 'Complete'}</span>
 
         <h2 className="m-0 text-3xl font-black tracking-tight sm:text-4xl">
-          {snapshot.isCleared ? 'Stage cleared' : snapshot.deathReason === 'drowned' ? 'River crossing missed' : 'Run complete'}
+          {snapshot.isCleared ? 'Training cleared' : snapshot.deathReason === 'drowned' ? 'River crossing missed' : snapshot.deathReason === 'poisoned' ? 'Overcome by spores' : 'Run complete'}
         </h2>
 
         <p className="m-0 text-sm tabular-nums text-muted">
@@ -45,10 +45,16 @@ export function GameOverOverlay({
             Jump across the river to stay safe. You can try again straight away.
           </p>
         )}
-        {!snapshot.isCleared && snapshot.deathReason !== 'drowned' && snapshot.goalKills !== null && (
+        {snapshot.deathReason === 'poisoned' && (
           <p className="m-0 max-w-xs text-sm leading-relaxed text-muted">
-            You did not reach this stage&rsquo;s target. Go again straight away, or pick a difficulty
-            that suits you better.
+            Put your hands on your hips to raise the shield inside the spore cloud. You can try
+            again straight away.
+          </p>
+        )}
+        {!snapshot.isCleared && snapshot.deathReason === 'damage' && snapshot.goalKills !== null && (
+          <p className="m-0 max-w-xs text-sm leading-relaxed text-muted">
+            You did not reach the training goal this time. Take a breath and go again whenever you
+            are ready.
           </p>
         )}
 

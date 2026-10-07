@@ -23,7 +23,7 @@ import { useConsent } from '@/lib/store/consent';
 const COLLECTED = [
   'Score, enemies defeated, session length and in-game distance',
   'The number of movements detected, and how long you kept moving',
-  'Which biome and stage you played, and the difficulty you chose',
+  'That you played Training mode, and whether you cleared it',
   'Technical measurements such as frame rate and detection latency',
 ];
 
@@ -53,7 +53,7 @@ export default function ConsentPage() {
     >
       <Card title="About this study" icon={<FlaskConical size={20} />}>
         <p className="m-0 max-w-3xl text-sm leading-relaxed text-muted">
-          This project studies how game elements — enemies, scoring and difficulty — affect intrinsic
+          This project studies how game elements — enemies, scoring and obstacles — affect intrinsic
           motivation and how consistently players keep moving. Participants are split into two
           groups: one plays the complete game, and the other performs the same movements through the
           same detection system without any game elements. Taking part is voluntary, and you can stop

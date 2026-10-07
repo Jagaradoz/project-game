@@ -55,6 +55,8 @@ export function syncScene(
     sceneRefs.enemyPool?.sync(state.enemies, state.elapsedMs, dtSec, state.bossWarningLane !== null);
     sceneRefs.obstaclePool?.sync(state.obstacles, state.elapsedMs + drowning.elapsedMs);
     sceneRefs.riverMask?.sync(state.obstacles);
+    sceneRefs.sporeCloud?.sync(state.spores, state.elapsedMs);
+    sceneRefs.shield?.update(state.isShielding && !state.isOver, state.elapsedMs, dtSec);
     const waterZ = drowningRiverZ(state, config);
     sceneRefs.drowningSplash?.update(drowning.active, drowning.elapsedMs / config.obstacle.drowningMs, laneToX(state.lane, config), waterZ);
     if (newEvents) stageKills(sceneRefs, state, config);
@@ -71,6 +73,7 @@ export function syncScene(
     }
     sceneRefs.obstaclePool?.hide();
     sceneRefs.riverMask?.hide();
+    sceneRefs.sporeCloud?.hide();
     sceneRefs.drowningSplash?.update(false, 0, 0, 0);
     sceneRefs.bulletPool?.hide();
   }
