@@ -18,6 +18,10 @@ BLEND_PATH = ROOT / "public/assets/models/blender/environment/trail_logs.blend"
 RECORD_PATH = ROOT / "docs/tasks/hazard-assets-record.md"
 
 
+BODY_RADIUS = .52
+MAX_HEIGHT = 1.3
+
+
 def material(name, color):
     rgb = [int(color[i:i + 2], 16) / 255 for i in (0, 2, 4)]
     linear = [c / 12.92 if c <= .04045 else ((c + .055) / 1.055) ** 2.4 for c in rgb]
@@ -39,7 +43,7 @@ def build_log(scene, name, length, materials):
 
     # More longitudinal sections on the longer log: the diameter and bark
     # details remain authored at the same scale instead of stretching an asset.
-    sides, sections = 12, round(length / .6)
+    sides, sections = 14, round(length / .6)
     ring_positions = []
     for segment in range(sections + 1):
         x = -length / 2 + length * segment / sections
@@ -49,8 +53,8 @@ def build_log(scene, name, length, materials):
         for side in range(sides):
             angle = math.tau * side / sides
             ridge = 1 + .055 * math.sin(side * 2.7) + .025 * math.sin(segment * 1.1 + side)
-            y = offset_y + .335 * math.cos(angle) * ridge
-            z = .296 + offset_z + .285 * math.sin(angle) * ridge
+            y = offset_y + BODY_RADIUS * math.cos(angle) * ridge
+            z = BODY_RADIUS + offset_z + BODY_RADIUS * math.sin(angle) * ridge
             profile.append((y, z))
             vertices.append((x, y, z))
         ring_positions.append(profile)
@@ -58,7 +62,10 @@ def build_log(scene, name, length, materials):
         for side in range(sides):
             a, b = segment * sides + side, segment * sides + (side + 1) % sides
             # Broad bark strips, with sparse darker grain valleys.
-            shade = 1 if side in (2, 7, 10) else 2 if side in (1, 5) else 0
+            shade = 1 if side in (2, 8, 11) else 2 if side in (1, 5) else 0
+            # Moss clings to the upper shoulder in irregular runs.
+            if side in (2, 3, 4) and (segment * 5 + side * 3) % 7 in (0, 1, 2):
+                shade = 5
             face((a, b, b + sides, a + sides), shade)
 
     # Cut faces are slightly inset in the bark rim. Polygonal growth rings
@@ -85,13 +92,14 @@ def build_log(scene, name, length, materials):
     # Stubby broken branches occupy the top/near side, staying inside the
     # solid body's lateral endpoints and the common gameplay footprint.
     for index, frac in enumerate((-.28, .08, .33)):
-        base = Vector((length * frac, -.19 + index * .12, .40))
-        tip = base + Vector((.10 * (-1 if index % 2 else 1), -.08, .22 - index * .015))
+        side_sign = -1 if index % 2 else 1
+        base = Vector((length * frac, side_sign * .40, .62))
+        tip = base + Vector((.18 * side_sign, side_sign * .14, .26 - index * .03))
         direction = (tip - base).normalized()
         u = direction.cross(Vector((1, 0, 0))).normalized()
         v = direction.cross(u).normalized()
         start = len(vertices)
-        for center, radius in [(base, .095), (tip, .055)]:
+        for center, radius in [(base, .17), (tip, .10)]:
             for side in range(7):
                 angle = math.tau * side / 7
                 vertices.append(tuple(center + radius * (u * math.cos(angle) + v * math.sin(angle))))
@@ -104,21 +112,42 @@ def build_log(scene, name, length, materials):
     # Small raised longitudinal ridges give bark readable relief at road level.
     for index in range(sections):
         x = -length / 2 + (index + .5) * length / sections
-        y = -.324 + .012 * math.sin(index)
-        z = .29 + .10 * math.sin(index * 2.4)
+        y = -BODY_RADIUS * .97 + .012 * math.sin(index)
+        z = BODY_RADIUS + .13 * math.sin(index * 2.4)
         start = len(vertices)
         vertices.extend([(x - .23, y, z), (x + .20, y, z + .009),
                          (x + .12, y - .012, z + .042), (x - .18, y - .014, z + .033)])
         face((start, start + 1, start + 2, start + 3), 1)
 
-    # Exact authored footprint: snap vertical ground datum, center the depth,
-    # and normalize height identically for both independently built variants.
+    # Small shelf mushrooms on the mossy shoulder: cream stem, red cap.
+    for index, frac in enumerate((-.34, -.06, .27, .40)):
+        cx, cy = length * frac, .07 * (1 if index % 2 else -1)
+        cz = BODY_RADIUS * 1.9 - .04
+        stem_h, cap_h, stem_r, cap_r = .12 + .015 * index, .09, .045, .13 + .02 * (index % 2)
+        start = len(vertices)
+        for z, radius in ((cz, stem_r), (cz + stem_h, stem_r)):
+            for side in range(6):
+                angle = math.tau * side / 6
+                vertices.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle), z))
+        for side in range(6):
+            a, b = start + side, start + (side + 1) % 6
+            face((a, b, b + 6, a + 6), 6)
+        cap = len(vertices)
+        for z, radius in ((cz + stem_h, cap_r), (cz + stem_h + cap_h, cap_r * .55)):
+            for side in range(8):
+                angle = math.tau * side / 8
+                vertices.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle), z))
+        vertices.append((cx, cy, cz + stem_h + cap_h * 1.25))
+        for side in range(8):
+            a, b = cap + side, cap + (side + 1) % 8
+            face((a, b, b + 8, a + 8), 7)
+            face((cap + 8 + side, cap + 8 + (side + 1) % 8, len(vertices) - 1), 7)
+        face(tuple(reversed([cap + side for side in range(8)])), 6)
+
+    # Ground datum only: the authored sizes above are already in world units.
     low_z = min(p[2] for p in vertices)
-    high_z = max(p[2] for p in vertices)
-    low_y = min(p[1] for p in vertices)
-    high_y = max(p[1] for p in vertices)
-    mid_y = (low_y + high_y) / 2
-    vertices = [(x, y - mid_y, (z - low_z) * .65 / (high_z - low_z)) for x, y, z in vertices]
+    mid_y = (min(p[1] for p in vertices) + max(p[1] for p in vertices)) / 2
+    vertices = [(x, y - mid_y, z - low_z) for x, y, z in vertices]
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(vertices, [], faces)
     mesh.update()
@@ -130,7 +159,7 @@ def build_log(scene, name, length, materials):
     obj = bpy.data.objects.new(name, mesh)
     scene.collection.objects.link(obj)
     obj["game_length"] = length
-    obj["game_height"] = .65
+    obj["game_height"] = MAX_HEIGHT
     obj["orientation"] = "long axis game X; ground Y=0; centered X/Z"
     return obj
 
@@ -191,7 +220,8 @@ def main():
         bpy.data.objects.remove(obj, do_unlink=True)
     materials = [material(name, color) for name, color in [
         ("woodBark", "765033"), ("woodBarkDark", "493322"),
-        ("woodBarkWarm", "805b3b"), ("woodInner", "d3a36b"), ("wood", "b9864a")]]
+        ("woodBarkWarm", "805b3b"), ("woodInner", "d3a36b"), ("wood", "b9864a"),
+        ("leafsGreen", "537d3f"), ("colorTan", "e7c395"), ("colorRed", "fe6601")]]
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
     entries = []
@@ -208,11 +238,11 @@ def main():
         summary = glb_summary(MODEL_DIR / (name + ".glb"))
         assert abs(summary["size"][0] - length) < .00001
         assert abs(summary["min"][1]) < .00001
-        assert abs(summary["size"][1] - .65) < .00001
-        assert summary["size"][2] <= .9
+        assert 1.0 <= summary["size"][1] <= MAX_HEIGHT + .00001
+        assert summary["size"][2] <= 1.5
         assert abs(summary["min"][0] + summary["max"][0]) < .00001
         assert abs(summary["min"][2] + summary["max"][2]) < .00001
-        assert summary["mesh_nodes"] == 1 and summary["triangles"] < 1500
+        assert summary["mesh_nodes"] == 1 and summary["triangles"] < 2500
         entries.append(summary)
     for scene in list(bpy.data.scenes):
         if scene.name not in ("log_two_lane", "log_three_lane"):
@@ -230,14 +260,14 @@ def main():
              "Built two independent low-poly logs in background Blender. Original tree/catalog assets and the live Blender scene were not opened or modified.", "",
              "## Key changes", "",
              "- Faceted irregular bark, contrasting cut ends with geometric wood rings, three broken branch stubs and sparse raised bark grain.",
-             "- Palette material names: woodBark, woodBarkDark, woodInner and wood; restrained woodBarkWarm retains authored color.",
+             "- Palette material names: woodBark, woodBarkDark, woodInner, wood, leafsGreen (moss), colorTan and colorRed (shelf mushrooms); restrained woodBarkWarm retains authored color.",
              "- Editable Blender source has a separate scene per variant; GLBs contain one mesh each, with no lights, cameras, images or external buffers.",
              "- Source: `tools/build_trail_logs.py`; Blender: `public/assets/models/blender/environment/trail_logs.blend`.", "",
              "## Validation", "", "Serialized GLB positions inspected through full node transforms in game/glTF X/Y/Z axes:", "",
              "| Model | Bounds min | Bounds max | Triangles | Material primitives | Bytes |", "|---|---|---|---:|---:|---:|"]
     for item in entries:
         lines.append(f"| {Path(item['file']).name} | {item['min']} | {item['max']} | {item['triangles']} | {item['material_primitives']} | {item['bytes']} |")
-    lines.extend(["", "Both lengths, 0.65 height, ground datum Y=0, centered X/Z and depth below 0.9 passed assertions. Material and triangle structure checked from exported binaries. Game-camera visual acceptance remains supervisor validation.",
+    lines.extend(["", "Both lengths, 1.0-1.3 tall, ground datum Y=0, centered X/Z and depth below 1.5 passed assertions. Material and triangle structure checked from exported binaries. Game-camera visual acceptance remains supervisor validation.",
                   "", "## Blockers", "", "None for asset export and structural validation.", ""])
     RECORD_PATH.write_text("\n".join(lines), encoding="utf-8")
     print("TRAIL_LOG_RESULT=" + json.dumps(entries))

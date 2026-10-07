@@ -25,9 +25,9 @@ test('real exported assets cover their lanes, keep an open lane, and reuse four 
   const scene = new THREE.Scene();
   const pool = await addObstaclePool(THREE, scene, CONFIG.game, loader, GOLDEN_FOREST);
   expect(pool.items).toHaveLength(4);
-  expect(loaded).toHaveLength(7);
+  expect(loaded).toHaveLength(9);
   expect(loaded.some(path => path.includes('rock_'))).toBe(false);
-  expect(loaded).toContain('/assets/models/environment/stone_smallPile.glb');
+  expect(loaded).toContain('/assets/models/environment/stone_bigC.glb');
   expect(loaded).toContain('/assets/models/environment/stone_mediumTrio.glb');
   const groups = pool.items.map(s => s.group);
   for (const kind of ['log', 'stones'] as const) {
@@ -44,14 +44,15 @@ test('real exported assets cover their lanes, keep an open lane, and reuse four 
       if (kind === 'log') {
         expect(bounds.min.x).toBeCloseTo(left);
         expect(bounds.max.x).toBeCloseTo(right);
-        expect(bounds.max.y).toBeCloseTo(.65);
+        expect(bounds.max.y).toBeGreaterThan(1);
+        expect(bounds.max.y).toBeLessThan(CONFIG.game.jump.clearance * 1.1);
       } else {
-        expect(bounds.max.y).toBeLessThan(.6);
-        expect(bounds.min.z).toBeGreaterThanOrEqual(-12.45);
-        expect(bounds.max.z).toBeLessThanOrEqual(-11.55);
+        expect(bounds.max.y).toBeLessThan(CONFIG.game.jump.clearance);
+        expect(bounds.min.z).toBeGreaterThanOrEqual(-12 - CONFIG.game.obstacle.radius - .3);
+        expect(bounds.max.z).toBeLessThanOrEqual(-12 + CONFIG.game.obstacle.radius + .3);
         const instances = slot.stones.group.children as THREE.InstancedMesh[];
-        // Each stone has multiple material primitives, sharing the same placements.
-        expect(instances.every(mesh => mesh.count === count * 2)).toBe(true);
+        // Boulders and gap fillers: at least five placements per occupied lane across all meshes.
+        expect(instances.reduce((total, mesh) => total + mesh.count, 0)).toBeGreaterThanOrEqual(count * 5);
       }
     }
   }
@@ -61,7 +62,7 @@ test('real exported assets cover their lanes, keep an open lane, and reuse four 
   expect(river.group.rotation.y).toBe(0);
   const water = river.group.children[0] as THREE.Mesh;
   const size = new THREE.Box3().setFromObject(water).getSize(new THREE.Vector3());
-  expect(size.z).toBeCloseTo(1.6);
+  expect(size.z).toBeCloseTo(CONFIG.game.obstacle.riverRadius * 2);
   expect(size.x).toBeGreaterThan(1000);
   pool.hide();
   expect(groups.every(group => !group.visible)).toBe(true);
@@ -78,7 +79,7 @@ test('river masking composes with terrain deformation and clears on restart', ()
   expect(shader.vertexShader).toContain('vRiverPosition = lrWorld.xyz');
   expect(shader.fragmentShader).toContain('discard');
   expect(shader.fragmentShader).not.toContain('uRiverHalfWidth');
-  expect(mask.uniforms.uRiverHalfDepth.value).toBe(.8);
+  expect(mask.uniforms.uRiverHalfDepth.value).toBe(CONFIG.game.obstacle.riverRadius);
   mask.sync([hazard('river'), hazard('log')]);
   expect([...mask.uniforms.uRiverCentres.value]).toEqual([-12, 10000, 10000, 10000]);
   mask.sync([]);

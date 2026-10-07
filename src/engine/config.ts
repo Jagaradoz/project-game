@@ -228,7 +228,7 @@ export const CONFIG = {
 
     playerRadius: 0.75,
     playerZ: 0,
-    enemyRadius: 0.65,
+    enemyRadius: 1,
 
     /** Enemies appear here and are retired once past despawnZ, behind the player. */
     spawnZ: -85,
@@ -268,22 +268,27 @@ export const CONFIG = {
     enemyPoolSize: 24,
 
     jump: {
-      durationMs: 800, height: 1.65, clearance: 0.8,
+      durationMs: 800, height: 2.4, clearance: 1.2,
       // Source Jump frames 4-13 contain flight; 13-19 absorb landing.
       takeoffPose: 4 / 19, landingPose: 13 / 19,
     },
     obstacle: {
-      firstMs: 8500, intervalMs: 8500, radius: 0.45, poolSize: 4,
-      riverRadius: 0.8,
+      firstMs: 8500, intervalMs: 8500, radius: 0.7, poolSize: 4,
+      riverRadius: 1.3,
       logWeight: 0.4, stoneWeight: 0.4, riverWeight: 0.2,
       drowningMs: 650,
     },
     boss: { triggerKills: 12, holdZ: -20, attackIntervalMs: 2800, telegraphMs: 1100 },
+    /**
+     * Heights are matched to the player (the mage stands ~3.7 with hat). approachSpeed is relative
+     * to the scrolling ground and must stay positive: a negative value makes the enemy back away
+     * while its Walk/Run clip steps forward.
+     */
     enemyTypes: {
-      weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, height: 1.8, radius: 0.6, color: '#9bdd66' },
-      normal: { name: 'Bramble Skeleton', path: '/assets/models/enemies/animated/BrambleSkeleton.glb', hp: 2, approachSpeed: 2, height: 2.1, radius: 0.65, color: '#e5d7b1' },
-      tank: { name: 'Shroom Brute', path: '/assets/models/enemies/animated/ShroomBrute.glb', hp: 6, approachSpeed: -3, height: 2.7, radius: 0.9, color: '#e9a15b' },
-      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 40, approachSpeed: 0, height: 5, radius: 1.4, color: '#df7650' },
+      weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, height: 3.4, radius: 1, color: '#9bdd66' },
+      normal: { name: 'Bramble Skeleton', path: '/assets/models/enemies/animated/BrambleSkeleton.glb', hp: 2, approachSpeed: 2, height: 3.7, radius: 1.05, color: '#e5d7b1' },
+      tank: { name: 'Shroom Brute', path: '/assets/models/enemies/animated/ShroomBrute.glb', hp: 6, approachSpeed: 1, height: 3.9, radius: 1.3, color: '#e9a15b' },
+      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 40, approachSpeed: 0, height: 8, radius: 2, color: '#df7650' },
     },
 
     enemy: {

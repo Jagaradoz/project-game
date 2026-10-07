@@ -7,7 +7,18 @@ import { TRAIL_Y } from '@/engine/render/world/ground';
 import { createRng } from '@/engine/render/world/rng';
 import { laneToX } from '@/engine/core/state';
 import { buildRiver } from '@/engine/render/actors/rivers';
-import { SMALL_STONES } from '@/engine/render/world/catalog';
+
+/** Boulders first, then the small stones that fill the gaps between them. */
+const BAND_STONES = ['stone_bigA', 'stone_bigC', 'stone_leaning', 'stone_bigB', 'stone_bigDuo', 'stone_mediumA', 'stone_mediumTrio'];
+/** Tall boulders; the flatter big stones double as gap fillers and bank rocks. */
+const BOULDER_VARIANTS = 3;
+const RIVER_ROCKS = 5;
+const BIG_COUNT = 3;
+const ROTATION_JITTER = .35;
+/** Stones stay inside the hazard's collision depth plus a little visual margin. */
+const BAND_HALF_DEPTH = 1;
+const BOULDER_FOOTPRINT = 1.5;
+const BOULDER_MAX_HEIGHT = 1.15;
 
 function buildStoneBand(THREE: ThreeModule, sources: T.Group[]) {
   const group = new THREE.Group();
@@ -38,26 +49,37 @@ function buildStoneBand(THREE: ThreeModule, sources: T.Group[]) {
     arrange(id: number, lanes: number, laneWidth: number) {
       const rng = createRng(id * 1877);
       const counts = sources.map(() => 0);
-      // Ten stones per lane in two staggered rows, inside the occupied lane edges.
+      const place = (variant: number, laneX: number, z: number, footprint: number, maxHeight: number) => {
+        const { size, meshes } = parts[variant];
+        let x = laneX;
+        const scale = Math.min(footprint / Math.max(size.x, size.z), maxHeight / size.y);
+        transform.scale.setScalar(scale);
+        // Rotation is at most ROTATION_JITTER off axis; keep that footprint inside the occupied lanes and depth.
+        const cos = Math.cos(ROTATION_JITTER), sin = Math.sin(ROTATION_JITTER);
+        const reachX = scale * (size.x * cos + size.z * sin) / 2, reachZ = scale * (size.z * cos + size.x * sin) / 2;
+        const edge = lanes * laneWidth / 2;
+        x = Math.max(-edge + reachX, Math.min(edge - reachX, x));
+        const zClamped = Math.max(-BAND_HALF_DEPTH + reachZ, Math.min(BAND_HALF_DEPTH - reachZ, z));
+        transform.rotation.set(0, (rng() < .5 ? 0 : Math.PI) + (rng() * 2 - 1) * ROTATION_JITTER, 0);
+        transform.position.set(x, .015, zClamped);
+        transform.updateMatrix();
+        const index = counts[variant]++;
+        for (const part of meshes) {
+          matrix.multiplyMatrices(transform.matrix, part.matrix);
+          part.mesh.setMatrixAt(index, matrix);
+        }
+      };
+      // Per lane: a staggered wall of boulders with smaller stones wedged into the gaps.
       for (let lane = 0; lane < lanes; lane++) {
-        for (let i = 0; i < 10; i++) {
-          const variant = i % parts.length;
-          const { size, meshes } = parts[variant];
-          const width = Math.min(.34 + rng() * .08, laneWidth * .175);
-          const scale = Math.min(width / Math.max(size.x, size.z), .55 / size.y);
-          transform.scale.setScalar(scale);
-          transform.rotation.set(0, rng() * Math.PI * 2, 0);
-          transform.position.set(
-            (lane - (lanes - 1) / 2) * laneWidth + (i % 5 - 2) * laneWidth / 5.5 + (rng() - .5) * .045,
-            .015,
-            (i < 5 ? -.13 : .13) + (rng() - .5) * .03,
-          );
-          transform.updateMatrix();
-          const index = counts[variant]++;
-          for (const part of meshes) {
-            matrix.multiplyMatrices(transform.matrix, part.matrix);
-            part.mesh.setMatrixAt(index, matrix);
-          }
+        const centre = (lane - (lanes - 1) / 2) * laneWidth;
+        for (let i = 0; i < BIG_COUNT; i++) {
+          const x = centre + (i - 1) * laneWidth * .33 + (rng() - .5) * .08;
+          place(Math.floor(rng() * BOULDER_VARIANTS), x, (i % 2 ? .12 : -.12) + (rng() - .5) * .08,
+            BOULDER_FOOTPRINT + rng() * .22, BOULDER_MAX_HEIGHT);
+        }
+        for (const side of [-1, 1]) {
+          place(BOULDER_VARIANTS + Math.floor(rng() * (parts.length - BOULDER_VARIANTS)),
+            centre + side * laneWidth * .17, side * .42 + (rng() - .5) * .08, .8 + rng() * .16, BOULDER_MAX_HEIGHT * .6);
         }
       }
       parts.forEach((part, i) => part.meshes.forEach(({ mesh }) => {
@@ -71,7 +93,7 @@ function buildStoneBand(THREE: ThreeModule, sources: T.Group[]) {
 
 /** Fixed slots own every variant; reassignment changes only transforms and visibility. */
 export async function addObstaclePool(THREE: ThreeModule, scene: T.Scene, config: GameConfig, loader: GLTFLoader, palette: Palette) {
-  const paths = ['log_two_lane', 'log_three_lane', ...SMALL_STONES];
+  const paths = ['log_two_lane', 'log_three_lane', ...BAND_STONES];
   const sources = await Promise.all(paths.map(async name => (await loader.loadAsync(`/assets/models/environment/${name}.glb`)).scene));
   sources.forEach(source => repaintKitModel(THREE, source, palette.kit));
   const items = Array.from({ length: config.obstacle.poolSize }, () => {
@@ -79,7 +101,7 @@ export async function addObstaclePool(THREE: ThreeModule, scene: T.Scene, config
     group.name = 'trail-hazard';
     const logs = sources.slice(0, 2).map(source => source.clone(true));
     const stones = buildStoneBand(THREE, sources.slice(2));
-    const river = buildRiver(THREE, config, palette);
+    const river = buildRiver(THREE, config, palette, sources.slice(2, 2 + RIVER_ROCKS));
     for (const log of logs) log.traverse(node => {
       const mesh = node as T.Mesh;
       if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }

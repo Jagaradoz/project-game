@@ -62,7 +62,7 @@ for (const lane of [0, 1, 2]) {
 
 test('a river jump must stay clear until the whole crossing passes', () => {
   let state: GameState = { ...approaching(hazard('river')), jumpStartedMs: -250 };
-  for (let i = 0; i < 5; i++) state = updateGame(state, idle, 50);
+  for (let i = 0; i < 6; i++) state = updateGame(state, idle, 50);
   expect(state.hp).toBe(3);
   expect(state.obstacles[0].status).toBe('cleared');
   const early = { ...approaching(hazard('river', 0, 3, -.6)), jumpStartedMs: -585 };
@@ -75,11 +75,11 @@ test('a river jump must stay clear until the whole crossing passes', () => {
 test('wider river banks use their own contact bounds without enlarging solid hazards', () => {
   const check = (kind: TrailHazard['kind'], z: number) =>
     advanceHazards([hazard(kind, 0, 3, z)], 1, 0, 0, 50, null, CONFIG.game);
-  expect(check('river', -1.4).drowned).toBe(true);
-  expect(check('river', 1.4).drowned).toBe(true);
-  expect(check('river', -1.6).drowned).toBe(false);
-  expect(check('log', -1.4).hit).toBe(false);
-  expect(check('stones', -1.4).hit).toBe(false);
+  expect(check('river', -1.9).drowned).toBe(true);
+  expect(check('river', 1.9).drowned).toBe(true);
+  expect(check('river', -2.2).drowned).toBe(false);
+  expect(check('log', -1.6).hit).toBe(false);
+  expect(check('stones', -1.6).hit).toBe(false);
 });
 
 test('swept crossing catches a missed river even when an entire hazard passes in one step', () => {

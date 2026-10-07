@@ -7,7 +7,7 @@ Built two independent low-poly logs in background Blender. Original tree/catalog
 ## Key changes
 
 - Faceted irregular bark, contrasting cut ends with geometric wood rings, three broken branch stubs and sparse raised bark grain.
-- Palette material names: woodBark, woodBarkDark, woodInner and wood; restrained woodBarkWarm retains authored color.
+- Palette material names: woodBark, woodBarkDark, woodInner, wood, leafsGreen (moss), colorTan and colorRed (shelf mushrooms); restrained woodBarkWarm retains authored color.
 - Editable Blender source has a separate scene per variant; GLBs contain one mesh each, with no lights, cameras, images or external buffers.
 - Source: `tools/build_trail_logs.py`; Blender: `public/assets/models/blender/environment/trail_logs.blend`.
 
@@ -17,12 +17,10 @@ Serialized GLB positions inspected through full node transforms in game/glTF X/Y
 
 | Model | Bounds min | Bounds max | Triangles | Material primitives | Bytes |
 |---|---|---|---:|---:|---:|
-| log_two_lane.glb | [-2.4, 0.0, -0.352382] | [2.4, 0.65, 0.352382] | 588 | 5 | 27812 |
-| log_three_lane.glb | [-3.6, 0.0, -0.352873] | [3.6, 0.65, 0.352873] | 692 | 5 | 33440 |
+| log_two_lane.glb | [-2.4, 0.0, -0.628773] | [2.4, 1.253497, 0.628773] | 840 | 8 | 42832 |
+| log_three_lane.glb | [-3.6, 0.0, -0.628773] | [3.6, 1.253497, 0.628773] | 960 | 8 | 49324 |
 
-Both lengths, 0.65 height, ground datum Y=0, centered X/Z and depth below 0.9 passed assertions. Material and triangle structure checked from exported binaries. Game-camera visual acceptance remains supervisor validation.
-
-Saved Blender file reopened successfully in a second background process: two scenes, each with exactly one editable mesh (350 vertices / 414 vertices).
+Both lengths, 1.0-1.3 tall, ground datum Y=0, centered X/Z and depth below 1.5 passed assertions. Material and triangle structure checked from exported binaries. Game-camera visual acceptance remains supervisor validation.
 
 ## Blockers
 

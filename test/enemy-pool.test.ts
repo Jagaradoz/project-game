@@ -31,3 +31,26 @@ test('reset hides old corpses when a run restarts', async () => {
   expect(pool.corpses.some(s => s.group.visible)).toBe(false);
   pool.dispose();
 });
+test('a hit flinches on top of the locomotion loop instead of replacing it', async () => {
+  const pool = await fixture();
+  const brute = { id: 1, kind: 'tank' as const, hp: 4, lane: 1, z: -10, previousZ: -10 };
+  pool.sync([brute], 100, .1, false);
+  const slot = pool.items.find(s => s.id === 1)!;
+  expect(slot.current).toBe('Walk');
+  pool.sync([{ ...brute, lastHitMs: 150 }], 150, .05, false);
+  expect(slot.overlays.Hit!.isRunning()).toBe(true);
+  expect(slot.overlays.Hit!.blendMode).toBe(THREE.AdditiveAnimationBlendMode);
+  expect(slot.current).toBe('Walk');
+  expect(slot.action!.isRunning()).toBe(true);
+  pool.dispose();
+});
+test('every enemy walks or runs forward relative to the ground it stands on', () => {
+  for (const def of Object.values(CONFIG.game.enemyTypes)) expect(def.approachSpeed).toBeGreaterThanOrEqual(0);
+});
+test('enemies are sized to stand next to the player instead of dwarfed by them', () => {
+  const { weak, normal, tank, boss } = CONFIG.game.enemyTypes;
+  expect(weak.height).toBeGreaterThanOrEqual(3);
+  expect(normal.height).toBeGreaterThanOrEqual(weak.height);
+  expect(tank.height).toBeGreaterThanOrEqual(normal.height);
+  expect(boss.height).toBeGreaterThan(tank.height * 1.8);
+});

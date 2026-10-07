@@ -10,8 +10,12 @@ import { TRAIL_Y } from '@/engine/render/world/ground';
 export interface EnemySlot {
   group: T.Group; mixer: T.AnimationMixer | null; action: T.AnimationAction | null;
   actions: Record<string, T.AnimationAction>; current: string; kind?: EnemyKind;
+  /** Hit/Attack ride on top of the locomotion loop so the legs never freeze. */
+  overlays: Record<string, T.AnimationAction>; attacked?: boolean;
   id?: number; lastHitMs?: number; aura: T.Mesh; health: T.Mesh; model?: T.Object3D; elapsed?: number;
 }
+const OVERLAYS = ['Hit', 'Attack'];
+
 export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: GameConfig,
   _palette: Palette, loader: GLTFLoader | null) {
   const templates = new Map<EnemyKind, GLTF>();
@@ -35,7 +39,7 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
     aura.rotation.x = -Math.PI / 2; aura.position.y = .045;
     const health = new THREE.Mesh(barGeo, materials.get('normal'));
     group.add(aura, health); group.position.y = TRAIL_Y; group.visible = false; scene.add(group);
-    return { group, aura, health, mixer: null, action: null, actions: {}, current: '' };
+    return { group, aura, health, mixer: null, action: null, actions: {}, overlays: {}, current: '' };
   };
   const items = Array.from({ length: config.enemyPoolSize }, makeSlot);
   const corpses = Array.from({ length: config.enemy.corpseCount }, makeSlot);
@@ -53,17 +57,34 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
     slot.group.add(model); slot.model = model; slot.kind = kind;
     slot.aura.material = materials.get(kind)!; slot.health.material = materials.get(kind)!;
     slot.aura.scale.setScalar(def.radius * 1.65); slot.health.position.set(0, def.height + .25, 0);
-    slot.mixer = template ? new THREE.AnimationMixer(model) : null; slot.actions = {};
-    for (const clip of template?.animations ?? []) slot.actions[clip.name] = slot.mixer!.clipAction(clip);
+    slot.mixer = template ? new THREE.AnimationMixer(model) : null; slot.actions = {}; slot.overlays = {};
+    for (const clip of template?.animations ?? []) {
+      if (!OVERLAYS.includes(clip.name)) { slot.actions[clip.name] = slot.mixer!.clipAction(clip); continue; }
+      // Upper-body reactions: additive, so they bend the pose instead of replacing the legs.
+      const additive = clip.clone();
+      THREE.AnimationUtils.makeClipAdditive(additive, 0, clip);
+      const action = slot.mixer!.clipAction(additive);
+      action.blendMode = THREE.AdditiveAnimationBlendMode;
+      action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = false;
+      slot.overlays[clip.name] = action;
+    }
     slot.current = ''; slot.action = null;
   }
   function play(slot: EnemySlot, name: string, once = false, restart = false) {
     const target = slot.actions[name] ?? slot.actions.Run ?? slot.actions.Walk;
     if (!target || (!restart && slot.action === target)) return;
-    slot.action?.fadeOut(.08);
+    // A fresh slot has no pose to blend from: start at full weight so it never shows the bind pose.
+    const blend = slot.action ? .12 : 0;
+    slot.action?.fadeOut(blend);
     target.reset().setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
-    target.clampWhenFinished = once; target.fadeIn(.08).play();
+    target.clampWhenFinished = once; target.fadeIn(blend).play();
     slot.action = target; slot.current = name;
+    if (!blend) slot.mixer?.update(0);
+  }
+  function overlay(slot: EnemySlot, name: string, timeScale = 1) {
+    const action = slot.overlays[name];
+    if (!action) return;
+    action.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).play();
   }
   function sync(enemies: GameBody[], elapsedMs: number, dtSec: number, bossAttacking: boolean) {
     const wanted = new Set(enemies.map((e, i) => e.id ?? -i - 1));
@@ -75,20 +96,19 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
       if (!slot) break;
       const fresh = slot.id !== id;
       loadKind(slot, enemy.kind ?? 'normal');
-      if (fresh) { slot.current = ''; slot.action?.stop(); slot.action = null; slot.id = id; slot.lastHitMs = -Infinity; }
+      if (fresh) {
+        slot.current = ''; slot.action?.stop(); slot.action = null; slot.id = id; slot.lastHitMs = -Infinity; slot.attacked = false;
+        for (const action of Object.values(slot.overlays)) action.stop();
+      }
       slot.group.visible = true; slot.group.position.set(laneToX(enemy.lane, config), TRAIL_Y, enemy.z);
       const def = config.enemyTypes[slot.kind!], health = Math.max(0, (enemy.hp ?? 1) / def.hp);
       slot.health.visible = health < 1 || slot.kind === 'boss';
-      slot.health.scale.x = health * (slot.kind === 'boss' ? 3 : 1.2);
-      if (slot.kind === 'boss' && bossAttacking) {
-        slot.lastHitMs = enemy.lastHitMs; play(slot, 'Attack', true);
-      } else if (enemy.lastHitMs !== undefined && enemy.lastHitMs !== slot.lastHitMs) {
-        slot.lastHitMs = enemy.lastHitMs; play(slot, 'Hit', true, true);
-        slot.action?.setEffectiveTimeScale(2.5);
-      } else if (slot.current === 'Hit' && slot.action?.isRunning()) {
-        // Complete the brief recoil.
-      } else if (slot.kind !== 'boss' && enemy.z > -5) play(slot, 'Attack', true);
-      else play(slot, slot.kind === 'tank' ? 'Walk' : slot.kind === 'boss' && enemy.z >= config.boss.holdZ ? 'Idle' : 'Run');
+      slot.health.scale.x = health * def.radius * 2;
+      const swinging = slot.kind === 'boss' ? bossAttacking : enemy.z > -5;
+      if (swinging && !slot.attacked) overlay(slot, 'Attack');
+      slot.attacked = swinging;
+      if (enemy.lastHitMs !== undefined && enemy.lastHitMs !== slot.lastHitMs) { slot.lastHitMs = enemy.lastHitMs; overlay(slot, 'Hit', 2.5); }
+      play(slot, slot.kind === 'tank' ? 'Walk' : slot.kind === 'boss' && enemy.z >= config.boss.holdZ ? 'Idle' : 'Run');
       if (slot.mixer && animated < config.enemy.animatedCount && enemy.z > config.enemy.animateBeyondZ) { slot.mixer.update(dtSec); animated++; }
       slot.aura.rotation.z = Math.sin(elapsedMs * .005 + id) * .08;
     }

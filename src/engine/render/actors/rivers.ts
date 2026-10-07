@@ -2,9 +2,14 @@ import type * as T from 'three';
 import type { GameConfig, ThreeModule } from '@/engine/types';
 import type { Palette } from '@/engine/render/world/palette';
 import { createHeightSampler } from '@/engine/render/world/ground';
+import { createRng } from '@/engine/render/world/rng';
+
+const WET_BANK = .5;
+const BANK_ROCKS = 7;
+const BANK_ROCK_SPAN = 30;
 
 /** Water is an opaque recessed surface; lighting and moving highlights provide depth. */
-export function buildRiver(THREE: ThreeModule, config: GameConfig, palette: Palette) {
+export function buildRiver(THREE: ThreeModule, config: GameConfig, palette: Palette, rocks: T.Object3D[] = []) {
   const group = new THREE.Group();
   group.name = 'river-channel';
   // Beyond the terrain and fog: neither end is visible from the gameplay camera.
@@ -58,12 +63,51 @@ export function buildRiver(THREE: ThreeModule, config: GameConfig, palette: Pale
     group.add(wall);
     surface(side * depth / 2 + .08, side * depth / 2 - .08, -.012, bank);
   }
+  // A darker channel down the middle reads as depth; pale foam traces each bank.
+  const deepMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(palette.kit.water).multiplyScalar(.74), roughness: .4, metalness: .05, flatShading: true,
+  });
+  surface(depth * .26, -depth * .26, -.03, deepMaterial);
   const foamMaterial = new THREE.MeshBasicMaterial({ color: '#d4e5d4', transparent: true, opacity: .42, depthWrite: false });
-  const ripples = Array.from({ length: 40 }, (_, i) => {
-    const foam = new THREE.Mesh(new THREE.PlaneGeometry(.24 + (i % 4) * .14, .016), foamMaterial);
+  const edgeFoamMaterial = new THREE.MeshBasicMaterial({ color: '#e6f0e2', transparent: true, opacity: .6, depthWrite: false });
+  for (const side of [-1, 1]) {
+    const inner = side * (depth / 2 - .26), outer = side * (depth / 2 - .08);
+    surface(Math.max(inner, outer), Math.min(inner, outer), -.02, edgeFoamMaterial).receiveShadow = false;
+  }
+  // Wet mud darkens the ground beside the water, so the channel reads wider than its hit zone.
+  const mud = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(palette.kit.dirtDark).lerp(new THREE.Color(palette.kit.water), .12), roughness: .8, flatShading: true,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  for (const side of [-1, 1]) {
+    const inner = side * (depth / 2 + .02), outer = side * (depth / 2 + WET_BANK);
+    surface(Math.max(inner, outer), Math.min(inner, outer), .01, mud);
+  }
+  // Boulders sit on both banks, just outside the water.
+  const rng = createRng(config.obstacle.riverRadius * 1000 | 0);
+  rocks.forEach(rock => rock.updateMatrixWorld(true));
+  const rockBounds = rocks.map(rock => new THREE.Box3().setFromObject(rock));
+  if (rocks.length) for (const side of [-1, 1]) {
+    for (let i = 0; i < BANK_ROCKS; i++) {
+      const variant = Math.floor(rng() * rocks.length);
+      const scale = 1.1 + rng() * .9;
+      const x = -BANK_ROCK_SPAN / 2 + (i + rng() * .7) * BANK_ROCK_SPAN / BANK_ROCKS;
+      const rock = rocks[variant]!.clone(true);
+      rock.scale.setScalar(scale);
+      rock.rotation.y = rng() * Math.PI * 2;
+      rock.position.set(x, heightAt(x) - rockBounds[variant]!.min.y * scale - .02, side * (depth / 2 + .3 + rng() * .45));
+      rock.traverse(node => {
+        const mesh = node as T.Mesh;
+        if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+      });
+      group.add(rock);
+    }
+  }
+  const ripples = Array.from({ length: 56 }, (_, i) => {
+    const foam = new THREE.Mesh(new THREE.PlaneGeometry(.34 + (i % 4) * .2, .026), foamMaterial);
     foam.rotation.x = -Math.PI / 2;
-    const x = -24 + i * 48 / 39;
-    foam.position.set(x, heightAt(x) - .027, (i % 3 - 1) * depth * .25);
+    const x = -24 + i * 48 / 55;
+    foam.position.set(x, heightAt(x) - .027, (i % 5 - 2) * depth * .17);
     group.add(foam);
     return { mesh: foam, x: foam.position.x, z: foam.position.z };
   });

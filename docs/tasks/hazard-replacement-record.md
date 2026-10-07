@@ -43,3 +43,11 @@ Replaced the long-root tree's obstacle and roadside uses with seven log, stone, 
 ## Blockers / unverified acceptance
 
 Live Chrome control was unavailable (`Browser is not available: chrome`). Human webcam jumping and hardware-GPU frame rate remain unverified; software-rendered browser checks do not establish either. The development server is available at [local game](http://localhost:3000/play).
+
+## Enemy scale, enemy animation, bigger hazards — 2.11.0-alpha.0
+
+- Enemies sized against the player (mage ≈3.7 with hat): scout 3.4, skeleton 3.7, brute 3.9, treant 8. Collision radii grew with them (1 / 1.05 / 1.3 / 2).
+- Brute (tank) `approachSpeed` -3 → +1. Negative made it slide backwards over the scrolling ground while its Walk clip stepped forward. It is still the slowest enemy.
+- Hit and Attack clips are now additive overlays over the Walk/Run/Idle loop. Previously each one replaced the whole pose, so a brute under fire (every ~190 ms) never got to walk. Fresh slots also evaluate their first pose immediately instead of showing the bind pose.
+- Jump height 1.65 → 2.4 and clearance 0.8 → 1.2 (same ratio) so hazards can grow with the player. Logs 1.25 tall, mossy, with shelf mushrooms (rebuilt with `tools/build_trail_logs.py`). Stone bands are boulders 1.1 tall at most with gap fillers. River 2.6 deep (radius 1.3) with a darker channel, bank foam, wet mud and boulders on both banks.
+- Tools: `tools/check-enemy-anims.mjs` samples the clip each live enemy plays; `docs/shots/hazard-rework/` has review captures.

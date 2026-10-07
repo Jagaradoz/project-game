@@ -2,38 +2,38 @@
   "variants": [
     {
       "name": "log-2-lanes-left",
-      "calls": 336,
-      "triangles": 710844
+      "calls": 339,
+      "triangles": 711096
     },
     {
       "name": "log-2-lanes-right",
-      "calls": 336,
-      "triangles": 710844
+      "calls": 339,
+      "triangles": 711096
     },
     {
       "name": "log-3-lanes-left",
-      "calls": 336,
-      "triangles": 710948
+      "calls": 339,
+      "triangles": 711216
     },
     {
       "name": "stones-2-lanes-left",
-      "calls": 346,
-      "triangles": 711848
+      "calls": 349,
+      "triangles": 710828
     },
     {
       "name": "stones-2-lanes-right",
-      "calls": 346,
-      "triangles": 711848
+      "calls": 349,
+      "triangles": 710828
     },
     {
       "name": "stones-3-lanes-left",
-      "calls": 346,
-      "triangles": 712644
+      "calls": 349,
+      "triangles": 711192
     },
     {
       "name": "river-3-lanes",
-      "calls": 353,
-      "triangles": 714440
+      "calls": 392,
+      "triangles": 718390
     }
   ],
   "riverJump": {
@@ -57,18 +57,19 @@
     "drowningElapsedMs": 0,
     "splashVisible": false,
     "playerVisible": true,
-    "playerY": 0.10791516322973904,
-    "jumpHeight": 0.10791516322973904,
+    "playerY": 0.1569675101523477,
+    "jumpHeight": 0.1569675101523477,
     "jumpStartedMs": 16.666666666666668,
     "jumpCount": 1,
     "bossDefeated": false,
     "bossWarningLane": null,
     "hp": 3,
     "score": 0,
-    "calls": 342,
-    "tris": 714072,
+    "calls": 370,
+    "tris": 717752,
     "quality": "high",
     "corpses": 0,
+    "enemyAnims": [],
     "character": "mage",
     "anim": "jump",
     "animTime": 0.5338541800646405,
@@ -85,7 +86,7 @@
   },
   "drowning": {
     "dist": 0,
-    "elapsedMs": 33.333333333333336,
+    "elapsedMs": 16.666666666666668,
     "isOver": true,
     "isCleared": false,
     "enemies": [],
@@ -95,7 +96,7 @@
         "kind": "river",
         "startLane": 0,
         "laneCount": 3,
-        "z": -1.4333326967592592,
+        "z": -1.6166666666666667,
         "status": "crossing"
       }
     ],
@@ -112,13 +113,14 @@
     "bossWarningLane": null,
     "hp": 0,
     "score": 0,
-    "calls": 350,
-    "tris": 714894,
+    "calls": 378,
+    "tris": 718716,
     "quality": "high",
     "corpses": 0,
+    "enemyAnims": [],
     "character": "mage",
     "anim": "idle",
-    "animTime": 0.7833333333333341,
+    "animTime": 0.8000000000000008,
     "animDuration": 1.0833333730697632,
     "animRunning": true,
     "clips": [
@@ -159,10 +161,11 @@
     "bossWarningLane": null,
     "hp": 3,
     "score": 0,
-    "calls": 336,
-    "tris": 710844,
+    "calls": 339,
+    "tris": 711096,
     "quality": "high",
     "corpses": 0,
+    "enemyAnims": [],
     "character": "mage",
     "anim": "run",
     "animTime": 0,

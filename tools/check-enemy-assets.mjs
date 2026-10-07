@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-for (const [name, height] of [['GoblinScout', 1.8], ['BrambleSkeleton', 2.1], ['ShroomBrute', 2.7], ['ElderTreant', 5]]) {
+for (const [name, height] of [['GoblinScout', 3.4], ['BrambleSkeleton', 3.7], ['ShroomBrute', 3.9], ['ElderTreant', 8]]) {
   const bytes = readFileSync('public/assets/models/enemies/animated/' + name + '.glb');
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   const model = gltf.scene;
