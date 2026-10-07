@@ -29,6 +29,7 @@ import { createDrowningSplash } from '@/engine/render/actors/rivers';
 import { createRiverMask } from '@/engine/render/world/riverMask';
 import { addPlayer } from '@/engine/render/actors/player';
 import { createEffects } from '@/engine/render/actors/effects';
+import { createScoreOrbs } from '@/engine/render/actors/scoreOrbs';
 import { addShieldBubble, addSporeCloud } from '@/engine/render/actors/spores';
 
 const MOTE_COUNT = 26;
@@ -76,6 +77,7 @@ export async function createScene(
   const obstaclePool = await addObstaclePool(THREE, scene, config, loader, palette);
   const drowningSplash = createDrowningSplash(THREE, scene, palette);
   const effects = createEffects(THREE, scene, palette);
+  const scoreOrbs = createScoreOrbs(THREE, scene, palette, config);
   const sporeCloud = await addSporeCloud(THREE, scene, config, loader);
   const shield = addShieldBubble(THREE, player.group);
 
@@ -151,6 +153,7 @@ export async function createScene(
     riverMask,
     drowningSplash,
     effects,
+    scoreOrbs,
     sporeCloud,
     shield,
     cameraFeedback,

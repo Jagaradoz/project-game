@@ -107,6 +107,8 @@ export const GOLDEN_FOREST = {
     enemy: '#fff3e2',
     enemyTrim: '#17120e',
     bullet: '#fff3e2',
+    /** Score orbs pick from these by id, so a burst reads as a handful of gems. */
+    orbs: ['#ffd34d', '#5ce1ff', '#ff5cb8', '#7dff6b', '#b98cff', '#ff9a3d'],
   },
 
   kit: FOREST_KIT,

@@ -19,6 +19,8 @@
 
 import { CONFIG } from '@/engine/config';
 import { advanceHazards, hasSafeHazardArrival } from '@/engine/core/hazards';
+import { advanceOrbs, collectAll, dropOrbs } from '@/engine/core/orbs';
+import { chainKills, stepPoints } from '@/engine/core/scoring';
 import {
   advanceSpores,
   canSpawnSpore,
@@ -50,6 +52,10 @@ export function createGameState(seed = 1, config: RunConfig = CONFIG.game): Game
     lane: centreLane(config),
     hp: config.maxHp,
     score: 0,
+    combo: 0,
+    lastKillMs: -Infinity,
+    orbs: [],
+    justCollected: [],
     distance: 0,
     speed: 0,
     enemies: [],
@@ -103,8 +109,8 @@ export function updateGame(
   config: RunConfig = CONFIG.game,
 ): GameState {
   if (state.isOver) {
-    if (!state.justHit && !state.justFired && state.justKilled.length === 0 && !state.justImpacts.length) return state;
-    return { ...state, justHit: false, justFired: false, justKilled: [], justImpacts: [] };
+    if (!state.justHit && !state.justFired && state.justKilled.length === 0 && !state.justImpacts.length && !state.justCollected.length) return state;
+    return { ...state, justHit: false, justFired: false, justKilled: [], justImpacts: [], justCollected: [] };
   }
 
   const stepMs = Math.min(Math.max(dtMs, 0), config.maxFrameMs);
@@ -216,17 +222,34 @@ export function updateGame(
   const spawnsSpore = hp > 0 && !isCleared && canSpawnSpore(state, retainedHazards, elapsedMs, isBossPhase, config) && spores.length === 0;
   const nextSpores = spawnsSpore ? [...spores, createSporeCloud(nextId++, config)] : spores;
   const nextSporeMs = spawnsSpore ? elapsedMs + config.spore.intervalMs : state.nextSporeMs;
+  // Existing orbs roll in first; this step's kills drop theirs behind them.
+  const chained = chainKills(state, shots.killed, tookDamage, elapsedMs, config);
+  const rolled = advanceOrbs(state.orbs, speed * stepSec, config);
+  const dropped = dropOrbs(rolled.orbs, shots.killed, chained.values, nextId, config);
+  nextId = dropped.nextId;
+  const swept = isCleared ? collectAll(dropped.orbs) : { collected: 0, collectedIds: [] };
+  const score = state.score + stepPoints({
+    fromDistance: state.distance,
+    toDistance: distance,
+    hazardsCleared: crossed.cleared,
+    justCleared: isCleared,
+    collected: rolled.collected + dropped.banked + swept.collected,
+  }, config);
 
   return {
     ...state,
-    nextId, obstacles: retainedHazards, nextObstacleMs, jumpStartedMs, lastTakeoffMs, jumpHeight,
+    obstacles: retainedHazards, nextObstacleMs, jumpStartedMs, lastTakeoffMs, jumpHeight,
     spores: nextSpores, nextSporeMs, nextSporeTickMs: spore.nextTickMs, isInSpore, isShielding,
     jumpHeld: wantsJump, jumpCount: state.jumpCount + Number(tookOff),
     hitAtMs: tookDamage ? elapsedMs : state.hitAtMs, justImpacts: shots.impacts,
     bossSpawned: state.bossSpawned || shouldSpawnBoss, bossDefeated, nextBossKills,
     lane,
     hp,
-    score: state.score + shots.kills,
+    nextId,
+    score,
+    ...chained.chain,
+    orbs: isCleared ? [] : dropped.orbs,
+    justCollected: [...rolled.collectedIds, ...swept.collectedIds],
     distance,
     speed,
     enemies: spawned.enemies,

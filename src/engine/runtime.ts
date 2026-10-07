@@ -16,6 +16,7 @@
 
 import { CONFIG } from '@/engine/config';
 import { createGameState, restartGame, updateGame } from '@/engine/core/state';
+import { activeMultiplier } from '@/engine/core/scoring';
 import { createDrowningPresentation, updateDrowningPresentation } from '@/engine/core/drowning';
 import { TRAINING_STAGE_NUMBER, resolveTrainingRules } from '@/engine/core/stage';
 import { createInput } from '@/engine/core/input';
@@ -122,6 +123,8 @@ export interface HudSnapshot {
   bossMaxHp: number;
   bossDefeated: boolean;
   score: number;
+  /** What the next kill would be multiplied by; 1 when no combo is running. */
+  comboMultiplier: number;
   hp: number;
   maxHp: number;
   distance: number;
@@ -174,8 +177,12 @@ export interface HudSnapshot {
 }
 
 /** Changes a player would notice immediately; these bypass the throttle. */
+/**
+ * `score` is deliberately absent: walking earns points every metre, so forcing
+ * it would publish every frame. A kill still shows at once through `killCount`.
+ */
 const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
-  'score',
+  'comboMultiplier',
   'hp',
   'isShielding',
   'isHandsOnHips',
@@ -297,6 +304,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       (near, o) => !near || o.z > near.z ? o : near, null);
     return {
       score: game.score,
+      comboMultiplier: activeMultiplier(game, game.elapsedMs, rules),
       jumpCount: jump.jumpCount,
       armRaiseCount: armsUp.raiseCount,
       hipsHoldCount: handsOnHips.holdCount,

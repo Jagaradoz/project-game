@@ -29,6 +29,9 @@ function runGame(
 
 const constantInput = (input: GameInput) => () => input;
 
+/** A kill pays through the orbs it drops, not straight into the score. */
+const orbValue = (state: GameState) => state.orbs.reduce((total, orb) => total + orb.value, 0);
+
 /** A state with one enemy already inside the player's collision band. */
 function stateWithEnemyOnPlayer(lane = 1) {
   return { ...createGameState(1), lane, enemies: [{ lane, z: 0, previousZ: 0 }] };
@@ -256,7 +259,8 @@ test('game: a bullet kills an enemy in its lane and scores the kill', () => {
   };
   const state = updateGame(engaged, { lane: 1, isFiring: false }, STEP_MS);
 
-  assert.equal(state.score, 1);
+  assert.equal(state.killCount, 1);
+  assert.equal(orbValue(state), GAME.scoring.kill.normal);
   assert.equal(state.enemies.length, 0);
   assert.equal(state.bullets.length, 0);
 });
@@ -285,7 +289,8 @@ test('game: one bullet kills one enemy, not the whole column', () => {
   };
   const state = updateGame(column, { lane: 1, isFiring: false }, STEP_MS);
 
-  assert.equal(state.score, 1);
+  assert.equal(state.killCount, 1);
+  assert.equal(orbValue(state), GAME.scoring.kill.normal);
   assert.equal(state.enemies.length, 1);
 });
 
@@ -298,7 +303,8 @@ test('game: a fast bullet cannot fly through an enemy on a long frame', () => {
   };
   const state = updateGame(engaged, { lane: 1, isFiring: false }, GAME.maxFrameMs);
 
-  assert.equal(state.score, 1);
+  assert.equal(state.killCount, 1);
+  assert.equal(orbValue(state), GAME.scoring.kill.normal);
   assert.equal(state.enemies.length, 0);
 });
 
@@ -405,7 +411,7 @@ test('game: a kill reports where it happened so the view can stage a death', () 
   const next = updateGame(state, { lane: 1, isFiring: false }, 100, config);
 
   // Assert
-  assert.equal(next.score, 1);
+  assert.equal(orbValue(next), GAME.scoring.kill.normal);
   assert.equal(next.justKilled.length, 1);
   assert.equal(next.justKilled[0].lane, 1);
   assert.ok(Number.isFinite(next.justKilled[0].z));

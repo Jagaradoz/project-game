@@ -2,6 +2,7 @@ import { ChartColumn, RotateCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import type { HudSnapshot } from '@/engine/runtime';
+import { formatNumber } from '@/lib/format';
 
 interface GameOverOverlayProps {
   snapshot: HudSnapshot;
@@ -34,7 +35,7 @@ export function GameOverOverlay({
         </h2>
 
         <p className="m-0 text-sm tabular-nums text-muted">
-          {snapshot.score} points &middot; {Math.round(snapshot.distance)} m
+          {formatNumber(snapshot.score)} points &middot; {Math.round(snapshot.distance)} m
           {snapshot.goalKills !== null && (
             <> &middot; {snapshot.killCount}/{snapshot.goalKills} defeated</>
           )}

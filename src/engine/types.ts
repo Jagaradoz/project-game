@@ -191,6 +191,15 @@ export interface GameBody {
   previousZ: number;
 }
 
+/** A kill's points lying on the trail, waiting for the player's lane; see core/orbs.ts. */
+export interface ScoreOrb {
+  id: number;
+  lane: number;
+  z: number;
+  previousZ: number;
+  value: number;
+}
+
 /** Where an enemy died this frame, so the view can play a death animation. */
 export interface KillMark {
   kind?: EnemyKind;
@@ -223,6 +232,12 @@ export interface GameState {
   lane: number;
   hp: number;
   score: number;
+  /** Kills in the running combo chain; see core/scoring.ts. */
+  combo: number;
+  lastKillMs: number;
+  orbs: ScoreOrb[];
+  /** Orbs picked up this frame, so the view can fly them to the player. */
+  justCollected: number[];
   distance: number;
   speed: number;
   enemies: GameBody[];

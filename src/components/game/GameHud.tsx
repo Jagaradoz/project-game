@@ -1,5 +1,7 @@
 import { Heart, Shield } from 'lucide-react';
 import type { HudSnapshot } from '@/engine/runtime';
+import { useCountUp } from '@/hooks/useCountUp';
+import { formatNumber } from '@/lib/format';
 
 interface GameHudProps {
   snapshot: HudSnapshot;
@@ -11,6 +13,7 @@ interface GameHudProps {
  */
 export function GameHud({ snapshot }: GameHudProps) {
   const pips = Array.from({ length: snapshot.maxHp }, (_, index) => index < snapshot.hp);
+  const shownScore = useCountUp(snapshot.score);
 
   return (
     <>
@@ -61,7 +64,17 @@ export function GameHud({ snapshot }: GameHudProps) {
       <div className="pointer-events-none absolute bottom-3 left-3 z-[1]">
         <div className="border-2 border-surface bg-ink px-3 py-2 shadow-[4px_4px_0_0_var(--color-primary)]">
           <div className="flex flex-col gap-0.5 font-semibold tabular-nums text-white">
-            <Stat label="Score" value={String(snapshot.score)} reactiveKey={snapshot.score} accent />
+            {/* Keyed on kills, not score: walking adds points every metre and would pulse it constantly. */}
+            <Stat label="Score" value={formatNumber(shownScore)} reactiveKey={snapshot.killCount} accent />
+            {snapshot.comboMultiplier > 1 && (
+              <span
+                key={snapshot.comboMultiplier}
+                className="self-start border border-primary px-1.5 text-xs font-black text-primary animate-[pulse_300ms_ease-out_1] motion-reduce:animate-none"
+                aria-label={`Combo multiplier ${snapshot.comboMultiplier} times`}
+              >
+                Combo ×{snapshot.comboMultiplier}
+              </span>
+            )}
             <Stat label="Distance" value={`${Math.round(snapshot.distance)} m`} />
           </div>
         </div>

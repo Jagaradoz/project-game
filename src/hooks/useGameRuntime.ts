@@ -32,6 +32,7 @@ const IDLE_SNAPSHOT: HudSnapshot = {
   obstacleKind: null, obstacleOpenLane: null, deathReason: null, endPresentationComplete: true,
   bossDefeated: false,
   score: 0,
+  comboMultiplier: 1,
   hp: CONFIG.game.maxHp,
   maxHp: CONFIG.game.maxHp,
   distance: 0,

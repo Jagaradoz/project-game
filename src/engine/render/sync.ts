@@ -31,6 +31,8 @@ import type { DrowningPresentation } from '@/engine/core/drowning';
 const BLINK_PERIOD_MS = 160;
 const BLINK_OPACITY = 0.25;
 const LANE_LERP = 0.35;
+/** Chest height above the player's feet, where score orbs are absorbed. */
+const ORB_TARGET_HEIGHT = 1.6;
 
 export function syncScene(
   sceneRefs: SceneRefs,
@@ -62,6 +64,7 @@ export function syncScene(
     if (newEvents) stageKills(sceneRefs, state, config);
     sceneRefs.enemyPool?.updateCorpses(dtSec, state.speed);
     sceneRefs.effects?.update(dtSec, state.speed);
+    sceneRefs.scoreOrbs?.update(state.orbs, newEvents ? state.justCollected : [], dtSec, orbTarget(sceneRefs, state, config));
     sceneRefs.bulletPool?.sync(state, dtSec, sceneRefs.player?.characterId ?? config.defaultCharacter);
   } else {
     if (sceneRefs.enemyPool) {
@@ -76,6 +79,7 @@ export function syncScene(
     sceneRefs.sporeCloud?.hide();
     sceneRefs.drowningSplash?.update(false, 0, 0, 0);
     sceneRefs.bulletPool?.hide();
+    sceneRefs.scoreOrbs?.hide();
   }
 
   sceneRefs.trailEdge?.update(state.distance);
@@ -203,6 +207,14 @@ function stageKills(sceneRefs: SceneRefs, state: GameState, config: GameConfig):
     sceneRefs.enemyPool?.spawnDeath(x, kill.z, kill.kind);
     sceneRefs.effects?.burst(x, config.enemyRadius + 0.6, kill.z);
   }
+}
+
+/** Collected orbs fly to the player's chest, following the lane lerp and the jump. */
+function orbTarget(sceneRefs: SceneRefs, state: GameState, config: GameConfig) {
+  const position = sceneRefs.player?.group.position;
+  return position
+    ? { x: position.x, y: position.y + ORB_TARGET_HEIGHT, z: position.z }
+    : { x: laneToX(state.lane, config), y: TRAIL_Y + state.jumpHeight + ORB_TARGET_HEIGHT, z: config.playerZ };
 }
 
 /** Shared by every layer of discrete meshes that scrolls with the run. */

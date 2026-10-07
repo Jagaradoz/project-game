@@ -18,7 +18,7 @@ function hazardReach(hazard: TrailHazard, config: RunConfig): number {
 export function advanceHazards(
   hazards: TrailHazard[], lane: number, deltaZ: number,
   fromMs: number, toMs: number, lastTakeoffMs: number | null, config: RunConfig,
-): { obstacles: TrailHazard[]; hit: boolean; drowned: boolean } {
+): { obstacles: TrailHazard[]; hit: boolean; drowned: boolean; cleared: number } {
   const { durationMs, leniency } = config.jump;
   const landedByMs = lastTakeoffMs === null ? -Infinity : lastTakeoffMs + durationMs + leniency.landingGraceMs;
   /** When, inside this step, a hazard moving from `startZ` reaches `z`. */
@@ -26,6 +26,8 @@ export function advanceHazards(
     startZ >= z || deltaZ <= 0 ? fromMs : fromMs + ((z - startZ) / deltaZ) * (toMs - fromMs);
   let hit = false;
   let drowned = false;
+  /** Hazards whose verdict came in safe this step. */
+  let cleared = 0;
   const obstacles = hazards.map(source => {
     const obstacle = { ...source, previousZ: source.z, z: source.z + deltaZ };
     const entryZ = config.playerZ - hazardReach(source, config);
@@ -40,11 +42,13 @@ export function advanceHazards(
     if (!obstacle.covered) {
       if (obstacle.kind === 'river') drowned = true;
       else if (!obstacle.hit) { hit = true; obstacle.hit = true; }
+    } else {
+      cleared += 1;
     }
     obstacle.status = 'cleared';
     return obstacle;
   });
-  return { obstacles, hit, drowned };
+  return { obstacles, hit, drowned, cleared };
 }
 
 /** Keep a full jump's time free of enemy contact before and after each hazard. */

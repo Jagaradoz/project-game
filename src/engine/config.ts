@@ -296,6 +296,33 @@ export const CONFIG = {
     },
     boss: { triggerKills: 15 },
     /**
+     * Score rules; see core/scoring.ts. Kill values scale with how long each kind
+     * takes to bring down, so a tank is worth its hp. The combo rewards keeping
+     * up the jog: every `comboStep` kills inside the window raise the multiplier.
+     */
+    scoring: {
+      kill: { weak: 100, normal: 250, tank: 600, boss: 3000 },
+      comboWindowMs: 2500,
+      comboStep: 5,
+      multiplierStep: 0.5,
+      maxMultiplier: 3,
+      perMetre: 5,
+      hazardCleared: 150,
+      stageCleared: 2000,
+    },
+    /**
+     * Score orbs (core/orbs.ts). A kill's points drop as orbs where the enemy
+     * fell and count once the player's magnet pulls them in: any lane, within
+     * `magnetReach` ahead. `spacing` strings a kill's orbs out along its lane.
+     * `maxOrbs` caps the field; past it, a kill's points are banked directly.
+     */
+    scoreOrbs: {
+      perKill: { weak: 3, normal: 4, tank: 6, boss: 14 },
+      maxOrbs: 96,
+      spacing: 0.8,
+      magnetReach: 5,
+    },
+    /**
      * Heights are matched to the player (the mage stands ~3.7 with hat). approachSpeed is relative
      * to the scrolling ground and must stay positive: a negative value makes the enemy back away
      * while its Walk clip steps forward. walkRate is the Walk clip's playback speed, so the
