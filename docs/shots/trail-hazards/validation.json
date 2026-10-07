@@ -2,38 +2,38 @@
   "variants": [
     {
       "name": "log-2-lanes-left",
-      "calls": 339,
-      "triangles": 711096
+      "calls": 336,
+      "triangles": 711052
     },
     {
       "name": "log-2-lanes-right",
-      "calls": 339,
-      "triangles": 711096
+      "calls": 336,
+      "triangles": 711052
     },
     {
       "name": "log-3-lanes-left",
-      "calls": 339,
-      "triangles": 711216
+      "calls": 336,
+      "triangles": 711172
     },
     {
       "name": "stones-2-lanes-left",
-      "calls": 349,
-      "triangles": 710828
+      "calls": 333,
+      "triangles": 711336
     },
     {
       "name": "stones-2-lanes-right",
-      "calls": 349,
-      "triangles": 710828
+      "calls": 333,
+      "triangles": 711336
     },
     {
       "name": "stones-3-lanes-left",
-      "calls": 349,
-      "triangles": 711192
+      "calls": 333,
+      "triangles": 711876
     },
     {
       "name": "river-3-lanes",
-      "calls": 392,
-      "triangles": 718390
+      "calls": 363,
+      "triangles": 716237
     }
   ],
   "riverJump": {
@@ -65,8 +65,8 @@
     "bossWarningLane": null,
     "hp": 3,
     "score": 0,
-    "calls": 370,
-    "tris": 717752,
+    "calls": 350,
+    "tris": 715723,
     "quality": "high",
     "corpses": 0,
     "enemyAnims": [],
@@ -113,8 +113,8 @@
     "bossWarningLane": null,
     "hp": 0,
     "score": 0,
-    "calls": 378,
-    "tris": 718716,
+    "calls": 357,
+    "tris": 716543,
     "quality": "high",
     "corpses": 0,
     "enemyAnims": [],
@@ -161,8 +161,8 @@
     "bossWarningLane": null,
     "hp": 3,
     "score": 0,
-    "calls": 339,
-    "tris": 711096,
+    "calls": 336,
+    "tris": 711052,
     "quality": "high",
     "corpses": 0,
     "enemyAnims": [],

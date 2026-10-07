@@ -274,7 +274,7 @@ export const CONFIG = {
     },
     obstacle: {
       firstMs: 8500, intervalMs: 8500, radius: 0.7, poolSize: 4,
-      riverRadius: 1.3,
+      riverRadius: 1.5,
       logWeight: 0.4, stoneWeight: 0.4, riverWeight: 0.2,
       drowningMs: 650,
     },

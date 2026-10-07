@@ -91,8 +91,9 @@ try {
   assert.equal(reset.splashVisible, false);
   const assets = await page.evaluate('performance.getEntriesByType("resource").map(r => r.name)');
   assert.equal(assets.some(path => path.includes('tree_root_oak.glb')), false);
-  assert.ok(assets.some(path => path.includes('log_two_lane.glb')));
-  assert.ok(assets.some(path => path.includes('log_three_lane.glb')));
+  for (const name of ['log_two_lane_A', 'log_three_lane_C', 'stone_hazard_two_lane_B', 'stone_hazard_three_lane_A', 'river_crossing']) {
+    assert.ok(assets.some(path => path.includes(name + '.glb')), name + ' loaded');
+  }
   const errors = page.logs.filter(log => ['error', 'pageerror'].includes(log.level));
   assert.deepEqual(errors, [], 'browser and shader errors');
   const report = { variants: results, riverJump: cleared, drowning: finished, restart: reset, errors };

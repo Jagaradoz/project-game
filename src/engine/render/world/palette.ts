@@ -32,6 +32,8 @@ const FOREST_KIT = {
   woodBirch: '#fff3e2',
   woodInner: '#d3a36b',
   water: '#5e9ea5',
+  waterDeep: '#3f7f89',
+  waterLight: '#86c3c6',
   corn: '#e8bb63',
   colorRed: '#fe6601',
   colorRedDark: '#a84314',

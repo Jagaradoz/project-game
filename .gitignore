@@ -9,3 +9,7 @@ coverage/
 .env.local
 .env.*.local
 !.env.example
+
+# Python cache
+__pycache__/
+*.pyc

@@ -586,9 +586,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         publish();
       },
       /** Deterministic fixture for visual regression, gated to development. */
-      previewHazard(kind: TrailHazard['kind'], startLane: 0 | 1 = 0, laneCount: 2 | 3 = 3, z = -12) {
+      previewHazard(kind: TrailHazard['kind'], startLane: 0 | 1 = 0, laneCount: 2 | 3 = 3, z = -12, id = 70) {
         if (!['log', 'stones', 'river'].includes(kind)) return;
-        const body = { id: 70, kind, z, previousZ: z, status: 'approaching' as const };
+        const body = { id: Math.floor(Number(id)) || 0, kind, z, previousZ: z, status: 'approaching' as const };
         const obstacle: TrailHazard = kind === 'river' || laneCount === 3
           ? { ...body, startLane: 0, laneCount: 3 }
           : { ...body, kind, startLane, laneCount: 2 };

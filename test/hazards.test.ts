@@ -77,7 +77,7 @@ test('wider river banks use their own contact bounds without enlarging solid haz
     advanceHazards([hazard(kind, 0, 3, z)], 1, 0, 0, 50, null, CONFIG.game);
   expect(check('river', -1.9).drowned).toBe(true);
   expect(check('river', 1.9).drowned).toBe(true);
-  expect(check('river', -2.2).drowned).toBe(false);
+  expect(check("river", -2.5).drowned).toBe(false);
   expect(check('log', -1.6).hit).toBe(false);
   expect(check('stones', -1.6).hit).toBe(false);
 });

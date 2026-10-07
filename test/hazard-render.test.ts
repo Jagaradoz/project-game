@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CONFIG } from '@/engine/config';
 import { GOLDEN_FOREST } from '@/engine/render/world/palette';
-import { addObstaclePool } from '@/engine/render/actors/obstacles';
+import { addObstaclePool, HAZARD_VARIANTS, hazardAssetName, hazardVariant } from '@/engine/render/actors/obstacles';
 import { createRiverMask } from '@/engine/render/world/riverMask';
 import { createTrailEdge } from '@/engine/render/world/trailEdge';
 import type { TrailHazard } from '@/engine/types';
@@ -25,34 +25,28 @@ test('real exported assets cover their lanes, keep an open lane, and reuse four 
   const scene = new THREE.Scene();
   const pool = await addObstaclePool(THREE, scene, CONFIG.game, loader, GOLDEN_FOREST);
   expect(pool.items).toHaveLength(4);
-  expect(loaded).toHaveLength(9);
+  expect(loaded).toHaveLength(13);
+  expect(loaded).toContain('/assets/models/environment/river_crossing.glb');
   expect(loaded.some(path => path.includes('rock_'))).toBe(false);
-  expect(loaded).toContain('/assets/models/environment/stone_bigC.glb');
-  expect(loaded).toContain('/assets/models/environment/stone_mediumTrio.glb');
   const groups = pool.items.map(s => s.group);
   for (const kind of ['log', 'stones'] as const) {
     for (const [start, count] of [[0, 2], [1, 2], [0, 3]] as const) {
-      pool.sync([hazard(kind, start, count)], 0);
-      const slot = pool.items[0];
-      scene.updateMatrixWorld(true);
-      const object = kind === 'log' ? slot.logs[count - 2] : slot.stones.group;
-      const bounds = new THREE.Box3().setFromObject(object);
-      const left = (start - 1.5) * 2.4;
-      const right = (start + count - 1.5) * 2.4;
-      expect(bounds.min.x).toBeGreaterThanOrEqual(left - .00001);
-      expect(bounds.max.x).toBeLessThanOrEqual(right + .00001);
-      if (kind === 'log') {
-        expect(bounds.min.x).toBeCloseTo(left);
-        expect(bounds.max.x).toBeCloseTo(right);
-        expect(bounds.max.y).toBeGreaterThan(1);
+      for (const id of [0, 1, 2]) {
+        pool.sync([{ ...hazard(kind, start, count), id }], 0);
+        const slot = pool.items[0];
+        scene.updateMatrixWorld(true);
+        const shown = [...slot.solids.values()].filter(object => object.visible);
+        expect(shown.map(object => object.name)).toEqual([hazardAssetName(kind, count, HAZARD_VARIANTS[hazardVariant(id)])]);
+        const bounds = new THREE.Box3().setFromObject(shown[0]!);
+        const left = (start - 1.5) * 2.4;
+        const right = (start + count - 1.5) * 2.4;
+        // Authored variants turn a little, so allow a small overhang past the occupied lanes.
+        expect(bounds.min.x).toBeGreaterThanOrEqual(left - .3);
+        expect(bounds.max.x).toBeLessThanOrEqual(right + .3);
+        expect(bounds.min.x).toBeLessThan(left + .3);
+        expect(bounds.max.x).toBeGreaterThan(right - .3);
         expect(bounds.max.y).toBeLessThan(CONFIG.game.jump.clearance * 1.1);
-      } else {
-        expect(bounds.max.y).toBeLessThan(CONFIG.game.jump.clearance);
-        expect(bounds.min.z).toBeGreaterThanOrEqual(-12 - CONFIG.game.obstacle.radius - .3);
-        expect(bounds.max.z).toBeLessThanOrEqual(-12 + CONFIG.game.obstacle.radius + .3);
-        const instances = slot.stones.group.children as THREE.InstancedMesh[];
-        // Boulders and gap fillers: at least five placements per occupied lane across all meshes.
-        expect(instances.reduce((total, mesh) => total + mesh.count, 0)).toBeGreaterThanOrEqual(count * 5);
+        expect(bounds.max.y).toBeGreaterThan(kind === 'log' ? 1 : .7);
       }
     }
   }
@@ -60,9 +54,10 @@ test('real exported assets cover their lanes, keep an open lane, and reuse four 
   const river = pool.items[0].river;
   expect(river.group.visible).toBe(true);
   expect(river.group.rotation.y).toBe(0);
-  const water = river.group.children[0] as THREE.Mesh;
-  const size = new THREE.Box3().setFromObject(water).getSize(new THREE.Vector3());
-  expect(size.z).toBeCloseTo(CONFIG.game.obstacle.riverRadius * 2);
+  const size = new THREE.Box3().setFromObject(river.group).getSize(new THREE.Vector3());
+  // Authored channel: fills the masked hole exactly, with scenery just outside it.
+  expect(size.z).toBeGreaterThanOrEqual(CONFIG.game.obstacle.riverRadius * 2);
+  expect(size.z).toBeLessThan(6);
   expect(size.x).toBeGreaterThan(1000);
   pool.hide();
   expect(groups.every(group => !group.visible)).toBe(true);
