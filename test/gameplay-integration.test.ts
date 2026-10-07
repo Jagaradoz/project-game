@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { createGameState, updateGame } from '@/engine/core/state';
 import { CONFIG } from '@/engine/config';
 import { createInput } from '@/engine/core/input';
+import type { GameState } from '@/engine/types';
 
 const idle = { lane: 1, isFiring: false };
 
@@ -66,16 +67,32 @@ test('keyboard jump is consumed once and tracking loss clears pending jumps', ()
   expect(input.read().jump).toBeUndefined();
 });
 
-test('boss attack warns a lane before damage, and moving aside avoids it', () => {
-  const state = { ...createGameState(3), bossSpawned: true,
-    enemies: [{ id: 99, kind: 'boss' as const, hp: 28, lane: 1, z: -20, previousZ: -20 }],
-  };
-  const warning = updateGame(state, idle, 50);
-  expect(warning.bossWarningLane).toBe(1);
-  expect(warning.hp).toBe(3);
-  const due = { ...warning, elapsedMs: warning.bossAttackAtMs! };
-  expect(updateGame(due, idle, 50).hp).toBe(2);
-  expect(updateGame(due, { ...idle, lane: 0 }, 50).hp).toBe(3);
+test('the boss walks into the player like any enemy: contact costs one HP and uses it up', () => {
+  const boss = { id: 99, kind: 'boss' as const, hp: 10, lane: 1, z: -3, previousZ: -3 };
+  const state = { ...createGameState(3), speed: 11, bossSpawned: true, enemies: [boss] };
+  const hit = updateGame(state, idle, 50);
+  expect(hit.hp).toBe(2);
+  expect(hit.enemies.some(e => e.kind === 'boss')).toBe(false);
+  const dodged = updateGame(state, { ...idle, lane: 0 }, 50);
+  expect(dodged.hp).toBe(3);
+});
+
+test('the boss never holds still: it keeps walking towards the player', () => {
+  let state: GameState = { ...createGameState(3), speed: 11, bossSpawned: true,
+    enemies: [{ id: 99, kind: 'boss' as const, hp: 10, lane: 1, z: -40, previousZ: -40 }] };
+  for (let i = 0; i < 20; i++) state = updateGame(state, { ...idle, lane: 0 }, 50);
+  expect(state.enemies[0].z).toBeGreaterThan(-30);
+});
+
+test('an endless run meets a new boss every triggerKills kills', () => {
+  const trigger = CONFIG.game.boss.triggerKills;
+  const due = { ...createGameState(3), killCount: trigger, nextSpawnMs: Infinity, nextObstacleMs: Infinity, nextSporeMs: Infinity };
+  const first = updateGame(due, idle, 50);
+  expect(first.enemies.filter(e => e.kind === 'boss')).toHaveLength(1);
+  expect(first.nextBossKills).toBe(trigger * 2);
+  const gone = { ...first, enemies: [], killCount: trigger * 2 };
+  expect(updateGame(gone, idle, 50).enemies.filter(e => e.kind === 'boss')).toHaveLength(1);
+  expect(updateGame({ ...first, enemies: [], killCount: trigger * 2 - 1 }, idle, 50).enemies).toHaveLength(0);
 });
 
 test('killing the boss clears a completed stage and reports the correct corpse type', () => {

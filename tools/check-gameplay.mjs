@@ -34,7 +34,6 @@ try {
         const before=h.summary();
         for (const e of before.enemies) if (!a.seen.includes(e.kind)) a.seen.push(e.kind);
         let lane=before.enemies.filter(e=>e.z<1).sort((x,y)=>y.z-x.z)[0]?.lane ?? 1;
-        if (before.bossWarningLane!==null) lane=(before.bossWarningLane+1)%3;
         const hazard=before.hazards.find(r=>r.status!=='cleared'&&r.z<0);
         const jumping=Boolean(hazard&&hazard.z>-5&&hazard.z<-3&&before.jumpHeight===0);
         h.simulate(.05,{lane,firing:true,jump:jumping});
@@ -43,7 +42,6 @@ try {
         if (hazard&&hazard.z>-18&&hazard.z<-12&&!a.captures.includes('hazard-approach')) capture='hazard-approach';
         if (jumping&&!a.captures.includes('jump')) { h.simulate(.2,{firing:true});next=h.summary();capture='jump'; }
         if (next.enemies.some(e=>e.kind==='boss'&&e.z>-40)&&!a.captures.includes('boss')) capture='boss';
-        if (next.bossWarningLane!==null&&!a.captures.includes('boss-warning')) capture='boss-warning';
         for(const r of next.hazards) if(r.status==='cleared'&&!a.crossed.includes(r.id)) a.crossed.push(r.id);
         if(capture){a.captures.push(capture);return {capture,state:next,seen:a.seen,crossed:a.crossed};}
         if(next.isOver)return {state:next,seen:a.seen,crossed:a.crossed};

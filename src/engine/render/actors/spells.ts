@@ -45,13 +45,6 @@ export async function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: G
   const flash = new THREE.Mesh(new THREE.SphereGeometry(.3, 8, 6), material);
   owned.add(flash.geometry);
   scene.add(flash);
-  const warningMaterial = new THREE.MeshBasicMaterial({ color: '#ff573e', transparent: true, opacity: .5,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-  owned.add(warningMaterial);
-  const warning = new THREE.Mesh(new THREE.PlaneGeometry(config.laneWidth * .85, 22), warningMaterial);
-  owned.add(warning.geometry);
-  warning.rotation.x = -Math.PI / 2; warning.position.y = TRAIL_Y + .04;
-  warning.visible = false; scene.add(warning);
   const items = Array.from({ length: config.bulletPoolSize }, () => {
     const mesh = new THREE.Group(); mesh.visible = false; scene.add(mesh);
     return { mesh, model: null as T.Object3D | null, character: '', mixer: null as T.AnimationMixer | null };
@@ -81,14 +74,9 @@ export async function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: G
     if (newFrame) {
       if (state.justFired) flashLife = .13;
       for (const mark of state.justImpacts) impact(laneToX(mark.lane, config), TRAIL_Y + 1.2, mark.z);
-      if (state.justBossAttack) impact(laneToX(state.lane, config), TRAIL_Y + .3, config.playerZ);
       lastEventMs = state.elapsedMs;
     }
     flashLife = Math.max(0, flashLife - dtSec);
-    warning.visible = state.bossWarningLane !== null;
-    warning.position.x = laneToX(state.bossWarningLane ?? 1, config);
-    warning.position.z = -10;
-    warningMaterial.opacity = .25 + (Math.sin(state.elapsedMs * .018) + 1) * .2;
     flash.visible = flashLife > 0;
     flash.position.set(laneToX(state.lane, config), TRAIL_Y + 1.2 + state.jumpHeight, -.85);
     flash.scale.setScalar(.3 + flashLife * 5);
@@ -127,11 +115,11 @@ export async function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: G
     trails.instanceMatrix.needsUpdate = true; sparks.instanceMatrix.needsUpdate = true;
   }
   return { items, sync, setCharacter, impact, hide() {
-    items.forEach(s => { s.mesh.visible = false; }); flash.visible = false; warning.visible = false;
+    items.forEach(s => { s.mesh.visible = false; }); flash.visible = false;
     hideInstances(trails); hideInstances(sparks);
   }, reset() {
     chips.forEach(chip => { chip.life = 0; }); flashLife = 0; lastEventMs = -1;
-    items.forEach(s => { s.mesh.visible = false; }); flash.visible = false; warning.visible = false;
+    items.forEach(s => { s.mesh.visible = false; }); flash.visible = false;
     hideInstances(trails); hideInstances(sparks);
   }, dispose() {
     for (const slot of items) {

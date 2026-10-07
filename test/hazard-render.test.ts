@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CONFIG } from '@/engine/config';
 import { GOLDEN_FOREST } from '@/engine/render/world/palette';
-import { addObstaclePool, HAZARD_VARIANTS, hazardAssetName, hazardVariant } from '@/engine/render/actors/obstacles';
+import { addObstaclePool, HAZARD_VARIANTS, hazardAssetName, hazardMirrored, hazardVariant } from '@/engine/render/actors/obstacles';
 import { createRiverMask } from '@/engine/render/world/riverMask';
 import { createTrailEdge } from '@/engine/render/world/trailEdge';
 import type { TrailHazard } from '@/engine/types';
@@ -31,12 +31,13 @@ test('real exported assets cover their lanes, keep an open lane, and reuse four 
   const groups = pool.items.map(s => s.group);
   for (const kind of ['log', 'stones'] as const) {
     for (const [start, count] of [[0, 2], [1, 2], [0, 3]] as const) {
-      for (const id of [0, 1, 2]) {
+      for (const id of [0, 1, 2, 3, 4, 5]) {
         pool.sync([{ ...hazard(kind, start, count), id }], 0);
         const slot = pool.items[0];
         scene.updateMatrixWorld(true);
         const shown = [...slot.solids.values()].filter(object => object.visible);
         expect(shown.map(object => object.name)).toEqual([hazardAssetName(kind, count, HAZARD_VARIANTS[hazardVariant(id)])]);
+        expect(Math.sign(shown[0]!.scale.x)).toBe(hazardMirrored(id) ? -1 : 1);
         const bounds = new THREE.Box3().setFromObject(shown[0]!);
         const left = (start - 1.5) * 2.4;
         const right = (start + count - 1.5) * 2.4;

@@ -84,10 +84,8 @@ export default function ResultPage() {
             tone={run.isCleared ? 'ok' : 'info'}
             title={run.isCleared ? 'Training cleared' : 'Run complete'}
           >
-            {biomeName(run.biomeId)} &middot; Training
-            {run.isCleared
-              ? ' — well done, you reached the goal.'
-              : ' — you did not reach the goal this time. Try again whenever you like.'}
+            {biomeName(run.biomeId)} &middot; Training &mdash; {formatNumber(run.enemiesKilled)} enemies
+            defeated before the run ended. Go again whenever you like.
           </Notice>
 
           <Card title="This run" icon={<Trophy size={20} />}>

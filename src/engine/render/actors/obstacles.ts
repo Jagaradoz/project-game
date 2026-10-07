@@ -8,9 +8,9 @@ import { laneToX } from '@/engine/core/state';
 import { buildRiver } from '@/engine/render/actors/rivers';
 
 /**
- * Logs and stone hazards are authored whole in Blender (tools/build_trail_obstacles_catalog.py, exported by
- * tools/export_trail_obstacles.py): three variants per kind and lane count. A hazard keeps its variant for
- * its whole life because the pick comes from its id.
+ * Logs and rockfalls are authored whole in Blender (tools/build_trail_obstacles_catalog.py, exported by
+ * tools/export_trail_obstacles.py): three variants per kind and lane count, each also shown mirrored, so
+ * six looks before one repeats. A hazard keeps its look for its whole life because the pick comes from its id.
  */
 export const HAZARD_VARIANTS = ['A', 'B', 'C'] as const;
 const LANE_NAMES = ['two', 'three'] as const;
@@ -23,6 +23,11 @@ export function hazardAssetName(kind: SolidKind, laneCount: 2 | 3, variant: stri
 
 export function hazardVariant(id: number): number {
   return Math.abs(id) % HAZARD_VARIANTS.length;
+}
+
+/** Every other pass through the variants is mirrored across the trail. */
+export function hazardMirrored(id: number): boolean {
+  return Math.floor(Math.abs(id) / HAZARD_VARIANTS.length) % 2 === 1;
 }
 
 const SOLID_ASSETS = (Object.keys(SOLID_KINDS) as SolidKind[]).flatMap(kind =>
@@ -75,6 +80,8 @@ export async function addObstaclePool(THREE: ThreeModule, scene: T.Scene, config
           if (wanted) wanted.visible = true;
           slot.shown = wanted;
         }
+        // A negative scale flips the winding; three.js compensates per object, so shading stays correct.
+        if (wanted) wanted.scale.x = hazardMirrored(hazard.id) ? -1 : 1;
         slot.river.group.visible = hazard.kind === 'river';
         if (hazard.kind === 'river') slot.river.update(elapsedMs);
       });

@@ -52,7 +52,7 @@ export function syncScene(
 
   if (actorsVisible) {
     syncPlayer(sceneRefs.player, newEvents ? state : { ...state, justHit: false, justFired: false }, dtSec, config, drowning);
-    sceneRefs.enemyPool?.sync(state.enemies, state.elapsedMs, dtSec, state.bossWarningLane !== null);
+    sceneRefs.enemyPool?.sync(state.enemies, state.elapsedMs, dtSec);
     sceneRefs.obstaclePool?.sync(state.obstacles, state.elapsedMs + drowning.elapsedMs);
     sceneRefs.riverMask?.sync(state.obstacles);
     sceneRefs.sporeCloud?.sync(state.spores, state.elapsedMs);

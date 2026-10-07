@@ -30,7 +30,7 @@ const IDLE_SNAPSHOT: HudSnapshot = {
   feetVisible: false, isJumpCalibrated: false, isAirborne: false,
   obstacleDistance: null, bossHp: null, bossMaxHp: CONFIG.game.enemyTypes.boss.hp,
   obstacleKind: null, obstacleOpenLane: null, deathReason: null, endPresentationComplete: true,
-  bossDefeated: false, bossWarningLane: null,
+  bossDefeated: false,
   score: 0,
   hp: CONFIG.game.maxHp,
   maxHp: CONFIG.game.maxHp,

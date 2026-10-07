@@ -49,7 +49,7 @@ import type {
   PoseLandmarks,
   RunSummary,
   ShadowQuality,
-  StageRules,
+  RunConfig,
   DeathReason,
   TrailHazard,
 } from '@/engine/types';
@@ -121,7 +121,6 @@ export interface HudSnapshot {
   bossHp: number | null;
   bossMaxHp: number;
   bossDefeated: boolean;
-  bossWarningLane: number | null;
   score: number;
   hp: number;
   maxHp: number;
@@ -217,7 +216,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   const mode: RuntimeMode = options.mode ?? 'game';
   const exposure = createExposureSampler();
 
-  const rules: StageRules = rulesFor(mode);
+  const rules: RunConfig = rulesFor(mode);
 
   let game: GameState = createGameState(options.seed ?? 1, rules);
   let drowning = createDrowningPresentation();
@@ -269,13 +268,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let pendingCharacter = options.character ?? CONFIG.game.defaultCharacter;
   let actorsVisible = true;
 
-  /**
-   * The config this run steps under. The game plays Training; pose mode has
-   * no reducer to feed, so it keeps the goal-less endless config.
-   */
-  function rulesFor(runMode: RuntimeMode): StageRules {
-    if (runMode === 'game') return resolveTrainingRules();
-    return { ...CONFIG.game, goalKills: Number.POSITIVE_INFINITY };
+  /** The config this run steps under: endless Training. Pose mode never reads it. */
+  function rulesFor(runMode: RuntimeMode): RunConfig {
+    return runMode === 'game' ? resolveTrainingRules() : { ...CONFIG.game };
   }
 
   /* ---------------------------------------------------------- snapshot ---- */
@@ -320,14 +315,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       bossHp: game.enemies.find(e => e.kind === 'boss')?.hp ?? null,
       bossMaxHp: rules.enemyTypes.boss.hp,
       bossDefeated: game.bossDefeated,
-      bossWarningLane: game.bossWarningLane,
       hp: game.hp,
       maxHp: rules.maxHp,
       distance: game.distance,
       isOver: game.isOver,
 
       killCount: game.killCount,
-      goalKills: Number.isFinite(rules.goalKills) ? rules.goalKills : null,
+      goalKills: rules.goalKills !== undefined && Number.isFinite(rules.goalKills) ? rules.goalKills : null,
       isCleared: game.isCleared,
       elapsedMs: game.elapsedMs,
       movementCount: movementTotal(),
@@ -675,6 +669,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           isCleared: game.isCleared,
           enemies: game.enemies.map(e => ({ id: e.id, kind: e.kind, hp: e.hp, z: e.z, lane: e.lane })),
           hazards: game.obstacles.map(o => ({ id: o.id, kind: o.kind, startLane: o.startLane, laneCount: o.laneCount, z: o.z, status: o.status })),
+          spores: game.spores.map(s => ({ id: s.id, z: s.z, length: s.length, status: s.status })),
           deathReason: game.deathReason,
           endPresentationComplete: drowning.complete,
           drowningElapsedMs: drowning.elapsedMs,
@@ -685,7 +680,6 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           jumpStartedMs: game.jumpStartedMs,
           jumpCount: game.jumpCount,
           bossDefeated: game.bossDefeated,
-          bossWarningLane: game.bossWarningLane,
           hp: game.hp,
           score: game.score,
           calls: info?.calls ?? null,

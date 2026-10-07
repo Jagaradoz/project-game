@@ -130,7 +130,7 @@ test('enemy rows cannot arrive within a jump duration of a hazard crossing', () 
 });
 
 test('boss waits for the last crossing and new hazards pause while the boss is due', () => {
-  const state = { ...approaching(hazard('log', 0, 3, -3)), killCount: 12, elapsedMs: 9000 };
+  const state = { ...approaching(hazard('log', 0, 3, -3)), killCount: CONFIG.game.boss.triggerKills, elapsedMs: 9000 };
   const next = updateGame(state, idle, 50);
   expect(next.bossSpawned).toBe(false);
   expect(next.obstacles).toHaveLength(1);

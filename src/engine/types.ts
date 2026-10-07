@@ -20,17 +20,9 @@ export type DrawConfig = AppConfig['draw'];
 export type GameConfig = AppConfig['game'];
 
 /**
- * A stage's tuned rules: the game config it runs under, plus the goal that
- * turns an endless run into a stage that can be passed. `updateGame` already
- * takes a GameConfig, so carrying `goalKills` on the same object is what lets
- * the reducer decide `isCleared` without learning about stages at all.
- */
-export type StageRules = GameConfig & { goalKills: number; requireBoss?: boolean };
-
-/**
  * What the reducer runs under. `goalKills` is optional on purpose: without it
- * the runner is endless, which is both the original behaviour and what the
- * control-group mode needs. StageRules satisfies it with the goal filled in.
+ * the runner is endless, which is what Training plays. With it (and
+ * `requireBoss`), the reducer can still end a run as cleared.
  */
 export type RunConfig = GameConfig & { goalKills?: number; requireBoss?: boolean };
 
@@ -220,10 +212,8 @@ export interface GameState {
   justImpacts: KillMark[];
   bossSpawned: boolean;
   bossDefeated: boolean;
-  bossWarningLane: number | null;
-  bossAttackAtMs: number | null;
-  nextBossAttackMs: number;
-  justBossAttack: boolean;
+  /** Kill count at which the next boss walks in. */
+  nextBossKills: number;
   lane: number;
   hp: number;
   score: number;

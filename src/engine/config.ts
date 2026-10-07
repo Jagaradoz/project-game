@@ -189,14 +189,9 @@ export const CONFIG = {
   },
 
   /**
-   * Training mode: the one run the game offers. A single forest stage with a
-   * kill goal and the boss at the end -- no stage ladder and no difficulty
-   * picker. How hard it gets is `game` below, nothing else.
+   * Training mode: the one run the game offers. Endless -- it ends only when
+   * the player runs out of health. A boss walks in every `boss.triggerKills`.
    */
-  training: {
-    /** Kills to clear the run, the boss included. */
-    goalKills: 12,
-  },
 
   game: {
     laneCount: 3,
@@ -272,11 +267,12 @@ export const CONFIG = {
       /**
        * Render-only multipliers on the Blender-authored log/stone meshes; collision still uses radius.
        * Width stays 1 because the meshes already span their lanes, and height must stay under
-       * jump.clearance (logs are authored up to ~1.25 tall, stones up to ~0.95) or the jump reads as clipping.
+       * jump.clearance (logs are authored up to ~1.25 tall, rockfalls up to ~1.0) or the jump reads as clipping.
+       * Rockfalls are authored at full depth with a rubble skirt, so they only need a light stretch.
        */
       visualScale: {
         log: { height: 1, depth: 1.6 },
-        stones: { height: 1.35, depth: 1.7 },
+        stones: { height: 1.2, depth: 1.15 },
       },
     },
     /**
@@ -293,7 +289,7 @@ export const CONFIG = {
       /** HUD warning starts this far before the front edge reaches the player. */
       warnDistance: 45,
     },
-    boss: { triggerKills: 12, holdZ: -20, attackIntervalMs: 2800, telegraphMs: 1100 },
+    boss: { triggerKills: 15 },
     /**
      * Heights are matched to the player (the mage stands ~3.7 with hat). approachSpeed is relative
      * to the scrolling ground and must stay positive: a negative value makes the enemy back away
@@ -304,7 +300,7 @@ export const CONFIG = {
       weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, walkRate: 1.6, height: 3.4, radius: 1, color: '#9bdd66' },
       normal: { name: 'Bramble Skeleton', path: '/assets/models/enemies/animated/BrambleSkeleton.glb', hp: 2, approachSpeed: 2, walkRate: 1.25, height: 3.7, radius: 1.05, color: '#e5d7b1' },
       tank: { name: 'Shroom Brute', path: '/assets/models/enemies/animated/ShroomBrute.glb', hp: 6, approachSpeed: 1, walkRate: 1, height: 3.9, radius: 1.3, color: '#e9a15b' },
-      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 40, approachSpeed: 0, walkRate: 1, height: 8, radius: 2, color: '#df7650' },
+      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 12, approachSpeed: 0.5, walkRate: 0.9, height: 8, radius: 2, color: '#df7650' },
     },
 
     enemy: {

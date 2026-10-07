@@ -8,22 +8,16 @@ import { TRAINING_STAGE_NUMBER, resolveTrainingRules } from '@/engine/core/stage
 
 test('resolveTrainingRules never mutates the shared config', () => {
   const before = JSON.stringify(CONFIG);
-  resolveTrainingRules();
+  const rules = resolveTrainingRules();
+  rules.maxHp = 99;
   assert.equal(JSON.stringify(CONFIG), before);
 });
 
-test('Training runs the base game with the kill goal and the boss', () => {
+test('Training is endless: the base game with no goal and no boss gate', () => {
   const rules = resolveTrainingRules();
   assert.equal(rules.maxHp, CONFIG.game.maxHp);
-  assert.equal(rules.spawnIntervalMs, CONFIG.game.spawnIntervalMs);
-  assert.equal(rules.maxSpeed, CONFIG.game.maxSpeed);
-  assert.equal(rules.goalKills, CONFIG.training.goalKills);
-  assert.equal(rules.requireBoss, true);
-});
-
-test('a goal below 1 is clamped, so a run is never cleared before it starts', () => {
-  const rules = resolveTrainingRules({ ...CONFIG, training: { goalKills: 0 } });
-  assert.equal(rules.goalKills, 1);
+  assert.equal(rules.goalKills, undefined);
+  assert.equal(rules.requireBoss, undefined);
 });
 
 test('Training reports itself as stage 1', () => {

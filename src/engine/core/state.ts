@@ -46,8 +46,7 @@ export function createGameState(seed = 1, config: RunConfig = CONFIG.game): Game
     nextId: 1, obstacles: [], nextObstacleMs: config.obstacle.firstMs,
     spores: [], nextSporeMs: config.spore.firstMs, nextSporeTickMs: 0, isInSpore: false, isShielding: false,
     jumpStartedMs: null, jumpHeight: 0, jumpHeld: false, jumpCount: 0,
-    hitAtMs: -Infinity, justImpacts: [], bossSpawned: false, bossDefeated: false,
-    bossWarningLane: null, bossAttackAtMs: null, nextBossAttackMs: 0, justBossAttack: false,
+    hitAtMs: -Infinity, justImpacts: [], bossSpawned: false, bossDefeated: false, nextBossKills: firstBossKills(config),
     lane: centreLane(config),
     hp: config.maxHp,
     score: 0,
@@ -104,8 +103,8 @@ export function updateGame(
   config: RunConfig = CONFIG.game,
 ): GameState {
   if (state.isOver) {
-    if (!state.justHit && !state.justFired && state.justKilled.length === 0 && !state.justImpacts.length && !state.justBossAttack) return state;
-    return { ...state, justHit: false, justFired: false, justKilled: [], justImpacts: [], justBossAttack: false };
+    if (!state.justHit && !state.justFired && state.justKilled.length === 0 && !state.justImpacts.length) return state;
+    return { ...state, justHit: false, justFired: false, justKilled: [], justImpacts: [] };
   }
 
   const stepMs = Math.min(Math.max(dtMs, 0), config.maxFrameMs);
@@ -128,11 +127,10 @@ export function updateGame(
   const jumpPhase = jumpStartedMs === null ? 0 : (elapsedMs - jumpStartedMs) / config.jump.durationMs;
   const jumpHeight = jumpStartedMs === null ? 0 : Math.sin(Math.PI * jumpPhase) * config.jump.height;
   const crossed = advanceHazards(state.obstacles, lane, speed * stepSec, state.elapsedMs, elapsedMs, flightStartedMs, config);
+  // The boss is just a big enemy: it walks in, and contact costs one HP.
   const movedEnemies = state.enemies.map((enemy) => {
     const extra = enemy.kind ? config.enemyTypes[enemy.kind].approachSpeed : 0;
-    const moved = advance(enemy, Math.max(2, speed + extra) * stepSec);
-    if (enemy.kind === 'boss') moved.z = Math.min(config.boss.holdZ, moved.z);
-    return moved;
+    return advance(enemy, Math.max(2, speed + extra) * stepSec);
   }).filter(enemy => hasSafeHazardArrival(enemy, crossed.obstacles, speed, config));
   const spores = advanceSpores(state.spores, speed * stepSec, config);
   const isInSpore = isInsideSpore(spores);
@@ -143,24 +141,7 @@ export function updateGame(
   const shots = resolveShots(movedBullets, movedEnemies, config, elapsedMs);
 
   const obstacles = crossed.obstacles;
-  const liveBoss = shots.enemies.find(e => e.kind === 'boss');
   const bossDefeated = state.bossDefeated || shots.killed.some(e => e.kind === 'boss');
-  let bossWarningLane = liveBoss ? state.bossWarningLane : null;
-  let bossAttackAtMs = liveBoss ? state.bossAttackAtMs : null;
-  let nextBossAttackMs = state.nextBossAttackMs;
-  let bossHit = false;
-  let justBossAttack = false;
-  if (liveBoss && liveBoss.z >= config.boss.holdZ) {
-    if (bossAttackAtMs !== null && elapsedMs >= bossAttackAtMs) {
-      bossHit = lane === bossWarningLane;
-      justBossAttack = true;
-      bossWarningLane = null; bossAttackAtMs = null;
-      nextBossAttackMs = elapsedMs + config.boss.attackIntervalMs;
-    } else if (bossAttackAtMs === null && elapsedMs >= nextBossAttackMs) {
-      bossWarningLane = lane;
-      bossAttackAtMs = elapsedMs + config.boss.telegraphMs;
-    }
-  }
 
   // While the grace window is open, enemies pass straight through instead of
   // being consumed -- being hit must never clear the road for free.
@@ -168,9 +149,10 @@ export function updateGame(
   const survivors = isGraced
     ? shots.enemies
     : shots.enemies.filter((enemy) => !isHit(enemy, lane, config));
-  const hitCount = isGraced ? 0 : shots.enemies.length - survivors.length + Number(crossed.hit || bossHit);
+  const hitCount = isGraced ? 0 : shots.enemies.length - survivors.length + Number(crossed.hit);
 
   const liveEnemies = survivors.filter((enemy) => enemy.z <= config.despawnZ);
+  const liveBoss = liveEnemies.find(e => e.kind === 'boss');
   // A cloud ahead holds back new enemies until the player is through it.
   const spawned = sporePending
     ? { enemies: liveEnemies, seed: state.seed, nextSpawnMs: Math.max(state.nextSpawnMs, elapsedMs), nextId: state.nextId }
@@ -197,18 +179,22 @@ export function updateGame(
   const killCount = state.killCount + shots.kills;
   const isCleared = !crossed.drowned && config.goalKills !== undefined && killCount >= config.goalKills && (!config.requireBoss || bossDefeated);
   let nextId = spawned.nextId;
-  const trigger = config.requireBoss && config.goalKills !== undefined ? Math.max(0, config.goalKills - 1) : config.boss.triggerKills;
-  const bossDue = !state.bossSpawned && killCount >= trigger;
+  // One boss at a time. An endless run meets a new one every `triggerKills`
+  // kills; a run with a goal meets exactly one, just before the goal.
+  const bossDue = !liveBoss && killCount >= state.nextBossKills;
   const shouldSpawnBoss = bossDue && !crossed.drowned && obstacles.every(o => o.status === 'cleared') && !sporePending;
+  const nextBossKills = !shouldSpawnBoss ? state.nextBossKills
+    : config.goalKills !== undefined ? Number.POSITIVE_INFINITY : killCount + config.boss.triggerKills;
   if (shouldSpawnBoss) {
     spawned.enemies = spawned.enemies.filter(e => e.z > -30);
     spawned.enemies.push({ id: nextId++, kind: 'boss', hp: config.enemyTypes.boss.hp, lane: 1, z: config.spawnZ, previousZ: config.spawnZ });
-  } else if (state.bossSpawned && !bossDefeated) {
+  } else if (liveBoss) {
+    // The boss walks alone: ordinary spawns wait until it is dealt with.
     spawned.enemies = spawned.enemies.filter(e => e.kind === 'boss' || e.z > -30);
   }
   let nextObstacleMs = state.nextObstacleMs;
   const retainedHazards = obstacles.filter(o => o.z <= config.despawnZ);
-  const isBossPhase = Boolean(liveBoss) || bossDue || (state.bossSpawned && !bossDefeated);
+  const isBossPhase = Boolean(liveBoss) || bossDue;
   if (hp > 0 && !isCleared && !sporePending && elapsedMs >= nextObstacleMs && retainedHazards.length < config.obstacle.poolSize && !isBossPhase) {
     const typeRoll = random(spawned.seed);
     const widthRoll = random(typeRoll.seed);
@@ -235,8 +221,7 @@ export function updateGame(
     spores: nextSpores, nextSporeMs, nextSporeTickMs: spore.nextTickMs, isInSpore, isShielding,
     jumpHeld: wantsJump, jumpCount: state.jumpCount + Number(tookOff),
     hitAtMs: tookDamage ? elapsedMs : state.hitAtMs, justImpacts: shots.impacts,
-    bossSpawned: state.bossSpawned || shouldSpawnBoss, bossDefeated,
-    bossWarningLane, bossAttackAtMs, nextBossAttackMs, justBossAttack,
+    bossSpawned: state.bossSpawned || shouldSpawnBoss, bossDefeated, nextBossKills,
     lane,
     hp,
     score: state.score + shots.kills,
@@ -264,6 +249,13 @@ export function updateGame(
 
 export function isInvulnerable(state: GameState): boolean {
   return state.elapsedMs < state.invulnUntilMs;
+}
+
+/** A run with a boss-gated goal meets its boss one kill short of the goal. */
+function firstBossKills(config: RunConfig): number {
+  return config.requireBoss && config.goalKills !== undefined
+    ? Math.max(0, config.goalKills - 1)
+    : config.boss.triggerKills;
 }
 
 function centreLane(config: RunConfig): number {

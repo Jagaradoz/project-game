@@ -90,7 +90,7 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
     if (!action) return;
     action.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).play();
   }
-  function sync(enemies: GameBody[], elapsedMs: number, dtSec: number, bossAttacking: boolean) {
+  function sync(enemies: GameBody[], elapsedMs: number, dtSec: number) {
     const wanted = new Set(enemies.map((e, i) => e.id ?? -i - 1));
     for (const slot of items) if (slot.id === undefined || !wanted.has(slot.id)) { slot.group.visible = false; slot.id = undefined; }
     let animated = 0;
@@ -108,12 +108,11 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
       const def = config.enemyTypes[slot.kind!], health = Math.max(0, (enemy.hp ?? 1) / def.hp);
       slot.health.visible = health < 1 || slot.kind === 'boss';
       slot.health.scale.x = health * def.radius * 2;
-      const swinging = slot.kind === 'boss' ? bossAttacking : enemy.z > -5;
+      const swinging = enemy.z > -5;
       if (swinging && !slot.attacked) overlay(slot, 'Attack');
       slot.attacked = swinging;
       if (enemy.lastHitMs !== undefined && enemy.lastHitMs !== slot.lastHitMs) { slot.lastHitMs = enemy.lastHitMs; overlay(slot, 'Hit', 2.5); }
-      const holding = slot.kind === 'boss' && enemy.z >= config.boss.holdZ;
-      play(slot, holding ? 'Idle' : 'Walk', false, false, holding ? 1 : def.walkRate);
+      play(slot, 'Walk', false, false, def.walkRate);
       if (slot.mixer && animated < config.enemy.animatedCount && enemy.z > config.enemy.animateBeyondZ) { slot.mixer.update(dtSec); animated++; }
       slot.aura.rotation.z = Math.sin(elapsedMs * .005 + id) * .08;
     }

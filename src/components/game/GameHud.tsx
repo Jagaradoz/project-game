@@ -22,11 +22,6 @@ export function GameHud({ snapshot }: GameHudProps) {
             <progress className="mt-1 h-2 w-full accent-orange-500" max={snapshot.bossMaxHp} value={snapshot.bossHp} aria-label="Elder Treant health" />
           </div>
         )}
-        {snapshot.bossWarningLane !== null && (
-          <div role="status" className="border-2 border-white bg-red-700 px-3 py-2 text-sm font-black text-white">
-            Move away from the {['left', 'centre', 'right'][snapshot.bossWarningLane]} lane!
-          </div>
-        )}
         <SporeBanner snapshot={snapshot} />
         {snapshot.obstacleDistance !== null && snapshot.obstacleDistance < 35 && (
           <div role="status" className="border-2 border-ink bg-primary px-3 py-2 text-sm font-black text-ink">

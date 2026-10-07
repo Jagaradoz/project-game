@@ -223,7 +223,7 @@ function ProfileStat({
   );
 }
 
-/** Training is one stage, so its progress is one row: cleared yet, and the best score. */
+/** Training is one endless stage, so its progress is one row: the best score. */
 function trainingStage(biomes: BiomeProgress[]) {
   return biomes[0]?.stages[0] ?? null;
 }
@@ -236,8 +236,8 @@ function TrainingProgressPanel({ biomes }: { biomes: BiomeProgress[] }) {
     <Card title="Training progress" icon={<Map size={20} />}>
       <div className="flex items-baseline justify-between gap-2 text-sm">
         <span className="flex items-center gap-1.5 font-semibold">
-          {stage?.isCleared && <CircleCheck aria-hidden size={16} className="text-ok-text" />}
-          {name} &middot; {stage?.isCleared ? 'Cleared' : 'Not cleared yet'}
+          <CircleCheck aria-hidden size={16} className="text-ok-text" />
+          {name} &middot; Endless training
         </span>
         <span className="tabular-nums text-muted">
           Best {stage?.bestScore != null ? formatNumber(stage.bestScore) : '—'}
@@ -250,5 +250,5 @@ function TrainingProgressPanel({ biomes }: { biomes: BiomeProgress[] }) {
 function biomeStatusLine(biomes: BiomeProgress[]): string | null {
   const stage = trainingStage(biomes);
   if (!stage) return null;
-  return `Training · ${stage.isCleared ? 'cleared' : 'not cleared yet'}`;
+  return `Training · best ${stage.bestScore != null ? formatNumber(stage.bestScore) : '—'}`;
 }

@@ -51,10 +51,9 @@ export function GameOverOverlay({
             again straight away.
           </p>
         )}
-        {!snapshot.isCleared && snapshot.deathReason === 'damage' && snapshot.goalKills !== null && (
+        {snapshot.deathReason === 'damage' && (
           <p className="m-0 max-w-xs text-sm leading-relaxed text-muted">
-            You did not reach the training goal this time. Take a breath and go again whenever you
-            are ready.
+            You ran out of health. Take a breath and go again whenever you are ready.
           </p>
         )}
 

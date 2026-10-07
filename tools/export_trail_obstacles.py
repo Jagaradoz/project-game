@@ -1,9 +1,10 @@
-"""Export the log and stone hazard variants authored by tools/build_trail_obstacles_catalog.py.
+"""Export the log, rockfall and spore assets authored by tools/build_trail_obstacles_catalog.py.
 
 Run (headless; the catalog .blend is not opened or modified):
   blender --background --factory-startup --python tools/export_trail_obstacles.py
-Writes public/assets/models/environment/{log,stone_hazard}_{two,three}_lane_{A,B,C}.glb.
-Seeds and lane picks match the catalog section, so the game ships exactly what the catalog shows.
+Writes public/assets/models/environment/{log,stone_hazard}_{two,three}_lane_{A,B,C}.glb,
+spore_puff_{A,B,C}.glb and sky_cloud.glb (from tools/build_clouds_catalog.py).
+Seeds match the catalog section, so the game ships exactly what the catalog shows.
 """
 
 import importlib.util
@@ -29,8 +30,12 @@ def export(obj):
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
     path = OUTPUT / (obj.name + ".glb")
-    bpy.ops.export_scene.gltf(filepath=str(path), export_format="GLB", use_selection=True, export_extras=False,
-                              export_animations=False, export_cameras=False, export_lights=False)
+    options = dict(filepath=str(path), export_format="GLB", use_selection=True, export_extras=False,
+                   export_animations=False, export_cameras=False, export_lights=False)
+    if obj.data.color_attributes:
+        # The sky cloud's shading is baked into vertex colours; ship them even if no material reads them.
+        options["export_vertex_color"] = "ACTIVE"
+    bpy.ops.export_scene.gltf(**options)
     lo = [min(v.co[i] for v in obj.data.vertices) for i in range(3)]
     hi = [max(v.co[i] for v in obj.data.vertices) for i in range(3)]
     # Report in game axes: X, Y up, Z travel (Blender -Y).
@@ -47,13 +52,13 @@ def main():
     for lane_name, length in (("log_two_lane", 4.8), ("log_three_lane", 7.2)):
         for variant in "ABC":
             results.append(export(kit.build_log_variant(logs, scene, f"{lane_name}_{variant}", length, variant)))
-    lanes = {variant: kit.build_barrier(f"stone_barrier_{variant}", 3 + index * 5, kit.BARRIER_STYLES[variant])
-             for index, variant in enumerate("ABCDEF")}
-    for prefix, groups, base in (("stone_hazard_two_lane", ("AB", "CD", "EF"), 41),
-                                 ("stone_hazard_three_lane", ("ACE", "BDF", "FAD"), 73)):
-        for variant, picks in zip("ABC", groups):
-            mesh = kit.build_hazard(f"{prefix}_{variant}", [lanes[k].data for k in picks], base + ord(variant))
-            results.append(export(mesh))
+    for lanes in (2, 3):
+        for variant in "ABC":
+            results.append(export(kit.build_stone_hazard(lanes, variant)))
+    for variant in "ABC":
+        results.append(export(kit.build_spore_puff(variant)))
+    clouds = load("clouds_import", ROOT / "tools/build_clouds_catalog.py")
+    results.append(export(clouds.build_sky_cloud()))
     print("TRAIL_OBSTACLE_EXPORT=" + json.dumps(results))
 
 

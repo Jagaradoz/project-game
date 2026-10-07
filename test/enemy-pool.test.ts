@@ -16,11 +16,11 @@ test('enemy identities survive array removal and a recycled slot restarts its ac
   const pool = await fixture();
   const a = { id: 1, kind: 'weak' as const, hp: 1, lane: 0, z: -10, previousZ: -10 };
   const b = { ...a, id: 2, lane: 1 };
-  pool.sync([a, b], 100, .1, false);
+  pool.sync([a, b], 100, .1);
   const slot = pool.items.find(s => s.id === 2)!;
-  pool.sync([b], 200, .1, false);
+  pool.sync([b], 200, .1);
   expect(pool.items.find(s => s.id === 2)).toBe(slot);
-  pool.sync([{ ...a, id: 3 }], 300, .1, false);
+  pool.sync([{ ...a, id: 3 }], 300, .1);
   expect(pool.items.find(s => s.id === 3)!.action!.isRunning()).toBe(true);
   pool.dispose();
 });
@@ -34,10 +34,10 @@ test('reset hides old corpses when a run restarts', async () => {
 test('a hit flinches on top of the locomotion loop instead of replacing it', async () => {
   const pool = await fixture();
   const brute = { id: 1, kind: 'tank' as const, hp: 4, lane: 1, z: -10, previousZ: -10 };
-  pool.sync([brute], 100, .1, false);
+  pool.sync([brute], 100, .1);
   const slot = pool.items.find(s => s.id === 1)!;
   expect(slot.current).toBe('Walk');
-  pool.sync([{ ...brute, lastHitMs: 150 }], 150, .05, false);
+  pool.sync([{ ...brute, lastHitMs: 150 }], 150, .05);
   expect(slot.overlays.Hit!.isRunning()).toBe(true);
   expect(slot.overlays.Hit!.blendMode).toBe(THREE.AdditiveAnimationBlendMode);
   expect(slot.current).toBe('Walk');
@@ -47,7 +47,7 @@ test('a hit flinches on top of the locomotion loop instead of replacing it', asy
 test('every approaching kind plays its authored Walk loop', async () => {
   const pool = await fixture();
   const kinds = ['weak', 'normal', 'tank', 'boss'] as const;
-  pool.sync(kinds.map((kind, i) => ({ id: i + 1, kind, hp: 1, lane: i % 3, z: -60, previousZ: -60 })), 100, .1, false);
+  pool.sync(kinds.map((kind, i) => ({ id: i + 1, kind, hp: 1, lane: i % 3, z: -60, previousZ: -60 })), 100, .1);
   for (const slot of pool.items.filter(s => s.id !== undefined)) expect(slot.current).toBe('Walk');
   pool.dispose();
 });
@@ -55,15 +55,15 @@ test('enemies are animated from the moment they spawn, not frozen until they are
   const pool = await fixture();
   const z = CONFIG.game.spawnZ;
   const goblin = { id: 1, kind: 'weak' as const, hp: 1, lane: 1, z, previousZ: z };
-  pool.sync([goblin], 100, .1, false);
+  pool.sync([goblin], 100, .1);
   const slot = pool.items.find(s => s.id === 1)!, before = slot.action!.time;
-  pool.sync([goblin], 200, .1, false);
+  pool.sync([goblin], 200, .1);
   expect(slot.action!.time).not.toBe(before);
   pool.dispose();
 });
 test('a crowd of the same kind does not march in lockstep', async () => {
   const pool = await fixture();
-  pool.sync([1, 2].map(id => ({ id, kind: 'normal' as const, hp: 2, lane: id, z: -30, previousZ: -30 })), 100, 0, false);
+  pool.sync([1, 2].map(id => ({ id, kind: 'normal' as const, hp: 2, lane: id, z: -30, previousZ: -30 })), 100, 0);
   const [a, b] = [1, 2].map(id => pool.items.find(s => s.id === id)!.action!.time);
   expect(a).not.toBeCloseTo(b!, 3);
   pool.dispose();

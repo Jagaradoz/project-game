@@ -69,14 +69,14 @@ export async function createScene(
   // `clouds` is not a CONFIG key today; addClouds falls back to its own
   // defaults. Typed as optional so setting it later needs no change here.
   const cloudOptions = (config as GameConfig & { clouds?: CloudOptions }).clouds;
-  const clouds = addClouds(THREE, scene, palette, cloudOptions);
+  const clouds = await addClouds(THREE, scene, palette, loader, cloudOptions);
   const player = await addPlayer(THREE, scene, config, palette, loader);
   const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
   const bulletPool = await addSpellPool(THREE, scene, config, loader);
   const obstaclePool = await addObstaclePool(THREE, scene, config, loader, palette);
   const drowningSplash = createDrowningSplash(THREE, scene, palette);
   const effects = createEffects(THREE, scene, palette);
-  const sporeCloud = addSporeCloud(THREE, scene, config);
+  const sporeCloud = await addSporeCloud(THREE, scene, config, loader);
   const shield = addShieldBubble(THREE, player.group);
 
   // Short, damped camera impulses give hits and kills physical weight while

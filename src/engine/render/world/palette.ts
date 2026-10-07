@@ -25,6 +25,8 @@ const FOREST_KIT = {
   dirtDark: '#715338',
   stone: '#b8b1a2',
   stoneDark: '#726b60',
+  stoneMid: '#958e80',
+  stoneWarm: '#c6b498',
   wood: '#b9864a',
   woodBark: '#765033',
   woodBarkDark: '#493322',

@@ -5,9 +5,10 @@ Run inside the open catalog (live Blender) or headless:
 
 Adds section "04 Trail obstacles" below the plants, in the catalog's tile style. Re-running rebuilds the
 section from scratch. Models are authored 1:1 in game units (Blender Z is up, ground at Z=0):
-  - logs:    long axis X, lane-aligned lengths (2 lanes = 4.8, 3 lanes = 7.2)
-  - barrier: one lane (2.4 wide) of boulders; the game places one per occupied lane
-  - river:   runs along X, 2.6 deep along the travel axis Y, banks wobble so the edge is not a ruler line
+  - logs:      long axis X, lane-aligned lengths (2 lanes = 4.8, 3 lanes = 7.2)
+  - rockfalls: one whole pile per hazard spanning its lanes (tools/trail_stone_hazards.py)
+  - spores:    puffs built here (build_spore_puff) but shown in 05 Clouds (tools/build_clouds_catalog.py)
+  - river:     runs along X, 2.6 deep along the travel axis Y, banks wobble so the edge is not a ruler line
 Materials use the nature kit's names so the game's biome palette recolours them.
 """
 
@@ -39,6 +40,11 @@ KIT = {
 # Darker water for the channel centre; the game palette has no key for it, so the exporter maps it to `water`.
 KIT["waterDeep"] = "3f7f89"
 KIT["waterLight"] = "86c3c6"
+# Extra stone tones so a rockfall is not one flat colour; the game palette carries the same keys.
+KIT.update({"stoneMid": "958e80", "stoneWarm": "c6b498"})
+# Spores. The game swaps `sporePuff` for its own translucent material and tints every puff instance, so its
+# colour here is only for the catalog.
+KIT.update({"sporePuff": "c9b2e0"})
 
 
 def srgb_to_linear(c):
@@ -99,68 +105,32 @@ def add_rock(bm, centre, size, seed, moss=0.0, slots=(0, 1, 2), detail=2):
     return verts
 
 
-def fit_box(bm, max_x, max_y, max_z):
-    """Shrink (never grow) a build so it stays inside its authored footprint."""
-    lo = Vector([min(v.co[i] for v in bm.verts) for i in range(3)])
-    hi = Vector([max(v.co[i] for v in bm.verts) for i in range(3)])
-    sx = min(1.0, max_x / max(hi.x - lo.x, 1e-6))
-    sy = min(1.0, max_y / max(hi.y - lo.y, 1e-6))
-    sz = min(1.0, max_z / max(hi.z - lo.z, 1e-6))
-    cx, cy = (lo.x + hi.x) / 2, (lo.y + hi.y) / 2
-    for v in bm.verts:
-        v.co = Vector(((v.co.x - cx) * sx, (v.co.y - cy) * sy, v.co.z * sz))
+def load_module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-BARRIER_STYLES = {"A": "mixed", "B": "mixed", "C": "mixed", "D": "low", "E": "tall", "F": "pile"}
+STONES = load_module("trail_stone_hazards", ROOT / "tools/trail_stone_hazards.py")
+SPORES = load_module("spore_assets", ROOT / "tools/spore_assets.py")
+# Seeds per (lanes, variant); shared with the exporter so the game ships what the catalog shows.
+HAZARD_SEEDS = {(2, "A"): 121, (2, "B"): 122, (2, "C"): 123, (3, "A"): 134, (3, "B"): 135, (3, "C"): 136}
+PUFF_SEEDS = {"A": 7, "B": 8, "C": 9}
 
 
-def barrier_pieces(style, rng):
-    """(centre, size, _) for the main rocks of one lane; z of centre lifts a rock onto another."""
-    big_x = rng.uniform(-.45, -.2)
-    if style == "low":      # wide shallow rubble spread
-        return [((-.78, rng.uniform(-.1, .1), 0), (1.1, .95, .55), 0), ((.05, rng.uniform(-.15, .1), 0), (.95, .85, .5), 0),
-                ((.8, rng.uniform(-.1, .15), 0), (.85, .75, .45), 0), ((-.1, rng.uniform(.3, .4), 0), (.7, .55, .38), 0)]
-    if style == "tall":     # one standing boulder with two supporting rocks
-        return [((-.2, rng.uniform(-.05, .05), 0), (1.05, .9, 1.25), 0), ((.78, rng.uniform(0, .15), 0), (.8, .7, .7), 0),
-                ((-.95, rng.uniform(-.2, -.05), 0), (.6, .55, .5), 0)]
-    if style == "pile":     # rocks stacked on a base
-        return [((-.4, 0, 0), (1.3, 1.0, .7), 0), ((.7, rng.uniform(0, .15), 0), (1.0, .9, .6), 0),
-                ((-.3, .05, .38), (.8, .7, .55), 0), ((.45, -.05, .34), (.6, .55, .45), 0)]
-    return [((big_x, rng.uniform(-.1, .1), 0), (1.25, 1.0, 1.1), 0),
-            ((big_x + 1.0 + rng.uniform(0, .12), rng.uniform(-.05, .2), 0), (.95, .85, .8), 0),
-            ((big_x - .85, rng.uniform(-.3, -.05), 0), (.7, .6, .55), 0),
-            ((big_x + .45, rng.uniform(-.5, -.35), 0), (.62, .5, .42), 0),
-            ((big_x + .35, rng.uniform(.3, .45), 0), (.58, .5, .38), 0)]
+def build_stone_hazard(lanes, variant):
+    name = f"stone_hazard_{('two', 'three')[lanes - 2]}_lane_{variant}"
+    return mesh_object(name, STONES.build_stone_hazard(lanes, variant, HAZARD_SEEDS[lanes, variant]), STONES.STONE_SLOTS)
 
 
-def build_barrier(name, seed, style="mixed"):
-    """One lane of boulders plus small stones wedged between and across lane edges."""
-    rng = random.Random(seed)
-    bm = bmesh.new()
-    pieces = barrier_pieces(style, rng)
-    for index, (centre, size, moss) in enumerate(pieces):
-        add_rock(bm, centre, size, seed * 31 + index)
-
-    # Small stones make the lane read as one rubble bank: bridges across lane edges, then gap fillers.
-    small = []
-    for side in (-1, 1):
-        for slot in (-1, 1):
-            small.append(((side * (.98 + rng.uniform(-.04, .02)), slot * rng.uniform(.12, .32), 0),
-                          (rng.uniform(.46, .56), rng.uniform(.4, .5), rng.uniform(.3, .4))))
-    tries = 0
-    while len(small) < 15 and tries < 120:
-        tries += 1
-        x, y = rng.uniform(-.95, .95), rng.uniform(-.55, .55)
-        inside_big = any(((x - c[0]) / (sz[0] / 2 + .08)) ** 2 + ((y - c[1]) / (sz[1] / 2 + .08)) ** 2 < 1
-                         for c, sz, _ in pieces)
-        too_close = any(math.hypot(x - c[0], y - c[1]) < .3 for c, _ in small)
-        if inside_big or too_close:
-            continue
-        small.append(((x, y, 0), (rng.uniform(.26, .42), rng.uniform(.24, .38), rng.uniform(.18, .32))))
-    for index, (centre, size) in enumerate(small):
-        add_rock(bm, centre, size, seed * 53 + index, detail=1)
-    fit_box(bm, LANE_WIDTH + .06, 1.5, 1.15)
-    return mesh_object(name, bm, ["stone", "stoneDark", "leafsGreen"])
+def build_spore_puff(variant):
+    obj = mesh_object(f"spore_puff_{variant}", SPORES.build_spore_puff(variant, PUFF_SEEDS[variant]), SPORES.PUFF_SLOTS)
+    # Smooth normals: the game's mist shader fades each puff's silhouette by how squarely it faces the
+    # camera, and flat normals would turn that fade into visible facets.
+    for polygon in obj.data.polygons:
+        polygon.use_smooth = True
+    return obj
 
 
 # --- river -----------------------------------------------------------------
@@ -465,30 +435,10 @@ def build_log_variant(log_module, scene, name, length, variant):
 
 
 
-def build_hazard(name, lane_meshes, seed):
-    """Whole stone hazard from lane modules: each lane turned a little, plus stones bridging the seams."""
-    rng = random.Random(seed)
-    bm = bmesh.new()
-    count = len(lane_meshes)
-    for lane, mesh in enumerate(lane_meshes):
-        turn = (math.pi if rng.random() < .5 else 0) + rng.uniform(-.1, .1)
-        matrix = Matrix.Translation(((lane - (count - 1) / 2) * LANE_WIDTH, rng.uniform(-.1, .1), 0)) @ Matrix.Rotation(turn, 4, "Z")
-        append_mesh(bm, mesh, matrix)
-    for seam in range(count - 1):
-        x = (seam - (count - 2) / 2) * LANE_WIDTH
-        for index in range(2):
-            add_rock(bm, (x + rng.uniform(-.1, .1), rng.uniform(-.5, .5), 0),
-                     (rng.uniform(.4, .6), rng.uniform(.35, .5), rng.uniform(.25, .4)), seed * 7 + seam * 3 + index, detail=1)
-    return mesh_object(name, bm, ["stone", "stoneDark", "leafsGreen"])
-
-
 # --- catalog layout ---------------------------------------------------------
 
 def load_log_module():
-    spec = importlib.util.spec_from_file_location("build_trail_logs", LOG_SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_module("build_trail_logs", LOG_SCRIPT)
 
 
 def clear_section():
@@ -566,7 +516,7 @@ def main():
     title_source = bpy.data.objects["03 Plants and details"]
 
     assets, display = new_collection(ASSET_COLLECTION), new_collection(DISPLAY_COLLECTION)
-    shift_floor(26.0)
+    shift_floor(22.0)
 
     log_module = load_log_module()
     entries = []
@@ -578,20 +528,14 @@ def main():
             obj = build_log_variant(log_module, scene, name, length, variant)
             entries.append((obj, name, (x, 8.4 - row * 4.4), (tile_w, 3.8)))
 
-    lanes = {}
-    for index, variant in enumerate("ABCDEF"):
-        name = f"stone_barrier_{variant}"
-        lanes[variant] = build_barrier(name, 3 + index * 5, BARRIER_STYLES[variant])
-        entries.append((lanes[variant], name, (-13.2 + index * 3.5, -.6), (3.2, 3.2)))
-    for variant, picks in zip("ABC", ("AB", "CD", "EF")):
-        name = f"stone_hazard_two_lane_{variant}"
-        entries.append((build_hazard(name, [lanes[k].data for k in picks], 41 + ord(variant)), name,
-                        (-11.4 + "ABC".index(variant) * 6.6, -4.6), (6.0, 3.2)))
-    for variant, picks in zip("ABC", ("ACE", "BDF", "FAD")):
-        name = f"stone_hazard_three_lane_{variant}"
-        entries.append((build_hazard(name, [lanes[k].data for k in picks], 73 + ord(variant)), name,
-                        (-10.0 + "ABC".index(variant) * 9.4, -8.6), (8.6, 3.2)))
-    entries.append((build_river_production("river_crossing", 9.0, preview=True), "river_crossing", (-5.6, -15.2), (19.6, 8.2)))
+    # Spore puffs live in section 05 Clouds (tools/build_clouds_catalog.py).
+    for variant in "ABC":
+        obj = build_stone_hazard(2, variant)
+        entries.append((obj, obj.name, (-11.4 + "ABC".index(variant) * 6.6, -.6), (6.0, 3.2)))
+    for variant in "ABC":
+        obj = build_stone_hazard(3, variant)
+        entries.append((obj, obj.name, (-10.0 + "ABC".index(variant) * 9.4, -4.6), (8.6, 3.2)))
+    entries.append((build_river_production("river_crossing", 9.0, preview=True), "river_crossing", (-5.6, -11.2), (19.6, 8.2)))
 
     for obj, name, centre, tile in entries:
         place_asset(obj, name, centre, tile, assets, display, tile_source, label_source, tri_source,
@@ -599,7 +543,7 @@ def main():
 
     title = copy_object(title_source, "04 Trail obstacles", display, (title_source.location.x, 11.6, title_source.location.z),
                         data_copy=True)
-    title.data.body = "04  TRAIL OBSTACLES / LOGS, STONE BARRIERS, RIVER"
+    title.data.body = "04  TRAIL OBSTACLES / LOGS, ROCKFALLS, RIVER"
 
     camera_source = bpy.data.objects["CAMERA | Plants and details"]
     camera = copy_object(camera_source, "CAMERA | Trail obstacles", display,
