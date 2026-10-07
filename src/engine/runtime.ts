@@ -671,6 +671,10 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           enemyAnims: (sceneRefs?.enemyPool?.items ?? []).filter(s => s.group.visible).map(s => ({
             kind: s.kind, clip: s.current, time: s.action?.time ?? null, z: s.group.position.z, height: s.model?.scale.y ?? null,
           })),
+          corpseAnims: (sceneRefs?.enemyPool?.corpses ?? []).filter(s => s.group.visible).map(s => ({
+            kind: s.kind, clip: s.current, time: s.action?.time ?? null, weight: s.action?.getEffectiveWeight() ?? null,
+            x: s.group.position.x, y: s.group.position.y, z: s.group.position.z, elapsed: s.elapsed ?? null,
+          })),
           character: player?.characterId ?? null,
           anim: player?.currentActionName ?? null,
           animTime: player?.currentAction?.time ?? null,

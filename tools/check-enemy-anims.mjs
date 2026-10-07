@@ -14,7 +14,7 @@ try {
       h.simulate(.05, { lane, firing: true });
       const s = h.summary();
       for (const a of s.enemyAnims) {
-        const key = a.kind + ':' + a.clip + ':' + (a.z > -5 ? 'near' : a.z > -70 ? 'live' : 'frozen');
+        const key = a.kind + ':' + a.clip + ':' + (a.z > -5 ? 'near' : a.z > -70 ? 'mid' : 'far');
         (seen[key] ??= []).push(+a.time.toFixed(2));
       }
       if (s.isOver) h.restart();

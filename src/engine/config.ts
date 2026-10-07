@@ -277,18 +277,28 @@ export const CONFIG = {
       riverRadius: 1.5,
       logWeight: 0.4, stoneWeight: 0.4, riverWeight: 0.2,
       drowningMs: 650,
+      /**
+       * Render-only multipliers on the Blender-authored log/stone meshes; collision still uses radius.
+       * Width stays 1 because the meshes already span their lanes, and height must stay under
+       * jump.clearance (logs are authored up to ~1.25 tall, stones up to ~0.95) or the jump reads as clipping.
+       */
+      visualScale: {
+        log: { height: 1, depth: 1.6 },
+        stones: { height: 1.35, depth: 1.7 },
+      },
     },
     boss: { triggerKills: 12, holdZ: -20, attackIntervalMs: 2800, telegraphMs: 1100 },
     /**
      * Heights are matched to the player (the mage stands ~3.7 with hat). approachSpeed is relative
      * to the scrolling ground and must stay positive: a negative value makes the enemy back away
-     * while its Walk/Run clip steps forward.
+     * while its Walk clip steps forward. walkRate is the Walk clip's playback speed, so the
+     * faster kinds stride quicker instead of gliding.
      */
     enemyTypes: {
-      weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, height: 3.4, radius: 1, color: '#9bdd66' },
-      normal: { name: 'Bramble Skeleton', path: '/assets/models/enemies/animated/BrambleSkeleton.glb', hp: 2, approachSpeed: 2, height: 3.7, radius: 1.05, color: '#e5d7b1' },
-      tank: { name: 'Shroom Brute', path: '/assets/models/enemies/animated/ShroomBrute.glb', hp: 6, approachSpeed: 1, height: 3.9, radius: 1.3, color: '#e9a15b' },
-      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 40, approachSpeed: 0, height: 8, radius: 2, color: '#df7650' },
+      weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, walkRate: 1.6, height: 3.4, radius: 1, color: '#9bdd66' },
+      normal: { name: 'Bramble Skeleton', path: '/assets/models/enemies/animated/BrambleSkeleton.glb', hp: 2, approachSpeed: 2, walkRate: 1.25, height: 3.7, radius: 1.05, color: '#e5d7b1' },
+      tank: { name: 'Shroom Brute', path: '/assets/models/enemies/animated/ShroomBrute.glb', hp: 6, approachSpeed: 1, walkRate: 1, height: 3.9, radius: 1.3, color: '#e9a15b' },
+      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 40, approachSpeed: 0, walkRate: 1, height: 8, radius: 2, color: '#df7650' },
     },
 
     enemy: {
@@ -303,10 +313,11 @@ export const CONFIG = {
       },
       /**
        * Skinning is the expensive part of a crowd, so only the nearest few are
-       * animated. Past this the pose is frozen, which is invisible at distance.
+       * animated. animateBeyondZ sits behind spawnZ: enemies are well inside the
+       * fog line when they appear, and most die out there, so a frozen pose shows.
        */
-      animatedCount: 8,
-      animateBeyondZ: -70,
+      animatedCount: 12,
+      animateBeyondZ: -95,
       /** Bodies staged for the death animation, separate from the live pool. */
       corpseCount: 5,
     },

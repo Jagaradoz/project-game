@@ -34,6 +34,7 @@ export async function addObstaclePool(THREE: ThreeModule, scene: T.Scene, config
   const sources = await Promise.all(paths.map(async name => (await loader.loadAsync(`/assets/models/environment/${name}.glb`)).scene));
   sources.forEach(source => repaintKitModel(THREE, source, palette.kit));
   const templates = new Map(SOLID_ASSETS.map((name, i) => [name, sources[i]!]));
+  const scaleOf = (name: string) => name.startsWith(SOLID_KINDS.log) ? config.obstacle.visualScale.log : config.obstacle.visualScale.stones;
   const items = Array.from({ length: config.obstacle.poolSize }, () => {
     const group = new THREE.Group();
     group.name = 'trail-hazard';
@@ -41,6 +42,8 @@ export async function addObstaclePool(THREE: ThreeModule, scene: T.Scene, config
     for (const [name, template] of templates) {
       const solid = template.clone(true);
       solid.name = name;
+      const { height, depth } = scaleOf(name);
+      solid.scale.multiply(new THREE.Vector3(1, height, depth));
       solid.visible = false;
       solid.traverse(node => {
         const mesh = node as T.Mesh;

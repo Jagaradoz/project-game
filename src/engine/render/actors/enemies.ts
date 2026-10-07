@@ -15,6 +15,8 @@ export interface EnemySlot {
   id?: number; lastHitMs?: number; aura: T.Mesh; health: T.Mesh; model?: T.Object3D; elapsed?: number;
 }
 const OVERLAYS = ['Hit', 'Attack'];
+/** Golden-ratio step: spreads loop phases across a crowd so neighbours never march in lockstep. */
+const PHASE_STEP = .618034;
 
 export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: GameConfig,
   _palette: Palette, loader: GLTFLoader | null) {
@@ -70,14 +72,16 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
     }
     slot.current = ''; slot.action = null;
   }
-  function play(slot: EnemySlot, name: string, once = false, restart = false) {
-    const target = slot.actions[name] ?? slot.actions.Run ?? slot.actions.Walk;
+  function play(slot: EnemySlot, name: string, once = false, restart = false, rate = 1) {
+    const target = slot.actions[name] ?? slot.actions.Walk ?? slot.actions.Run;
     if (!target || (!restart && slot.action === target)) return;
     // A fresh slot has no pose to blend from: start at full weight so it never shows the bind pose.
     const blend = slot.action ? .12 : 0;
     slot.action?.fadeOut(blend);
     target.reset().setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
-    target.clampWhenFinished = once; target.fadeIn(blend).play();
+    target.clampWhenFinished = once; target.setEffectiveTimeScale(rate);
+    if (!once && slot.id !== undefined) target.time = ((Math.abs(slot.id) * PHASE_STEP) % 1) * target.getClip().duration;
+    target.fadeIn(blend).play();
     slot.action = target; slot.current = name;
     if (!blend) slot.mixer?.update(0);
   }
@@ -108,7 +112,8 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
       if (swinging && !slot.attacked) overlay(slot, 'Attack');
       slot.attacked = swinging;
       if (enemy.lastHitMs !== undefined && enemy.lastHitMs !== slot.lastHitMs) { slot.lastHitMs = enemy.lastHitMs; overlay(slot, 'Hit', 2.5); }
-      play(slot, slot.kind === 'tank' ? 'Walk' : slot.kind === 'boss' && enemy.z >= config.boss.holdZ ? 'Idle' : 'Run');
+      const holding = slot.kind === 'boss' && enemy.z >= config.boss.holdZ;
+      play(slot, holding ? 'Idle' : 'Walk', false, false, holding ? 1 : def.walkRate);
       if (slot.mixer && animated < config.enemy.animatedCount && enemy.z > config.enemy.animateBeyondZ) { slot.mixer.update(dtSec); animated++; }
       slot.aura.rotation.z = Math.sin(elapsedMs * .005 + id) * .08;
     }

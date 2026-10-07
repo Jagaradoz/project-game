@@ -78,8 +78,18 @@ def add_clip(rig, label, source, frame_start=None, frame_end=None):
     start, end = source.frame_range
     strip.action_frame_start = frame_start if frame_start is not None else start
     strip.action_frame_end = frame_end if frame_end is not None else end
-    strip.frame_end = strip.action_frame_end
+    fit_strip(strip)
     return action
+
+
+def fit_strip(strip):
+    """Make the strip exactly as long as its action range.
+
+    A strip placed at frame 0 over an action keyed from frame 1 must end at
+    end - start, not at the action's end frame: the extra frame evaluates to the
+    rest pose and exports as a one-sample snap (the enemy stood up mid-Death).
+    """
+    strip.frame_end = strip.frame_start + (strip.action_frame_end - strip.action_frame_start)
 
 
 def export_selection(path, objects, animation_mode='NLA_TRACKS', fps=24):
@@ -183,6 +193,34 @@ def validate_glb(path, expected_clips=None, max_triangles=None, in_place_jump=Fa
 
 def rig_children(rig):
     return [o for o in rig.children_recursive if o.type in {'MESH', 'CURVE'}]
+
+
+def flatten_procedural_colors(objects):
+    """Bake node-driven base colours to a flat value the glTF exporter keeps.
+
+    The exporter drops a Base Color fed by Noise -> Color Ramp, and the runtime
+    then draws the surface white. Each ramp is reduced to the mean of its stops.
+    """
+    flattened = []
+    for mat in {slot.material for obj in objects for slot in obj.material_slots if slot.material}:
+        if not mat.use_nodes:
+            continue
+        bsdf = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+        if not bsdf or not bsdf.inputs['Base Color'].is_linked:
+            continue
+        socket = bsdf.inputs['Base Color']
+        source = socket.links[0].from_node
+        if source.type == 'VALTORGB':
+            stops = [stop.color for stop in source.color_ramp.elements]
+            color = [sum(c[i] for c in stops) / len(stops) for i in range(4)]
+        elif source.type == 'RGB':
+            color = list(source.outputs[0].default_value)
+        else:
+            raise RuntimeError(f'Unsupported base colour source {source.type} on {mat.name}')
+        mat.node_tree.links.remove(socket.links[0])
+        socket.default_value = color
+        flattened.append(mat.name)
+    return sorted(flattened)
 
 
 def skin_rigid_children(rig):
@@ -352,14 +390,42 @@ def in_place_reaction(rig, label, hit=False):
     return action
 
 
+def bake_shape_modifiers(parts):
+    """Apply each part's own modifiers (subdivision, bevel...) before the join.
+
+    Joining keeps only the active object's modifier stack, so without this every
+    other piece exports as its raw low-poly cage. Subdivision is capped at one
+    level to stay inside the runtime triangle budget.
+    """
+    for obj in parts:
+        if obj.data.users > 1:
+            obj.data = obj.data.copy()
+        skins = [m for m in obj.modifiers if m.type == 'ARMATURE']
+        for mod in skins:
+            mod.show_viewport = False
+        bpy.context.view_layer.objects.active = obj
+        for mod in [m for m in obj.modifiers if m.type != 'ARMATURE']:
+            if mod.type == 'SUBSURF':
+                mod.levels = min(mod.levels, 1)
+            if mod.show_viewport:
+                bpy.ops.object.modifier_apply(modifier=mod.name)
+            else:
+                obj.modifiers.remove(mod)
+        for mod in skins:
+            mod.show_viewport = True
+
+
 def normalize_enemy_geometry(rig, stage_location):
     # Convert bone-parented rigid pieces into armature-weighted mesh data before
     # joining. This keeps each detail attached to the same bone after merging.
     pose_position = rig.data.pose_position
     rig.data.pose_position = 'REST'
     bpy.context.view_layer.update()
-    parts = rig_children(rig)
-    old_world = {o.name: o.matrix_world.copy() for o in parts}
+    # Weighted parts (legs, thorns) hang off the staging empty, not the rig;
+    # only their Armature modifier ties them to it.
+    deformed = [o for o in bpy.data.objects if o.type == 'MESH' and o.parent != rig
+                and any(m.type == 'ARMATURE' and m.object == rig for m in o.modifiers)]
+    parts = rig_children(rig) + deformed
     root_world = rig.matrix_world.copy()
     inverse_root = root_world.inverted()
     curves = [o for o in parts if o.type == 'CURVE']
@@ -369,16 +435,14 @@ def normalize_enemy_geometry(rig, stage_location):
             obj.select_set(True)
         bpy.context.view_layer.objects.active = curves[0]
         bpy.ops.object.convert(target='MESH')
-    parts = rig_children(rig)
+    parts = rig_children(rig) + deformed
+    bake_shape_modifiers(parts)
+    # Read placement with the rig at rest: a bone parent puts the child at the
+    # bone's tail, which Blender has already resolved into matrix_world.
+    old_world = {o.name: o.matrix_world.copy() for o in parts}
     for obj in parts:
-        if obj.data.users > 1:
-            obj.data = obj.data.copy()
         bone_name = obj.parent_bone if obj.parent_type == 'BONE' else ''
-        if bone_name in rig.data.bones:
-            world = (root_world @ rig.data.bones[bone_name].matrix_local @
-                     obj.matrix_parent_inverse @ obj.matrix_basis)
-        else:
-            world = old_world[obj.name]
+        world = old_world[obj.name]
         obj.parent = None
         obj.matrix_world = world
         # Transform into rig-local rest coordinates, removing preview placement.
@@ -393,13 +457,14 @@ def normalize_enemy_geometry(rig, stage_location):
         if bone_name in rig.data.bones:
             group = obj.vertex_groups.get(bone_name) or obj.vertex_groups.new(name=bone_name)
             group.add(list(range(len(obj.data.vertices))), 1.0, 'REPLACE')
-        if obj.type == 'MESH' and bone_name in rig.data.bones:
+        if obj.type == 'MESH':
             mod = next((m for m in obj.modifiers if m.type == 'ARMATURE'), None)
             if not mod:
                 mod = obj.modifiers.new('Gameplay skin', 'ARMATURE')
             mod.object = rig
     bpy.context.view_layer.update()
     meshes = [o for o in rig_children(rig) if o.type == 'MESH']
+    assert all(o in meshes for o in deformed), 'weighted parts missing from the join'
     bpy.ops.object.select_all(action='DESELECT')
     for obj in meshes:
         obj.select_set(True)
@@ -453,12 +518,19 @@ def export_enemies():
                 strip.action_slot = action.slots[0]
             strip.action_frame_start = 1
             strip.action_frame_end = 15 if clip == 'Attack' else 10
-            strip.frame_end = strip.action_frame_end
+            fit_strip(strip)
             rig.animation_data.action = None
         bounds_report = validate_enemy_bounds(rig, ENEMY_HEIGHT[output_name])
+        print('ENEMY', output_name, 'flattened colours', flatten_procedural_colors(rig_children(rig)), flush=True)
         path = ENEMY_OUT / f'{output_name}.glb'
         stats = export_selection(path, [rig] + rig_children(rig))
         assert set(stats['clips']) == {'Walk', 'Run', 'Idle', 'Death', 'Attack', 'Hit'}, stats
+        blob = path.read_bytes()
+        doc = json.loads(blob[20:20 + struct.unpack_from('<I', blob, 12)[0]])
+        uncoloured = [m['name'] for m in doc['materials']
+                      if 'baseColorFactor' not in m.get('pbrMetallicRoughness', {})
+                      and 'baseColorTexture' not in m.get('pbrMetallicRoughness', {})]
+        assert not uncoloured, (path.name, 'materials export white', uncoloured)
         assert stats['skins'] >= 1, (path.name, stats)
         assert triangles <= 15000, (path.name, triangles)
         assert material_count <= 20, (path.name, material_count)
