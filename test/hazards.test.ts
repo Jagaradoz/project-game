@@ -2,14 +2,22 @@ import { expect, test } from 'vitest';
 import { CONFIG } from '@/engine/config';
 import { createGameState, restartGame, updateGame } from '@/engine/core/state';
 import { advanceHazards } from '@/engine/core/hazards';
-import type { GameState, TrailHazard } from '@/engine/types';
+import type { GameInput, GameState, TrailHazard } from '@/engine/types';
 
 const idle = { lane: 1, isFiring: false };
+const { takeoffGraceMs, landingGraceMs } = CONFIG.game.jump.leniency;
 function hazard(kind: 'log' | 'stones' | 'river', startLane = 0, laneCount = 3, z = -1): TrailHazard {
   return { id: 70, kind, startLane, laneCount, z, previousZ: z, status: 'approaching' } as TrailHazard;
 }
 function approaching(obstacle: TrailHazard): GameState {
   return { ...createGameState(3), speed: 11, obstacles: [obstacle] };
+}
+/** Step until every hazard has its verdict (or the run ends). */
+function settle(state: GameState, input: GameInput = idle, config = CONFIG.game): GameState {
+  for (let i = 0; i < 40 && !state.isOver && state.obstacles.some(o => o.status !== 'cleared'); i++) {
+    state = updateGame(state, input, 50, config);
+  }
+  return state;
 }
 
 for (const kind of ['log', 'stones'] as const) {
@@ -17,39 +25,57 @@ for (const kind of ['log', 'stones'] as const) {
     for (const lane of [0, 1, 2]) {
       test(`${kind} two lanes starting ${startLane}: player lane ${lane}`, () => {
         const state = approaching(hazard(kind, startLane, 2));
-        const next = updateGame(state, { ...idle, lane }, 50);
-        expect(next.hp).toBe(lane >= startLane && lane < startLane + 2 ? 2 : 3);
-        const jumping = updateGame({ ...state, jumpStartedMs: -250 }, { ...idle, lane }, 50);
-        expect(jumping.hp).toBe(3);
+        expect(settle(state, { ...idle, lane }).hp).toBe(lane >= startLane && lane < startLane + 2 ? 2 : 3);
+        expect(settle({ ...state, jumpStartedMs: -250 }, { ...idle, lane }).hp).toBe(3);
       });
     }
   }
   for (const lane of [0, 1, 2]) {
     test(`${kind} three lanes requires jumping in lane ${lane}`, () => {
       const state = approaching(hazard(kind));
-      expect(updateGame(state, { ...idle, lane }, 50).hp).toBe(2);
-      expect(updateGame({ ...state, jumpStartedMs: -250 }, { ...idle, lane }, 50).hp).toBe(3);
+      expect(settle(state, { ...idle, lane }).hp).toBe(2);
+      expect(settle({ ...state, jumpStartedMs: -250 }, { ...idle, lane }).hp).toBe(3);
     });
   }
   test(`${kind} contact is charged once even without a grace window`, () => {
     const config = { ...CONFIG.game, invulnMs: 0 };
     let state = approaching(hazard(kind));
-    for (let i = 0; i < 5; i++) state = updateGame(state, idle, 50, config);
+    for (let i = 0; i < 12; i++) state = updateGame(state, idle, 50, config);
     expect(state.hp).toBe(2);
     expect(state.obstacles[0].status).toBe('cleared');
   });
-  test(`${kind} landing before exiting its crossing causes damage`, () => {
+  test(`${kind} is cleared by any jump that overlaps the crossing, however low`, () => {
+    // Lands just after the hazard reaches the player: the old height check charged this.
     const state = { ...approaching(hazard(kind, 0, 3, -.6)), jumpStartedMs: -585 };
-    const first = updateGame(state, idle, 50);
-    expect(first.hp).toBe(3);
-    expect(updateGame(first, idle, 50).hp).toBe(2);
+    expect(settle(state).hp).toBe(3);
+  });
+  test(`${kind} forgives a jump that landed just before it arrived`, () => {
+    const arrive = hazard(kind, 0, 3, -1.46);
+    const durationMs = CONFIG.game.jump.durationMs;
+    expect(settle({ ...approaching(arrive), lastTakeoffMs: -durationMs - landingGraceMs + 50 }).hp).toBe(3);
+    expect(settle({ ...approaching(arrive), lastTakeoffMs: -durationMs - landingGraceMs - 50 }).hp).toBe(2);
+  });
+  test(`${kind} forgives a late webcam jump after its centre has passed`, () => {
+    const jumpingAtFrame = (jumpFrame: number) => {
+      let state = approaching(hazard(kind, 0, 3, -.3));
+      for (let frame = 1; frame <= 12; frame++) state = updateGame(state, { ...idle, jump: frame === jumpFrame }, 50);
+      return state.hp;
+    };
+    // The centre passes in the first 50 ms frame; the window stays open `takeoffGraceMs` past it.
+    expect(jumpingAtFrame(Math.floor(takeoffGraceMs / 50))).toBe(3);
+    expect(jumpingAtFrame(Math.ceil(takeoffGraceMs / 50) + 2)).toBe(2);
+  });
+  test(`${kind} is dodged by being out of its lanes at any point of the crossing`, () => {
+    let state = approaching(hazard(kind, 0, 2, -1.4));
+    state = updateGame(state, { ...idle, lane: 2 }, 50);
+    expect(settle(state, { ...idle, lane: 0 }).hp).toBe(3);
   });
 }
 
 for (const lane of [0, 1, 2]) {
-  test(`river instantly drowns a grounded player in lane ${lane}, even during grace`, () => {
+  test(`river drowns a grounded player in lane ${lane}, even during grace`, () => {
     const state = { ...approaching(hazard('river')), invulnUntilMs: 5000 };
-    const next = updateGame(state, { ...idle, lane }, 50);
+    const next = settle(state, { ...idle, lane });
     expect(next.hp).toBe(0);
     expect(next.isOver).toBe(true);
     expect(next.isCleared).toBe(false);
@@ -60,45 +86,35 @@ for (const lane of [0, 1, 2]) {
   });
 }
 
-test('a river jump must stay clear until the whole crossing passes', () => {
-  let state: GameState = { ...approaching(hazard('river')), jumpStartedMs: -250 };
-  for (let i = 0; i < 6; i++) state = updateGame(state, idle, 50);
+test('a river is crossed by any overlapping jump, including one that lands mid-crossing', () => {
+  const state = settle({ ...approaching(hazard('river')), jumpStartedMs: -250 });
   expect(state.hp).toBe(3);
   expect(state.obstacles[0].status).toBe('cleared');
-  const early = { ...approaching(hazard('river', 0, 3, -.6)), jumpStartedMs: -585 };
-  const first = updateGame(early, idle, 50);
-  expect(first.hp).toBe(3);
-  expect(updateGame(first, idle, 50).deathReason).toBe('drowned');
-  expect(updateGame(approaching(hazard('river')), { ...idle, jump: true }, 50).deathReason).toBe('drowned');
+  expect(settle({ ...approaching(hazard('river', 0, 3, -.6)), jumpStartedMs: -585 }).deathReason).toBeNull();
+  expect(settle(approaching(hazard('river')), { ...idle, jump: true }).deathReason).toBeNull();
 });
 
 test('wider river banks use their own contact bounds without enlarging solid hazards', () => {
   const check = (kind: TrailHazard['kind'], z: number) =>
-    advanceHazards([hazard(kind, 0, 3, z)], 1, 0, 0, 50, null, CONFIG.game);
-  expect(check('river', -1.9).drowned).toBe(true);
-  expect(check('river', 1.9).drowned).toBe(true);
-  expect(check("river", -2.5).drowned).toBe(false);
-  expect(check('log', -1.6).hit).toBe(false);
-  expect(check('stones', -1.6).hit).toBe(false);
+    advanceHazards([hazard(kind, 0, 3, z)], 1, 0, 0, 50, null, CONFIG.game).obstacles[0].status;
+  expect(check('river', -1.9)).toBe('crossing');
+  expect(check('river', -2.5)).toBe('approaching');
+  expect(check('log', -1.6)).toBe('approaching');
+  expect(check('stones', -1.6)).toBe('approaching');
+  expect(check('stones', -1.4)).toBe('crossing');
 });
 
-test('swept crossing catches a missed river even when an entire hazard passes in one step', () => {
+test('a missed river is caught even when the entire hazard passes in one step', () => {
   const config = { ...CONFIG.game, walkSpeed: 200, maxSpeed: 200 };
-  const next = updateGame({ ...approaching(hazard('river', 0, 3, -3)), speed: 200 }, idle, 50, config);
-  expect(next.deathReason).toBe('drowned');
-});
-
-test('swept clearance uses the contact interval rather than just the final jump height', () => {
-  const config = { ...CONFIG.game, walkSpeed: 200, maxSpeed: 200 };
-  const state = { ...approaching(hazard('river', 0, 3, -1.3)), speed: 200, jumpStartedMs: -100 };
-  const next = updateGame(state, idle, 50, config);
-  expect(next.jumpHeight).toBeGreaterThan(config.jump.clearance);
+  const next = settle({ ...approaching(hazard('river', 0, 3, -3)), speed: 200 }, idle, config);
   expect(next.deathReason).toBe('drowned');
 });
 
 test('drowning wins over a simultaneous stage-winning kill', () => {
   const config = { ...CONFIG.game, goalKills: 1 };
-  const state = { ...approaching(hazard('river')),
+  // Already past the player; the late-takeoff window closes this frame.
+  const due = { ...hazard('river', 0, 3, 2), status: 'crossing' as const, centredMs: -takeoffGraceMs };
+  const state = { ...approaching(due),
     enemies: [{ id: 1, lane: 1, z: -30, previousZ: -30 }],
     bullets: [{ lane: 1, z: -29, previousZ: -29 }],
   };
@@ -109,10 +125,12 @@ test('drowning wins over a simultaneous stage-winning kill', () => {
 });
 
 test('restart clears death state and outstanding hazards', () => {
-  const dead = updateGame(approaching(hazard('river')), idle, 50);
+  const dead = settle(approaching(hazard('river')));
+  expect(dead.deathReason).toBe('drowned');
   const next = restartGame(dead);
   expect(next.deathReason).toBeNull();
   expect(next.obstacles).toEqual([]);
+  expect(next.lastTakeoffMs).toBeNull();
   expect(next.hp).toBe(3);
 });
 
@@ -134,7 +152,7 @@ test('boss waits for the last crossing and new hazards pause while the boss is d
   const next = updateGame(state, idle, 50);
   expect(next.bossSpawned).toBe(false);
   expect(next.obstacles).toHaveLength(1);
-  const passed = { ...next, obstacles: [hazard('log', 0, 3, 2)] };
+  const passed = { ...next, obstacles: [{ ...hazard('log', 0, 3, 2), status: 'cleared' as const }] };
   expect(updateGame(passed, idle, 50).bossSpawned).toBe(true);
 });
 

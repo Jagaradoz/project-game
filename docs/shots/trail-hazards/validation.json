@@ -2,38 +2,38 @@
   "variants": [
     {
       "name": "log-2-lanes-left",
-      "calls": 336,
-      "triangles": 711052
+      "calls": 337,
+      "triangles": 796172
     },
     {
       "name": "log-2-lanes-right",
-      "calls": 336,
-      "triangles": 711052
+      "calls": 337,
+      "triangles": 796172
     },
     {
       "name": "log-3-lanes-left",
-      "calls": 336,
-      "triangles": 711172
+      "calls": 337,
+      "triangles": 796292
     },
     {
       "name": "stones-2-lanes-left",
-      "calls": 337,
-      "triangles": 711206
+      "calls": 338,
+      "triangles": 796244
     },
     {
       "name": "stones-2-lanes-right",
-      "calls": 337,
-      "triangles": 711206
+      "calls": 338,
+      "triangles": 796244
     },
     {
       "name": "stones-3-lanes-left",
-      "calls": 337,
-      "triangles": 711610
+      "calls": 338,
+      "triangles": 796468
     },
     {
       "name": "river-3-lanes",
-      "calls": 363,
-      "triangles": 716237
+      "calls": 364,
+      "triangles": 801357
     }
   ],
   "riverJump": {
@@ -65,8 +65,8 @@
     "bossDefeated": false,
     "hp": 3,
     "score": 0,
-    "calls": 350,
-    "tris": 715723,
+    "calls": 351,
+    "tris": 800843,
     "quality": "high",
     "corpses": 0,
     "enemyAnims": [],
@@ -86,8 +86,8 @@
     ]
   },
   "drowning": {
-    "dist": 0,
-    "elapsedMs": 16.666666666666668,
+    "dist": 5,
+    "elapsedMs": 416.6666666666668,
     "isOver": true,
     "isCleared": false,
     "enemies": [],
@@ -97,8 +97,8 @@
         "kind": "river",
         "startLane": 0,
         "laneCount": 3,
-        "z": -1.6166666666666667,
-        "status": "crossing"
+        "z": 2.7846552690273048,
+        "status": "cleared"
       }
     ],
     "spores": [],
@@ -114,8 +114,8 @@
     "bossDefeated": false,
     "hp": 0,
     "score": 0,
-    "calls": 357,
-    "tris": 716543,
+    "calls": 350,
+    "tris": 801407,
     "quality": "high",
     "corpses": 0,
     "enemyAnims": [],
@@ -163,8 +163,8 @@
     "bossDefeated": false,
     "hp": 3,
     "score": 0,
-    "calls": 336,
-    "tris": 711052,
+    "calls": 337,
+    "tris": 796172,
     "quality": "high",
     "corpses": 0,
     "enemyAnims": [],

@@ -10,7 +10,8 @@ Why it looks natural rather than tiled:
     pile has a dominant mass and tapers to rubble at the ends
   - rocks overlap, sink into the ground and tilt; a rubble skirt spills forward and back
   - each rock takes its own tone; undersides go dark and some tops carry moss
-The height stays under `MAX_HEIGHT` so the jump (clearance 1.2) never reads as clipping.
+  - no soil bed: the rocks sit straight on the trail
+The height stays under `MAX_HEIGHT`, well below the 2.4 jump peak, so a jump never reads as clipping.
 """
 
 import math
@@ -20,13 +21,13 @@ import bmesh
 from mathutils import Matrix, Vector
 
 LANE_WIDTH = 2.4
-MAX_HEIGHT = 1.12
-CORE_DEPTH = 1.5
+MAX_HEIGHT = 1.8
+CORE_DEPTH = 2.2
 SPILL = .22  # how far rubble may reach past the occupied lanes
 
 # Material slots of a stone hazard mesh, in order.
-STONE_SLOTS = ["stone", "stoneMid", "stoneDark", "stoneWarm", "leafsGreen", "dirtDark", "grass"]
-STONE, MID, DARK, WARM, MOSS, BED, GRASS = range(len(STONE_SLOTS))
+STONE_SLOTS = ["stone", "stoneMid", "stoneDark", "stoneWarm", "leafsGreen", "grass"]
+STONE, MID, DARK, WARM, MOSS, GRASS = range(len(STONE_SLOTS))
 TONES = (STONE, STONE, MID, MID, WARM)
 
 # Points per archetype and how each is squashed: (points, width, depth, height) multipliers.
@@ -104,7 +105,7 @@ def place_rock(bm, rng, centre, size, archetype, tone, moss=0.0, tilt=0.0, sink=
 
 def crest_height(x, half, crests):
     """Pile height at x from the variant's crests; never below a low rubble floor."""
-    h = .32
+    h = .5
     for cx, ch, spread in crests:
         d = (x - cx * half) / (spread * half * 2)
         h = max(h, ch * MAX_HEIGHT * math.exp(-d * d))
@@ -122,28 +123,13 @@ def add_blade(bm, base, lean, height, radius):
             bm.faces.new((lower[k], lower[(k + 1) % 3], upper[(k + 1) % 3], upper[k])).material_index = GRASS
 
 
-def add_bed(bm, rng, half):
-    """Low irregular soil mound under the pile so it sits in the trail instead of on it."""
-    ring = []
-    steps = 22
-    for i in range(steps):
-        a = i * math.tau / steps
-        rx = (half + .35) * rng.uniform(.94, 1.04)
-        ry = (CORE_DEPTH / 2 + .45) * rng.uniform(.85, 1.08)
-        ring.append(bm.verts.new((math.cos(a) * rx, math.sin(a) * ry, .0)))
-    inner = [bm.verts.new((v.co.x * .82, v.co.y * .7, rng.uniform(.05, .09))) for v in ring]
-    for k in range(steps):
-        bm.faces.new((ring[k], ring[(k + 1) % steps], inner[(k + 1) % steps], inner[k])).material_index = BED
-    bm.faces.new(list(inner)).material_index = BED
-
-
 def build_stone_hazard(lane_count, variant, seed):
     """One whole rockfall spanning `lane_count` lanes. Returns a bmesh in STONE_SLOTS order."""
     rng = random.Random(seed)
     crests, moss = LAYOUTS[variant]
     half = lane_count * LANE_WIDTH / 2
     bm = bmesh.new()
-    add_bed(bm, rng, half)
+    depth = CORE_DEPTH / 1.5  # offsets below were tuned at a 1.5 core
 
     # Core: walk across the span; rock size follows the crest profile, gaps are always covered.
     x = -half - .05
@@ -154,7 +140,7 @@ def build_stone_hazard(lane_count, variant, seed):
         width = max(.6, h * rng.uniform(1.25, 1.85)) if archetype != "shard" else max(.45, h * .7)
         size = (width, rng.uniform(.75, 1.05) * CORE_DEPTH * (.7 if archetype == "shard" else .85), h / ARCHETYPES[archetype][3])
         tilt = rng.uniform(.18, .38) if archetype in ("shard", "slab") else rng.uniform(0, .14)
-        place_rock(bm, rng, (x + width * .4, rng.uniform(-.18, .18), 0), size, archetype, rng.choice(TONES),
+        place_rock(bm, rng, (x + width * .4, rng.uniform(-.18, .18) * depth, 0), size, archetype, rng.choice(TONES),
                    moss=moss if h > .5 else 0, tilt=tilt, sink=rng.uniform(.03, .12))
         x += width * rng.uniform(.62, .82)
 
@@ -163,22 +149,22 @@ def build_stone_hazard(lane_count, variant, seed):
         for _ in range(lane_count + rng.randint(0, 2)):
             px = rng.uniform(-half * .9, half * .9)
             h = crest_height(px, half, crests) * rng.uniform(.4, .62)
-            place_rock(bm, rng, (px, side * rng.uniform(.5, .72), 0), (h * 1.5, h * 1.3, h / .7), "chunk",
+            place_rock(bm, rng, (px, side * rng.uniform(.5, .72) * depth, 0), (h * 1.5, h * 1.3, h / .7), "chunk",
                        rng.choice(TONES), tilt=rng.uniform(.1, .3), sink=.04)
 
     # Rubble skirt: pebbles spilling outward, thicker under the crests and past the ends.
     for _ in range(9 * lane_count):
         px = rng.uniform(-half - .3, half + .3)
         side = rng.choice((-1, 1))
-        py = side * rng.uniform(.7, 1.15) * (1 + .25 * crest_height(px, half, crests) / MAX_HEIGHT)
-        s = rng.uniform(.12, .3)
+        py = side * (rng.uniform(.7, 1.0) + .5 * (depth - 1)) * (1 + .25 * crest_height(px, half, crests) / MAX_HEIGHT)
+        s = rng.uniform(.15, .38)
         place_rock(bm, rng, (px, py, 0), (s * 1.3, s, s), "pebble", rng.choice((STONE, MID, DARK, WARM)),
                    tilt=rng.uniform(0, .4), sink=s * .2)
 
     # Grass where the rubble meets the trail edges.
     for end in (-1, 1):
         for _ in range(rng.randint(2, 3)):
-            base = Vector((end * (half + rng.uniform(-.2, .25)), rng.uniform(-.9, .9), 0))
+            base = Vector((end * (half + rng.uniform(-.2, .25)), rng.uniform(-.9, .9) * depth, 0))
             for _ in range(3):
                 lean = Vector((rng.uniform(-.15, .15), rng.uniform(-.15, .15), 0))
                 add_blade(bm, base + Vector((rng.uniform(-.07, .07), rng.uniform(-.07, .07), 0)), lean,

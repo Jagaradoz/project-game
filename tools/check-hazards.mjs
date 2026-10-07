@@ -63,7 +63,8 @@ try {
   assert.equal(cleared.hp, 3);
   assert.equal(cleared.hazards[0].status, 'cleared');
   await preview('river', 0, 3, -1.8);
-  const dead = await page.evaluate('window.__lane.simulate(.1, {firing:false}); window.__lane.summary()');
+  // The verdict waits for the late-takeoff grace after the river's centre passes.
+  const dead = await page.evaluate('window.__lane.simulate(.5, {firing:false}); window.__lane.summary()');
   assert.equal(dead.hp, 0);
   assert.equal(dead.deathReason, 'drowned');
   assert.equal(dead.isCleared, false);

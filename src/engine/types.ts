@@ -158,6 +158,10 @@ interface HazardBody {
   status: 'approaching' | 'crossing' | 'cleared';
   /** A solid hazard can charge contact only once, including during grace. */
   hit?: boolean;
+  /** When the hazard's centre passed the player; the verdict waits `jump.leniency.takeoffGraceMs` past it. */
+  centredMs?: number;
+  /** The player jumped (or stood clear of its lanes) at some point in the crossing window. */
+  covered?: boolean;
 }
 export type TrailHazard = HazardBody & (
   | { kind: 'log' | 'stones'; startLane: 0 | 1; laneCount: 2 }
@@ -205,6 +209,8 @@ export interface GameState {
   /** The hands-on-hips shield is up this frame. Blocks spores, stops firing. */
   isShielding: boolean;
   jumpStartedMs: number | null;
+  /** The most recent takeoff, kept after landing so a just-landed jump still clears a hazard. */
+  lastTakeoffMs: number | null;
   jumpHeight: number;
   jumpHeld: boolean;
   jumpCount: number;

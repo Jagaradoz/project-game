@@ -23,11 +23,13 @@ test('jump clears a road log while grounded contact costs one health', () => {
   const state = { ...createGameState(3),
     obstacles: [{ id: 7, kind: 'log' as const, startLane: 0 as const, laneCount: 3 as const, status: 'approaching' as const, z: -1, previousZ: -1 }],
   };
-  const grounded = updateGame(state, idle, 50);
+  let grounded: GameState = state;
+  for (let i = 0; i < 12; i++) grounded = updateGame(grounded, idle, 50);
   expect(grounded.hp).toBe(2);
-  const airborne = updateGame({ ...state, jumpStartedMs: -200 }, idle, 50);
-  expect(airborne.hp).toBe(3);
+  let airborne = updateGame({ ...state, jumpStartedMs: -200 }, idle, 50);
   expect(airborne.jumpHeight).toBeGreaterThan(0.8);
+  for (let i = 0; i < 11; i++) airborne = updateGame(airborne, idle, 50);
+  expect(airborne.hp).toBe(3);
 });
 
 test('hazards do not damage or stop enemies outside their crossing window', () => {

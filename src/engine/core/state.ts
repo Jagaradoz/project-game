@@ -45,7 +45,7 @@ export function createGameState(seed = 1, config: RunConfig = CONFIG.game): Game
   return {
     nextId: 1, obstacles: [], nextObstacleMs: config.obstacle.firstMs,
     spores: [], nextSporeMs: config.spore.firstMs, nextSporeTickMs: 0, isInSpore: false, isShielding: false,
-    jumpStartedMs: null, jumpHeight: 0, jumpHeld: false, jumpCount: 0,
+    jumpStartedMs: null, lastTakeoffMs: null, jumpHeight: 0, jumpHeld: false, jumpCount: 0,
     hitAtMs: -Infinity, justImpacts: [], bossSpawned: false, bossDefeated: false, nextBossKills: firstBossKills(config),
     lane: centreLane(config),
     hp: config.maxHp,
@@ -122,11 +122,12 @@ export function updateGame(
   const wantsJump = Boolean(input.jump);
   const tookOff = wantsJump && !state.jumpHeld && state.jumpStartedMs === null;
   const flightStartedMs = tookOff ? elapsedMs : state.jumpStartedMs;
+  const lastTakeoffMs = flightStartedMs ?? state.lastTakeoffMs;
   let jumpStartedMs = flightStartedMs;
   if (jumpStartedMs !== null && elapsedMs - jumpStartedMs >= config.jump.durationMs) jumpStartedMs = null;
   const jumpPhase = jumpStartedMs === null ? 0 : (elapsedMs - jumpStartedMs) / config.jump.durationMs;
   const jumpHeight = jumpStartedMs === null ? 0 : Math.sin(Math.PI * jumpPhase) * config.jump.height;
-  const crossed = advanceHazards(state.obstacles, lane, speed * stepSec, state.elapsedMs, elapsedMs, flightStartedMs, config);
+  const crossed = advanceHazards(state.obstacles, lane, speed * stepSec, state.elapsedMs, elapsedMs, lastTakeoffMs, config);
   // The boss is just a big enemy: it walks in, and contact costs one HP.
   const movedEnemies = state.enemies.map((enemy) => {
     const extra = enemy.kind ? config.enemyTypes[enemy.kind].approachSpeed : 0;
@@ -193,7 +194,8 @@ export function updateGame(
     spawned.enemies = spawned.enemies.filter(e => e.kind === 'boss' || e.z > -30);
   }
   let nextObstacleMs = state.nextObstacleMs;
-  const retainedHazards = obstacles.filter(o => o.z <= config.despawnZ);
+  // Keep a hazard until its verdict is in, even if a fast step carried it past despawnZ first.
+  const retainedHazards = obstacles.filter(o => o.z <= config.despawnZ || o.status !== 'cleared');
   const isBossPhase = Boolean(liveBoss) || bossDue;
   if (hp > 0 && !isCleared && !sporePending && elapsedMs >= nextObstacleMs && retainedHazards.length < config.obstacle.poolSize && !isBossPhase) {
     const typeRoll = random(spawned.seed);
@@ -217,7 +219,7 @@ export function updateGame(
 
   return {
     ...state,
-    nextId, obstacles: retainedHazards, nextObstacleMs, jumpStartedMs, jumpHeight,
+    nextId, obstacles: retainedHazards, nextObstacleMs, jumpStartedMs, lastTakeoffMs, jumpHeight,
     spores: nextSpores, nextSporeMs, nextSporeTickMs: spore.nextTickMs, isInSpore, isShielding,
     jumpHeld: wantsJump, jumpCount: state.jumpCount + Number(tookOff),
     hitAtMs: tookDamage ? elapsedMs : state.hitAtMs, justImpacts: shots.impacts,

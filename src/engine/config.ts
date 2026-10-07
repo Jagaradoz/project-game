@@ -255,24 +255,29 @@ export const CONFIG = {
     enemyPoolSize: 24,
 
     jump: {
-      durationMs: 800, height: 2.4, clearance: 1.2,
+      durationMs: 800, height: 2.4,
       // Source Jump frames 4-13 contain flight; 13-19 absorb landing.
       takeoffPose: 4 / 19, landingPose: 13 / 19,
+      /**
+       * Built for beginners: any jump overlapping a hazard's crossing clears it, whatever its height.
+       * These stretch that window for pose-detection latency (see core/hazards.ts advanceHazards).
+       */
+      leniency: { takeoffGraceMs: 250, landingGraceMs: 200 },
     },
     obstacle: {
       firstMs: 8500, intervalMs: 8500, radius: 0.7, poolSize: 4,
       riverRadius: 1.5,
-      logWeight: 0.4, stoneWeight: 0.4, riverWeight: 0.2,
+      // Relative odds per spawn: logs, rockfalls and rivers are equally likely.
+      logWeight: 1, stoneWeight: 1, riverWeight: 1,
       drowningMs: 650,
       /**
        * Render-only multipliers on the Blender-authored log/stone meshes; collision still uses radius.
-       * Width stays 1 because the meshes already span their lanes, and height must stay under
-       * jump.clearance (logs are authored up to ~1.25 tall, rockfalls up to ~1.0) or the jump reads as clipping.
-       * Rockfalls are authored at full depth with a rubble skirt, so they only need a light stretch.
+       * Width stays 1 because the meshes already span their lanes. Logs are authored up to ~1.25 tall and
+       * rockfalls up to ~1.6 (tools/trail_stone_hazards.py), so both stay under ~1.85, below the 2.4 jump peak.
        */
       visualScale: {
-        log: { height: 1, depth: 1.6 },
-        stones: { height: 1.2, depth: 1.15 },
+        log: { height: 1.15, depth: 1.75 },
+        stones: { height: 1.15, depth: 1 },
       },
     },
     /**

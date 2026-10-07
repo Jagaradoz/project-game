@@ -4,38 +4,44 @@ export function hazardBlocksLane(hazard: TrailHazard, lane: number): boolean {
   return lane >= hazard.startLane && lane < hazard.startLane + hazard.laneCount;
 }
 
-function heightAt(timeMs: number, startedMs: number | null, config: RunConfig): number {
-  if (startedMs === null) return 0;
-  const phase = (timeMs - startedMs) / config.jump.durationMs;
-  return phase <= 0 || phase >= 1 ? 0 : Math.sin(Math.PI * phase) * config.jump.height;
+function hazardReach(hazard: TrailHazard, config: RunConfig): number {
+  return config.playerRadius + (hazard.kind === 'river' ? config.obstacle.riverRadius : config.obstacle.radius);
 }
 
-/** Test the whole portion of a swept crossing that overlaps this frame. */
+/**
+ * Beginner rule: a crossing is safe if, at any moment between the hazard reaching the player and its
+ * centre passing them, the player was in the air or out of its lanes. Height never matters, and
+ * `jump.leniency` stretches the window both ways for webcam latency: a jump that landed up to
+ * `landingGraceMs` before still counts, and so does one taking off up to `takeoffGraceMs` after the
+ * centre passed. The verdict waits for that late window to close.
+ */
 export function advanceHazards(
   hazards: TrailHazard[], lane: number, deltaZ: number,
-  fromMs: number, toMs: number, jumpStartedMs: number | null, config: RunConfig,
+  fromMs: number, toMs: number, lastTakeoffMs: number | null, config: RunConfig,
 ): { obstacles: TrailHazard[]; hit: boolean; drowned: boolean } {
+  const { durationMs, leniency } = config.jump;
+  const landedByMs = lastTakeoffMs === null ? -Infinity : lastTakeoffMs + durationMs + leniency.landingGraceMs;
+  /** When, inside this step, a hazard moving from `startZ` reaches `z`. */
+  const reachedAt = (startZ: number, z: number) =>
+    startZ >= z || deltaZ <= 0 ? fromMs : fromMs + ((z - startZ) / deltaZ) * (toMs - fromMs);
   let hit = false;
   let drowned = false;
   const obstacles = hazards.map(source => {
-    const reach = config.playerRadius + (source.kind === 'river' ? config.obstacle.riverRadius : config.obstacle.radius);
-    const entryZ = config.playerZ - reach;
-    const exitZ = config.playerZ + reach;
     const obstacle = { ...source, previousZ: source.z, z: source.z + deltaZ };
+    const entryZ = config.playerZ - hazardReach(source, config);
     if (source.status === 'cleared') return obstacle;
-    const contact = obstacle.z >= entryZ && source.z <= exitZ;
-    if (contact && hazardBlocksLane(obstacle, lane)) {
-      const enter = deltaZ > 0 ? Math.max(0, (entryZ - source.z) / deltaZ) : 0;
-      const exit = deltaZ > 0 ? Math.min(1, (exitZ - source.z) / deltaZ) : 1;
-      const startHeight = heightAt(fromMs + enter * (toMs - fromMs), jumpStartedMs, config);
-      const endHeight = heightAt(fromMs + exit * (toMs - fromMs), jumpStartedMs, config);
-      // The sine flight arc is concave: its minimum over contact is an endpoint.
-      if (Math.min(startHeight, endHeight) < config.jump.clearance) {
-        if (obstacle.kind === 'river') drowned = true;
-        else if (!obstacle.hit) { hit = true; obstacle.hit = true; }
-      }
+    if (obstacle.z < entryZ) { obstacle.status = 'approaching'; return obstacle; }
+    const enteredMs = reachedAt(source.z, entryZ);
+    if (obstacle.centredMs === undefined && obstacle.z >= config.playerZ) obstacle.centredMs = reachedAt(source.z, config.playerZ);
+    const closesMs = obstacle.centredMs === undefined ? Infinity : obstacle.centredMs + leniency.takeoffGraceMs;
+    const airborne = lastTakeoffMs !== null && lastTakeoffMs <= Math.min(toMs, closesMs) && landedByMs >= enteredMs;
+    obstacle.covered = Boolean(source.covered) || airborne || !hazardBlocksLane(obstacle, lane);
+    if (toMs < closesMs) { obstacle.status = 'crossing'; return obstacle; }
+    if (!obstacle.covered) {
+      if (obstacle.kind === 'river') drowned = true;
+      else if (!obstacle.hit) { hit = true; obstacle.hit = true; }
     }
-    obstacle.status = obstacle.z > exitZ ? 'cleared' : contact ? 'crossing' : 'approaching';
+    obstacle.status = 'cleared';
     return obstacle;
   });
   return { obstacles, hit, drowned };
@@ -52,9 +58,9 @@ export function hasSafeHazardArrival(enemy: GameBody, hazards: TrailHazard[], sp
   const padding = config.jump.durationMs / 1000;
   return hazards.every(hazard => {
     if (hazard.status === 'cleared') return true;
-    const hazardReach = config.playerRadius + (hazard.kind === 'river' ? config.obstacle.riverRadius : config.obstacle.radius);
-    const enter = (config.playerZ - hazardReach - hazard.z) / trailSpeed;
-    const exit = (config.playerZ + hazardReach - hazard.z) / trailSpeed;
+    const reach = hazardReach(hazard, config);
+    const enter = (config.playerZ - reach - hazard.z) / trailSpeed;
+    const exit = (config.playerZ + reach - hazard.z) / trailSpeed;
     return enemyExit < enter - padding || enemyEnter > exit + padding;
   });
 }

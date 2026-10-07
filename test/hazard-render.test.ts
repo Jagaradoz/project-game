@@ -46,8 +46,9 @@ test('real exported assets cover their lanes, keep an open lane, and reuse four 
         expect(bounds.max.x).toBeLessThanOrEqual(right + .3);
         expect(bounds.min.x).toBeLessThan(left + .3);
         expect(bounds.max.x).toBeGreaterThan(right - .3);
-        expect(bounds.max.y).toBeLessThan(CONFIG.game.jump.clearance * 1.1);
-        expect(bounds.max.y).toBeGreaterThan(kind === 'log' ? 1 : .7);
+        // Hazards read big, but stay clearly under the jump's peak so a jump never looks like clipping.
+        expect(bounds.max.y).toBeLessThan(CONFIG.game.jump.height * .8);
+        expect(bounds.max.y).toBeGreaterThan(kind === 'log' ? 1.2 : 1.25);
       }
     }
   }
