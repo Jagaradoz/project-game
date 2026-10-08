@@ -10,6 +10,7 @@
 import type * as THREE_NS from 'three';
 import type { GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { collectResources, disposeSkeletons } from '@/engine/render/resources';
 
 import type { Palette } from '@/engine/render/world/palette';
 import type { CharacterDef, CharacterRoster, GameConfig, ThreeModule } from '@/engine/types';
@@ -42,6 +43,7 @@ export interface PlayerRefs {
   projectile?: ProjectileSource | null;
   playAnimation(name: string, duration?: number, loop?: boolean, restart?: boolean): void;
   loadCharacter(charId: string): Promise<boolean>;
+  dispose(): void;
 }
 
 import { laneToX } from '@/engine/core/state';
@@ -103,6 +105,7 @@ export async function addPlayer(
     // itself, which is not in scope inside its own literal.
     playAnimation: () => {},
     loadCharacter: async () => false,
+    dispose: () => {},
   };
 
   const gltfCache = new Map<string, GLTF>();
@@ -112,6 +115,34 @@ export async function addPlayer(
    * model's animation clips.
    */
   let loadToken = 0;
+  let disposed = false;
+
+  function releaseModel(): void {
+    playerObj.mixer?.stopAllAction();
+    for (const model of [...modelContainer.children]) {
+      playerObj.mixer?.uncacheRoot(model);
+      disposeSkeletons(model);
+      modelContainer.remove(model);
+    }
+    if (!playerObj.fallbackVisible) playerObj.materials.forEach(material => material.dispose());
+    playerObj.mixer = null;
+    playerObj.actions = {};
+    playerObj.currentAction = null;
+    playerObj.currentActionName = null;
+    playerObj.projectile = null;
+  }
+
+  playerObj.dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    loadToken += 1;
+    releaseModel();
+    const resources = new Set<{ dispose(): void }>();
+    collectResources(fallbackGroup, resources);
+    for (const gltf of gltfCache.values()) collectResources(gltf.scene, resources);
+    for (const resource of resources) resource.dispose();
+    gltfCache.clear();
+  };
 
   playerObj.playAnimation = function playAnimation(name: string, duration = 0.2, loop = true, restart = false) {
     if (!playerObj.mixer || playerObj.fallbackVisible) return;
@@ -159,23 +190,17 @@ export async function addPlayer(
   };
 
   playerObj.loadCharacter = async function loadCharacter(charId: string): Promise<boolean> {
+    if (disposed) return false;
     const token = loadToken += 1;
     playerObj.characterId = charId;
     playerObj.lastJumpStartedMs = null;
 
     if (charId === 'orb' || !loader) {
+      releaseModel();
       modelContainer.visible = false;
       fallbackGroup.visible = true;
       playerObj.fallbackVisible = true;
-      if (playerObj.mixer) {
-        playerObj.mixer.stopAllAction();
-        playerObj.mixer = null;
-      }
       playerObj.materials = [bodyMat, ringMat];
-      playerObj.actions = {};
-      playerObj.currentAction = null;
-      playerObj.currentActionName = null;
-      playerObj.projectile = null;
       return true;
     }
 
@@ -187,6 +212,12 @@ export async function addPlayer(
       let gltf = gltfCache.get(charDef.path);
       if (!gltf) {
         gltf = await loader.loadAsync(charDef.path);
+        if (disposed) {
+          const resources = new Set<{ dispose(): void }>();
+          collectResources(gltf.scene, resources);
+          for (const resource of resources) resource.dispose();
+          return false;
+        }
         gltfCache.set(charDef.path, gltf);
       }
 
@@ -194,13 +225,7 @@ export async function addPlayer(
       // owns the player now, and applying this one would half-overwrite it.
       if (token !== loadToken) return false;
 
-      if (playerObj.mixer) playerObj.mixer.stopAllAction();
-      const previousModel = modelContainer.children[0];
-      if (previousModel) playerObj.mixer?.uncacheRoot(previousModel);
-      if (!playerObj.fallbackVisible) playerObj.materials.forEach(material => material.dispose());
-      while (modelContainer.children.length > 0) {
-        modelContainer.remove(modelContainer.children[0]);
-      }
+      releaseModel();
 
       const model = clone(gltf.scene);
       const materials: THREE_NS.Material[] = [];
@@ -269,16 +294,11 @@ export async function addPlayer(
     } catch (error) {
       console.error(`Failed to load character model ${charId}:`, error);
       if (token !== loadToken) return false;
+      releaseModel();
       modelContainer.visible = false;
       fallbackGroup.visible = true;
       playerObj.fallbackVisible = true;
       playerObj.materials = [bodyMat, ringMat];
-      playerObj.mixer?.stopAllAction();
-      playerObj.mixer = null;
-      playerObj.actions = {};
-      playerObj.currentAction = null;
-      playerObj.currentActionName = null;
-      playerObj.projectile = null;
       return false;
     }
   };

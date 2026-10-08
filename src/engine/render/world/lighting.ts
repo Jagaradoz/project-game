@@ -30,13 +30,15 @@ export const SHADOW_QUALITY: Record<ShadowQuality, number> = {
   low: 0,
 };
 
+export const QUALITY_PIXEL_RATIO: Record<ShadowQuality, number> = { high: 2, medium: 1.5, low: 1 };
+
 export function configureRenderer(
   THREE: ThreeModule,
   renderer: THREE_NS.WebGLRenderer,
   palette: Palette,
   quality: ShadowQuality = 'high',
 ): number {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY_PIXEL_RATIO[quality]));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Neutral rather than ACES: ACES rolls bright saturated colours off towards
   // white and shifts their hue, which flattened the neon orbs, spells and sky.

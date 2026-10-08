@@ -22,6 +22,7 @@ export interface PoseDetectResult {
 let landmarker: PoseLandmarker | null = null;
 let delegateInUse: PoseDelegate | null = null;
 let lastTimestampMs = -1;
+let initRequestId = 0;
 
 /**
  * Loads the WASM runtime and model, preferring the GPU delegate.
@@ -31,6 +32,8 @@ let lastTimestampMs = -1;
  * on exactly the mobile hardware we are trying to measure.
  */
 export async function initPose(config: PoseConfig = CONFIG.pose): Promise<PoseInitResult> {
+  closePose();
+  const requestId = initRequestId;
   const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
   const modelAssetPath = MODEL_URLS[config.model as PoseModelName];
   if (!modelAssetPath) throw new Error(`Unknown model "${config.model}". Expected one of: ${Object.keys(MODEL_URLS).join(', ')}`);
@@ -44,20 +47,30 @@ export async function initPose(config: PoseConfig = CONFIG.pose): Promise<PoseIn
     outputSegmentationMasks: false,
   };
 
+  let instance: PoseLandmarker;
+  let delegate: PoseDelegate;
   try {
-    landmarker = await PoseLandmarker.createFromOptions(fileset, {
+    instance = await PoseLandmarker.createFromOptions(fileset, {
       ...options,
       baseOptions: { modelAssetPath, delegate: 'GPU' },
     });
-    delegateInUse = 'GPU';
+    delegate = 'GPU';
   } catch (gpuError) {
+    if (requestId !== initRequestId) throw gpuError;
     console.warn('GPU delegate unavailable, falling back to CPU:', gpuError);
-    landmarker = await PoseLandmarker.createFromOptions(fileset, {
+    instance = await PoseLandmarker.createFromOptions(fileset, {
       ...options,
       baseOptions: { modelAssetPath, delegate: 'CPU' },
     });
-    delegateInUse = 'CPU';
+    delegate = 'CPU';
   }
+
+  if (requestId !== initRequestId) {
+    instance.close();
+    throw new Error('Pose initialization cancelled.');
+  }
+  landmarker = instance;
+  delegateInUse = delegate;
 
   return { delegate: delegateInUse, model: config.model, connections: PoseLandmarker.POSE_CONNECTIONS };
 }
@@ -87,7 +100,9 @@ export function getDelegate() {
 }
 
 export function closePose() {
+  initRequestId += 1;
   landmarker?.close();
   landmarker = null;
+  delegateInUse = null;
   lastTimestampMs = -1;
 }

@@ -6,9 +6,18 @@ import { addPlayer } from '@/engine/render/actors/player';
 import { syncScene, updatePlayerAnimation, type SceneRefs } from '@/engine/render/sync';
 import { createGameState, updateGame } from '@/engine/core/state';
 
-async function fixture() {
+async function fixture(skinned = false) {
   const model = new THREE.Group();
-  model.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshStandardMaterial();
+  if (skinned) {
+    const count = geometry.attributes.position.count;
+    geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(count * 4), 4));
+    const weights = new Float32Array(count * 4);
+    for (let i = 0; i < count; i++) weights[i * 4] = 1;
+    geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
+    const bone = new THREE.Bone(), mesh = new THREE.SkinnedMesh(geometry, material);
+    model.add(bone, mesh); mesh.bind(new THREE.Skeleton([bone]));
+  } else model.add(new THREE.Mesh(geometry, material));
   const animations = ['Run', 'Attack', 'Death', 'Idle', 'Hit', 'Jump'].map((name) =>
     new THREE.AnimationClip(name, 1, [new THREE.NumberKeyframeTrack('.rotation[x]', [0, 1], [0, 0.1])]),
   );
@@ -186,4 +195,33 @@ test('a defeat pose stays fully visible after the last hit freezes the game cloc
   const state = { ...createGameState(), isOver: true, hp: 0, elapsedMs: 200, invulnUntilMs: 1000 };
   syncScene(scene, state, 16);
   expect(player.materials.every(material => material.opacity === 1)).toBe(true);
+});
+
+test('player teardown clears cached assets and prevents a late load restoring a disposed player', async () => {
+  const { player, loadAsync, model } = await fixture();
+  const geometry = (model.children[0] as THREE.Mesh).geometry;
+  const dispose = vi.spyOn(geometry, 'dispose');
+  let resolve!: (value: { scene: THREE.Group; animations: THREE.AnimationClip[] }) => void;
+  loadAsync.mockReturnValueOnce(new Promise(r => { resolve = r; }));
+  const pending = player.loadCharacter('druid');
+  player.dispose(); player.dispose();
+  expect(dispose).toHaveBeenCalledTimes(1);
+  resolve({ scene: new THREE.Group(), animations: [] });
+  expect(await pending).toBe(false);
+  expect(player.modelContainer.children).toHaveLength(0);
+  expect(player.mixer).toBeNull();
+  expect(await player.loadCharacter('mage')).toBe(false);
+});
+
+test('changing characters and switching to the fallback release the previous rig textures', async () => {
+  const { player } = await fixture(true);
+  for (const character of ['druid', 'mage', 'orb']) {
+    const mesh = player.modelContainer.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh;
+    mesh.skeleton.computeBoneTexture();
+    const dispose = vi.fn(); mesh.skeleton.boneTexture!.addEventListener('dispose', dispose);
+    await player.loadCharacter(character);
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(mesh.skeleton.boneTexture).toBeNull();
+  }
+  player.dispose();
 });

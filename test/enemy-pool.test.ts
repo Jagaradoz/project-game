@@ -1,12 +1,21 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import * as THREE from 'three';
 import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { addEnemyPool } from '@/engine/render/actors/enemies';
 import { CONFIG } from '@/engine/config';
 
-async function fixture() {
+async function fixture(skinned = false) {
   const model = new THREE.Group();
-  model.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshStandardMaterial();
+  if (skinned) {
+    const count = geometry.attributes.position.count;
+    geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(count * 4), 4));
+    const weights = new Float32Array(count * 4);
+    for (let i = 0; i < count; i++) weights[i * 4] = 1;
+    geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
+    const bone = new THREE.Bone(), mesh = new THREE.SkinnedMesh(geometry, material);
+    model.add(bone, mesh); mesh.bind(new THREE.Skeleton([bone]));
+  } else model.add(new THREE.Mesh(geometry, material));
   const animations = ['Run', 'Walk', 'Hit', 'Attack', 'Idle', 'Death'].map(name => new THREE.AnimationClip(name, .5,
     [new THREE.NumberKeyframeTrack('.rotation[x]', [0, .5], [0, .1])]));
   const loader = { loadAsync: async () => ({ scene: model, animations }) } as unknown as GLTFLoader;
@@ -86,4 +95,40 @@ test('enemies are sized to stand next to the player instead of dwarfed by them',
   expect(normal.height).toBeGreaterThanOrEqual(weak.height);
   expect(tank.height).toBeGreaterThanOrEqual(normal.height);
   expect(boss.height).toBeGreaterThan(tank.height * 1.8);
+});
+
+test('recycling enemy kinds releases every old bone texture while preserving shared assets', async () => {
+  const pool = await fixture(true);
+  const disposed: ReturnType<typeof vi.fn>[] = [];
+  let geometryDispose: ReturnType<typeof vi.spyOn> | undefined;
+  for (let i = 0; i < 120; i++) {
+    pool.sync([{ id: i, kind: i % 2 ? 'weak' : 'normal', hp: 1, lane: 1, z: -10, previousZ: -10 }], i * 100, .1);
+    const slot = pool.items.find(s => s.id === i)!;
+    const mesh = slot.model!.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh;
+    if (!geometryDispose) geometryDispose = vi.spyOn(mesh.geometry, 'dispose');
+    mesh.skeleton.computeBoneTexture();
+    const listener = vi.fn();
+    mesh.skeleton.boneTexture!.addEventListener('dispose', listener);
+    disposed.push(listener);
+    if (i) expect(disposed[i - 1]).toHaveBeenCalledTimes(1);
+  }
+  expect(geometryDispose).not.toHaveBeenCalled();
+  pool.dispose();
+  expect(disposed.every(listener => listener.mock.calls.length === 1)).toBe(true);
+  expect(geometryDispose).toHaveBeenCalled();
+});
+
+test('recycled corpse rigs release their bone textures too', async () => {
+  const pool = await fixture(true);
+  const disposed: ReturnType<typeof vi.fn>[] = [];
+  for (let i = 0; i < CONFIG.game.enemy.corpseCount * 4; i++) {
+    // Each complete pool rotation switches the kind held by the same corpse slot.
+    pool.spawnDeath(0, -10, Math.floor(i / CONFIG.game.enemy.corpseCount) % 2 ? 'weak' : 'normal');
+    const slot = pool.corpses[i % pool.corpses.length];
+    const mesh = slot.model!.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh;
+    mesh.skeleton.computeBoneTexture();
+    const listener = vi.fn(); mesh.skeleton.boneTexture!.addEventListener('dispose', listener); disposed.push(listener);
+  }
+  pool.dispose();
+  expect(disposed.every(listener => listener.mock.calls.length === 1)).toBe(true);
 });

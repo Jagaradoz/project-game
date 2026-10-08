@@ -6,6 +6,7 @@ import type { EnemyKind, GameBody, GameConfig, ThreeModule } from '@/engine/type
 import type { Palette } from '@/engine/render/world/palette';
 import { laneToX } from '@/engine/core/state';
 import { TRAIL_Y } from '@/engine/render/world/ground';
+import { disposeSkeletons } from '@/engine/render/resources';
 
 export interface EnemySlot {
   group: T.Group; mixer: T.AnimationMixer | null; action: T.AnimationAction | null;
@@ -51,7 +52,11 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
   function loadKind(slot: EnemySlot, kind: EnemyKind) {
     if (slot.kind === kind) return;
     slot.mixer?.stopAllAction();
-    if (slot.model) { slot.mixer?.uncacheRoot(slot.model); slot.group.remove(slot.model); }
+    if (slot.model) {
+      slot.mixer?.uncacheRoot(slot.model);
+      disposeSkeletons(slot.model);
+      slot.group.remove(slot.model);
+    }
     const template = templates.get(kind), def = config.enemyTypes[kind];
     const model = template ? clone(template.scene) : new THREE.Mesh(fallbackGeo, materials.get(kind));
     const bounds = new THREE.Box3().setFromObject(model);
@@ -143,7 +148,10 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
       slot.group.visible = false; slot.id = undefined; slot.action?.stop(); slot.action = null; slot.current = '';
     }
   }, dispose() {
-    for (const slot of [...items, ...corpses]) { slot.mixer?.stopAllAction(); if (slot.model) slot.mixer?.uncacheRoot(slot.model); }
+    for (const slot of [...items, ...corpses]) {
+      slot.mixer?.stopAllAction();
+      if (slot.model) { slot.mixer?.uncacheRoot(slot.model); disposeSkeletons(slot.model); }
+    }
     for (const template of templates.values()) template.scene.traverse(o => {
       const mesh = o as T.Mesh; if (!mesh.isMesh) return; resources.add(mesh.geometry);
       for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {

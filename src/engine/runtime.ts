@@ -38,6 +38,7 @@ import { createExposureSampler } from '@/engine/pose/exposure';
 import { ema } from '@/engine/util/smooth';
 import { measureBody } from '@/engine/util/landmarks';
 import { createScene } from '@/engine/render/scene';
+import { createQualityMonitor } from '@/engine/render/quality';
 import { syncScene } from '@/engine/render/sync';
 import type { SceneRefs } from '@/engine/render/sync';
 import { BIOMES } from '@/engine/render/world/biomes';
@@ -54,17 +55,6 @@ import type {
   DeathReason,
   TrailHazard,
 } from '@/engine/types';
-
-/**
- * Auto quality. Pose inference and the 3D scene share one machine, and the
- * shadow pass is the cheapest thing to give back, so a device that cannot hold a
- * smooth frame loses shadow resolution before anything else. Sampled once, after
- * a warm-up long enough for shader compilation to settle.
- */
-const QUALITY_WARMUP_FRAMES = 40;
-const QUALITY_SAMPLE_FRAMES = 120;
-const QUALITY_MEDIUM_FPS = 45;
-const QUALITY_LOW_FPS = 26;
 
 /** Simulated tail during which the screenshot harness also syncs the view. */
 const SIM_SYNC_TAIL_MS = 1500;
@@ -257,8 +247,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let smoothedFps: number | null = null;
   let smoothedInferenceMs: number | null = null;
 
-  let qualityFrames = 0;
-  let qualityTotalMs = 0;
+  const qualityMonitor = createQualityMonitor();
 
   /**
    * Movement tallies. Counted here rather than in the detectors because they
@@ -404,8 +393,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     // still paints behind the dialog and remains available to tools/shot.mjs.
     const isPlaying = isPoseRunning || isCameraSkipped;
     const stepMs = isPlaying ? dtMs : 0;
+    sampleQuality(dtMs, !isPlaying || previewPaused || game.isOver || document.hidden);
     if (isPlaying && !previewPaused) {
-      sampleQuality(dtMs);
       game = updateGame(game, input.read(), dtMs, rules);
     }
 
@@ -419,19 +408,10 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     gameFrameId = requestAnimationFrame(gameFrame);
   }
 
-  function sampleQuality(dtMs: number): void {
-    if (qualityFrames > QUALITY_WARMUP_FRAMES + QUALITY_SAMPLE_FRAMES) return;
-
-    qualityFrames += 1;
-    if (qualityFrames <= QUALITY_WARMUP_FRAMES) return;
-
-    qualityTotalMs += dtMs;
-    if (qualityFrames <= QUALITY_WARMUP_FRAMES + QUALITY_SAMPLE_FRAMES) return;
-
-    const averageFps = 1000 / (qualityTotalMs / QUALITY_SAMPLE_FRAMES);
-    if (averageFps >= QUALITY_MEDIUM_FPS) return;
-
-    sceneRefs?.setQuality(averageFps < QUALITY_LOW_FPS ? 'low' : 'medium');
+  function sampleQuality(dtMs: number, suspended: boolean): void {
+    if (!sceneRefs) return;
+    const next = qualityMonitor.sample(dtMs, sceneRefs.quality, suspended);
+    if (next) sceneRefs.setQuality(next);
   }
 
   /* ------------------------------------------------------- pose loop ------ */
@@ -786,6 +766,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       cancelPoseFrame();
       stopCamera(stream);
       stream = null;
+      closePose();
       input.clearPose();
       lastVideoTime = -1;
       setStatus('Camera stopped.');
@@ -798,6 +779,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       cancelPoseFrame();
       stopCamera(stream);
       stream = null;
+      closePose();
       input.clearPose();
       isCameraSkipped = true;
       setError(null);

@@ -16,7 +16,8 @@ import type { CloudOptions } from '@/engine/render/world/clouds';
 import type { Palette } from '@/engine/render/world/palette';
 import { GOLDEN_FOREST } from '@/engine/render/world/palette';
 import { addSky } from '@/engine/render/world/sky';
-import { configureRenderer, addLighting, SHADOW_QUALITY } from '@/engine/render/world/lighting';
+import { configureRenderer, addLighting, SHADOW_QUALITY, QUALITY_PIXEL_RATIO } from '@/engine/render/world/lighting';
+import { collectResources } from '@/engine/render/resources';
 import { addGround, trailHalfWidth } from '@/engine/render/world/ground';
 import { addScatter } from '@/engine/render/world/scatter';
 import { addLandmarks } from '@/engine/render/world/landmarks';
@@ -110,17 +111,18 @@ export async function createScene(
    * sharing this device, so the game does not get the whole frame to itself.
    */
   function setQuality(level: ShadowQuality) {
+    if (level === quality) return;
     const mapSize = SHADOW_QUALITY[level] ?? SHADOW_QUALITY.high;
     const wantsShadows = mapSize > 0;
 
     renderer.shadowMap.enabled = wantsShadows;
     lighting.sun.castShadow = wantsShadows;
+    lighting.sun.shadow.map?.dispose();
+    lighting.sun.shadow.map = null;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY_PIXEL_RATIO[level]));
 
     if (wantsShadows) {
       lighting.sun.shadow.mapSize.set(mapSize, mapSize);
-      // The existing render target is the old size; drop it so it is rebuilt.
-      lighting.sun.shadow.map?.dispose();
-      lighting.sun.shadow.map = null;
     }
 
     renderer.shadowMap.needsUpdate = true;
@@ -168,23 +170,13 @@ export async function createScene(
     render,
     dispose() {
       cameraFeedback.dispose();
+      lighting.sun.shadow.dispose();
       enemyPool.dispose();
       bulletPool.dispose();
       scoreOrbs.popups.dispose();
       const resources = new Set<{ dispose(): void }>();
-      scene.traverse((object) => {
-        const mesh = object as THREE_NS.Mesh;
-        if (!mesh.isMesh) return;
-        if ((mesh as THREE_NS.InstancedMesh).isInstancedMesh) resources.add(mesh as THREE_NS.InstancedMesh);
-        resources.add(mesh.geometry);
-        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-          resources.add(material);
-          for (const value of Object.values(material)) {
-            if (value instanceof THREE.Texture) resources.add(value);
-          }
-        }
-        if (mesh.customDepthMaterial) resources.add(mesh.customDepthMaterial);
-      });
+      collectResources(scene, resources);
+      player.dispose();
       for (const resource of resources) resource.dispose();
       renderer.dispose();
     },
