@@ -9,7 +9,6 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { ArrowBigUp, Footprints, MoveHorizontal, Shield } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useGameRuntime } from '@/hooks/useGameRuntime';
@@ -19,14 +18,9 @@ import { useRunStore } from '@/lib/store/run';
 import { useSettings } from '@/lib/store/settings';
 import { CameraPermissionModal } from '@/components/game/CameraPermissionModal';
 import { CameraStage } from '@/components/game/CameraStage';
-import { DetectorDebugPanel } from '@/components/game/DetectorDebugPanel';
 import { GameHud } from '@/components/game/GameHud';
 import { GameOverOverlay } from '@/components/game/GameOverOverlay';
-import { ScenePickers } from '@/components/game/ScenePickers';
 import { Notice } from '@/components/ui/Notice';
-import { SHELL_WIDTH } from '@/components/layout/container';
-import { SiteFooter } from '@/components/layout/SiteFooter';
-import { SiteHeader } from '@/components/layout/SiteHeader';
 
 export default function GameCanvas() {
   const router = useRouter();
@@ -36,8 +30,7 @@ export default function GameCanvas() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
 
   const character = useSettings((state) => state.character);
-  const setCharacter = useSettings((state) => state.setCharacter);
-  // Validated on the way out of the store: persisted preferences are untrusted.
+  // Keep the optional local camera bypass on the startup dialog only.
   const showDebugTools = usePlayDebugTools();
 
   const setLastRun = useRunStore((state) => state.setLastRun);
@@ -128,145 +121,41 @@ export default function GameCanvas() {
   }, [restart, snapshot.isOver]);
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <SiteHeader hasCta={false} />
-
-      <main className={`mx-auto flex w-full ${SHELL_WIDTH.wide} flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6`}>
-        <div
-          id="gameStage"
-          ref={containerRef}
-          /*
-           * Portrait at every size. CONFIG.game.camera is framed for a tall
-           * viewport -- "far enough back that the outer lanes stay inside a
-           * narrow viewport" -- and the old lg:aspect-16/10 fought that framing.
-           *
-           * The ratio has to be driven by WIDTH, capped so the derived height
-           * still fits the viewport. Capping height instead (max-h) lets a short
-           * window squash the box back to landscape, which is the bug this
-           * screen started with.
-           */
-          className="relative mx-auto aspect-3/4 w-full max-w-[calc(80vh*3/4)] touch-manipulation overflow-hidden rounded-none border-2 border-ink bg-bg"
-        >
-          <canvas ref={gameCanvasRef} className="block h-full w-full" />
-
-          <GameHud snapshot={snapshot} />
-          <CameraStage
-            videoRef={videoRef}
-            overlayRef={overlayRef}
-            isCameraRunning={snapshot.isCameraRunning}
-            isCameraSkipped={snapshot.isCameraSkipped}
-          />
-          <GameOverOverlay
-            snapshot={snapshot}
-            onRestart={restart}
-            onSeeResult={seeResult}
-            isSubmitting={isSubmitting}
-          />
-        </div>
-
-        {showDebugTools && (
-          <>
-            <div className="mx-auto flex w-full max-w-[calc(80vh*3/4)] justify-center">
-              <button
-              type="button"
-              disabled={snapshot.isOver || !snapshot.isSceneReady}
-              onPointerDown={(event) => {
-                event.currentTarget.setPointerCapture(event.pointerId);
-                actions.setDevFire(true);
-              }}
-              onPointerUp={() => actions.setDevFire(false)}
-              onPointerCancel={() => actions.setDevFire(false)}
-              onLostPointerCapture={() => actions.setDevFire(false)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') actions.setDevFire(true);
-              }}
-              onKeyUp={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') actions.setDevFire(false);
-              }}
-              onBlur={() => actions.setDevFire(false)}
-              className="min-h-11 rounded-none border-2 border-ink bg-elevated px-6 text-sm font-semibold text-text touch-none select-none hover:border-primary active:bg-primary disabled:opacity-50"
-              >
-                Hold to fire · Space
-              </button>
-            </div>
-            <ScenePickers
-              character={character}
-              onCharacterChange={setCharacter}
-            />
-          </>
+    <main className="play-screen" aria-label="Exercise game">
+      <div id="gameStage" ref={containerRef} className="play-stage">
+        <canvas ref={gameCanvasRef} className="block h-full w-full" />
+        <GameHud snapshot={snapshot} />
+        <CameraStage
+          videoRef={videoRef}
+          overlayRef={overlayRef}
+          isCameraRunning={snapshot.isCameraRunning}
+          isCameraSkipped={snapshot.isCameraSkipped}
+        />
+        <GameOverOverlay
+          snapshot={snapshot}
+          onRestart={restart}
+          onSeeResult={seeResult}
+          isSubmitting={isSubmitting}
+        />
+        {(snapshot.error && snapshot.isCameraRunning || submitError) && (
+          <div className="absolute inset-x-3 top-24 z-30 flex max-h-[40%] flex-col gap-2 overflow-y-auto">
+            {snapshot.error && snapshot.isCameraRunning && (
+              <Notice tone="error">{snapshot.error}</Notice>
+            )}
+            {submitError && (
+              <Notice tone="error" title="Your result was not saved">{submitError}</Notice>
+            )}
+          </div>
         )}
-
-        <p className="m-0 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[13px] text-muted">
-          {snapshot.isCameraSkipped ? (
-            <>
-              <span>Camera-free dev mode</span>
-              <span>← / → or A / D to change lane</span>
-              <span>Hold Space or the fire button to attack</span>
-              <span>↑ / W / J to jump</span>
-              <span>Hold S or Shift to shield</span>
-            </>
-          ) : (
-            <>
-              <span className="flex items-center gap-1.5">
-                <MoveHorizontal aria-hidden size={15} />
-                Step or lean sideways to change lane
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Footprints aria-hidden size={15} />
-                Jog in place to attack
-              </span>
-              <span className="flex items-center gap-1.5">
-                <ArrowBigUp aria-hidden size={15} />
-                Raise both arms to jump
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Shield aria-hidden size={15} />
-                Hands on hips to shield from spores
-              </span>
-              <span className="text-subtle">Arrow keys also work</span>
-            </>
-          )}
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <button type="button" onClick={actions.jump} disabled={snapshot.isOver || !snapshot.isSceneReady}
-            className="border-2 border-ink bg-primary px-4 py-2 text-sm font-black text-ink disabled:opacity-40">
-            Jump · ↑ / W / J
-          </button>
-          {snapshot.isCameraRunning && <span className="text-xs text-muted" role="status">
-            {!snapshot.feetVisible || !snapshot.isJumpCalibrated ? 'Raise both arms to jump' : 'Raise both arms or hop to jump'}
-          </span>}
-        </div>
-
-        {snapshot.error && snapshot.isCameraRunning && (
-          <Notice tone="error">{snapshot.error}</Notice>
-        )}
-
-        {submitError && (
-          <Notice tone="error" title="Your result was not saved">
-            {submitError}
-          </Notice>
-        )}
-
-        {showDebugTools && (
-          <DetectorDebugPanel
-            snapshot={snapshot}
-            onStartCamera={actions.startCamera}
-            onStopCamera={actions.stopCamera}
-            onRecalibrate={actions.recalibrate}
-          />
-        )}
-
-        {!snapshot.isCameraRunning && !snapshot.isCameraSkipped && (
-          <CameraPermissionModal
-            error={snapshot.error}
-            status={snapshot.status}
-            onAllow={actions.startCamera}
-            onSkip={showDebugTools && process.env.NODE_ENV !== 'production' ? actions.skipCamera : undefined}
-          />
-        )}
-      </main>
-
-      <SiteFooter />
-    </div>
+      </div>
+      {!snapshot.isCameraRunning && !snapshot.isCameraSkipped && (
+        <CameraPermissionModal
+          error={snapshot.error}
+          status={snapshot.status}
+          onAllow={actions.startCamera}
+          onSkip={showDebugTools && process.env.NODE_ENV !== 'production' ? actions.skipCamera : undefined}
+        />
+      )}
+    </main>
   );
 }

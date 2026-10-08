@@ -231,6 +231,9 @@ export interface GameState {
   jumpCount: number;
   hitAtMs: number;
   justImpacts: KillMark[];
+  /** Successful projectile hits in the current chain, including non-lethal hits. */
+  comboHits: number;
+  lastEnemyHitMs: number;
   bossSpawned: boolean;
   bossDefeated: boolean;
   /** Kill count at which the next boss walks in. */

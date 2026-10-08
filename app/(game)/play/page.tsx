@@ -9,7 +9,6 @@
  * this page carries the directive and the boundary lives right here.
  */
 
-import { SHELL_WIDTH } from '@/components/layout/container';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { LoaderCircle } from 'lucide-react';
@@ -17,8 +16,8 @@ import { LoaderCircle } from 'lucide-react';
 const GameCanvas = dynamic(() => import('@/components/game/GameCanvas'), {
   ssr: false,
   loading: () => (
-    <main className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6`}>
-      <div className="mx-auto grid aspect-3/4 w-full max-w-[calc(80vh*3/4)] place-content-center justify-items-center gap-4 rounded-none border-2 border-ink bg-surface text-muted">
+    <main className="play-screen">
+      <div className="play-stage grid place-content-center justify-items-center gap-4 text-muted">
         <div className="relative size-10 overflow-hidden rounded-none ring-1 ring-white/10">
           <Image
             src="/icon.png"

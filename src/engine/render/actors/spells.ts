@@ -8,8 +8,8 @@
  * alternate white-hot and neon, so they glint the way the label gradients do.
  * Each magician casts in their own colour.
  *
- * Trail puffs and impact chips are InstancedMeshes; a ball is a small Group of
- * three meshes that share one geometry and one material per layer.
+ * Trail puffs and impact chips are InstancedMeshes; pooled balls share a sphere,
+ * matcap and radial sprite texture.
  */
 
 import type * as T from 'three';
@@ -35,7 +35,7 @@ const BALL_SEGMENTS = 20;
 const OUTLINE_SCALE = 1.2;
 const OUTLINE_COLOR = '#2a0d3d';
 const GLOW_SCALE = 2.3;
-const GLOW_OPACITY = 0.45;
+const GLOW_OPACITY = 0.78;
 const PULSE = 0.1;
 const PULSE_RATE = 0.018;
 
@@ -62,6 +62,7 @@ const FLASH_Z = -0.85;
 
 /** Every other trail puff and chip is lifted this far towards white. */
 const WHITE_MIX = 0.65;
+const HALO_SIZE = 64;
 
 export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameConfig) {
   const owned = new Set<{ dispose(): void }>();
@@ -74,10 +75,29 @@ export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameCon
   const matcap = own(createGlossyMatcap(THREE));
   const coreMaterial = own(new THREE.MeshMatcapMaterial({ matcap, toneMapped: false }));
   const outlineMaterial = own(new THREE.MeshBasicMaterial({ color: OUTLINE_COLOR, side: THREE.BackSide }));
+  const haloData = new Uint8Array(HALO_SIZE * HALO_SIZE * 4);
+  for (let y = 0; y < HALO_SIZE; y += 1) {
+    for (let x = 0; x < HALO_SIZE; x += 1) {
+      const radius = Math.hypot((x + 0.5 - HALO_SIZE / 2) / (HALO_SIZE / 2), (y + 0.5 - HALO_SIZE / 2) / (HALO_SIZE / 2));
+      const alpha = Math.pow(Math.max(0, 1 - radius), 2.4) * Math.min(1, Math.max(0, (1 - radius) * 5));
+      const offset = (y * HALO_SIZE + x) * 4;
+      haloData[offset] = 255;
+      haloData[offset + 1] = 255;
+      haloData[offset + 2] = 255;
+      haloData[offset + 3] = Math.round(alpha * 255);
+    }
+  }
+  const haloTexture = own(new THREE.DataTexture(haloData, HALO_SIZE, HALO_SIZE, THREE.RGBAFormat));
+  haloTexture.magFilter = THREE.LinearFilter;
+  haloTexture.minFilter = THREE.LinearFilter;
+  haloTexture.needsUpdate = true;
   const additive = (opacity: number) => own(new THREE.MeshBasicMaterial({
     transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
   }));
-  const glowMaterial = additive(GLOW_OPACITY);
+  const glowMaterial = own(new THREE.SpriteMaterial({
+    map: haloTexture, color: 0xffffff, transparent: true, opacity: GLOW_OPACITY,
+    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+  }));
   const sparkMaterial = additive(1);
 
   const puff = own(new THREE.IcosahedronGeometry(TRAIL_SIZE, 1));
@@ -88,7 +108,8 @@ export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameCon
     layer.frustumCulled = false;
     scene.add(layer);
   }
-  const flash = new THREE.Mesh(own(new THREE.SphereGeometry(FLASH_RADIUS, 12, 8)), glowMaterial);
+  const flash = new THREE.Sprite(glowMaterial);
+  flash.scale.setScalar(FLASH_RADIUS * 2);
   scene.add(flash);
 
   const items = Array.from({ length: config.bulletPoolSize }, () => {
@@ -96,8 +117,8 @@ export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameCon
     const core = new THREE.Mesh(sphere, coreMaterial);
     const outline = new THREE.Mesh(sphere, outlineMaterial);
     outline.scale.setScalar(OUTLINE_SCALE);
-    const glow = new THREE.Mesh(sphere, glowMaterial);
-    glow.scale.setScalar(GLOW_SCALE);
+    const glow = new THREE.Sprite(glowMaterial);
+    glow.scale.setScalar(BALL_RADIUS * 2 * GLOW_SCALE);
     mesh.add(outline, core, glow);
     mesh.visible = false;
     scene.add(mesh);
@@ -112,6 +133,7 @@ export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameCon
   const color = new THREE.Color();
   const hot = new THREE.Color();
   const white = new THREE.Color(1, 1, 1);
+  const instanceTint = new THREE.Color();
   let character = '';
   let nextChip = 0;
   let flashLife = 0;
@@ -139,7 +161,9 @@ export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameCon
       nextChip = (nextChip + 1) % CHIP_COUNT;
       chip.life = CHIP_LIFE_SEC;
       chip.position.set(x, y, z);
-      chip.velocity.set((Math.random() - 0.5) * CHIP_SPREAD, Math.random() * CHIP_LIFT, (Math.random() - 0.5) * CHIP_SPREAD);
+      const angle = (count / CHIPS_PER_IMPACT) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const speed = CHIP_SPREAD * (0.35 + Math.random() * 0.65);
+      chip.velocity.set(Math.cos(angle) * speed, 1.2 + Math.random() * CHIP_LIFT, Math.sin(angle) * speed);
     }
   }
 
@@ -169,7 +193,7 @@ export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameCon
     flashLife = Math.max(0, flashLife - dtSec);
     flash.visible = flashLife > 0;
     flash.position.set(laneToX(state.lane, config), TRAIL_Y + BALL_HEIGHT + state.jumpHeight, FLASH_Z);
-    flash.scale.setScalar(1 + flashLife * FLASH_GROWTH);
+    flash.scale.setScalar(FLASH_RADIUS * 2 * (1 + flashLife * FLASH_GROWTH));
 
     items.forEach((slot, index) => {
       const bullet = state.bullets[index];
@@ -181,12 +205,16 @@ export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameCon
       for (let step = 0; step < TRAIL_PER_BALL; step += 1) {
         const phase = state.elapsedMs * TRAIL_RATE + index + step;
         if (bullet) {
+          const flow = phase * 0.72;
           origin.set(
-            laneToX(bullet.lane, config) + Math.sin(phase) * TRAIL_WOBBLE,
-            TRAIL_Y + BALL_HEIGHT + Math.cos(phase) * TRAIL_WOBBLE,
+            laneToX(bullet.lane, config) + (Math.sin(flow) + Math.sin(flow * 1.9 + step) * 0.35) * TRAIL_WOBBLE,
+            TRAIL_Y + BALL_HEIGHT + (Math.cos(flow * 0.8) + Math.sin(flow * 1.4 + index) * 0.3) * TRAIL_WOBBLE,
             bullet.z + BALL_RADIUS * 1.5 + step * TRAIL_GAP,
           );
-          scale.setScalar((1 - step / TRAIL_PER_BALL) * TRAIL_SCALE * (1 + Math.sin(phase) * PULSE));
+          const fade = 1 - step / TRAIL_PER_BALL;
+          scale.setScalar(fade * TRAIL_SCALE * (0.78 + Math.sin(phase * 1.7) * 0.22));
+          const trailColor = step % 2 ? color : hot;
+          trails.setColorAt(index * TRAIL_PER_BALL + step, instanceTint.copy(trailColor).multiplyScalar(0.45 + fade * 0.75));
         } else {
           origin.set(0, 0, 0);
           scale.setScalar(0);
@@ -203,12 +231,16 @@ export function addSpellPool(THREE: ThreeModule, scene: T.Scene, config: GameCon
         chip.position.z += state.speed * dtSec;
         chip.velocity.y -= dtSec * CHIP_GRAVITY;
       }
-      scale.setScalar(chip.life * CHIP_SCALE);
+      const lifeRatio = chip.life / CHIP_LIFE_SEC;
+      scale.setScalar(chip.life ? (0.35 + lifeRatio * 0.65) * CHIP_SCALE : 0);
       matrix.compose(chip.position, quaternion, scale);
       sparks.setMatrixAt(index, matrix);
+      sparks.setColorAt(index, instanceTint.copy(index % 2 ? color : hot).multiplyScalar(0.35 + lifeRatio * 0.9));
     });
     trails.instanceMatrix.needsUpdate = true;
+    trails.instanceColor!.needsUpdate = true;
     sparks.instanceMatrix.needsUpdate = true;
+    sparks.instanceColor!.needsUpdate = true;
   }
 
   setCharacter(config.defaultCharacter);

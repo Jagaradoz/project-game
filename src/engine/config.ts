@@ -233,6 +233,8 @@ export const CONFIG = {
     bulletSpeed: 46,
     bulletRadius: 0.18,
     fireIntervalMs: 190,
+    /** The visible hit chain resets after this long without a landed shot. */
+    hitCombo: { timeoutMs: 5000 },
     bulletPoolSize: 40,
 
     spawnIntervalMs: 1600,

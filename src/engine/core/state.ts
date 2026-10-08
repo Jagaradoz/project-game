@@ -49,7 +49,8 @@ export function createGameState(seed = 1, config: RunConfig = CONFIG.game): Game
     nextId: 1, obstacles: [], nextObstacleMs: config.obstacle.firstMs,
     spores: [], nextSporeMs: config.spore.firstMs, nextSporeTickMs: 0, isInSpore: false, isShielding: false,
     jumpStartedMs: null, lastTakeoffMs: null, jumpHeight: 0, jumpHeld: false, jumpCount: 0,
-    hitAtMs: -Infinity, justImpacts: [], bossSpawned: false, bossDefeated: false, nextBossKills: firstBossKills(config),
+    hitAtMs: -Infinity, justImpacts: [], comboHits: 0, lastEnemyHitMs: -Infinity,
+    bossSpawned: false, bossDefeated: false, nextBossKills: firstBossKills(config),
     lane: centreLane(config),
     hp: config.maxHp,
     score: 0,
@@ -152,6 +153,7 @@ export function updateGame(
   const movedBullets = state.bullets.map((bullet) => advance(bullet, -config.bulletSpeed * stepSec));
 
   const shots = resolveShots(movedBullets, movedEnemies, config, elapsedMs);
+  const liveHitCombo = elapsedMs - state.lastEnemyHitMs < config.hitCombo.timeoutMs ? state.comboHits : 0;
 
   const obstacles = crossed.obstacles;
   const bossDefeated = state.bossDefeated || shots.killed.some(e => e.kind === 'boss');
@@ -266,6 +268,8 @@ export function updateGame(
     justFired: fired.didFire,
     justKilled: shots.killed,
     killCount,
+    comboHits: liveHitCombo + shots.impacts.length,
+    lastEnemyHitMs: shots.impacts.length > 0 ? elapsedMs : state.lastEnemyHitMs,
     isCleared,
     // Clearing the goal ends the run just as surely as running out of HP --
     // one is a win and one is a loss, and /result tells them apart by isCleared.

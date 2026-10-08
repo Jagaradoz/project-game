@@ -1,4 +1,5 @@
 import { Heart, Shield } from 'lucide-react';
+import { useState, type CSSProperties } from 'react';
 import type { HudSnapshot } from '@/engine/runtime';
 import { useCountUp } from '@/hooks/useCountUp';
 import { formatNumber } from '@/lib/format';
@@ -6,6 +7,16 @@ import { formatNumber } from '@/lib/format';
 interface GameHudProps {
   snapshot: HudSnapshot;
 }
+
+/** Each five-hit milestone moves to the next vivid colour family. */
+const HIT_PALETTES = [
+  ['#fff36a', '#ff941f'],
+  ['#8dff8a', '#18eaca'],
+  ['#86f4ff', '#369dff'],
+  ['#ffb1f7', '#fa47c7'],
+  ['#d6b4ff', '#a36cff'],
+  ['#ffd59a', '#ff654d'],
+] as const;
 
 /**
  * Score, distance, health and stage progress, over the canvas.
@@ -46,6 +57,8 @@ export function GameHud({ snapshot }: GameHudProps) {
         <BossBar snapshot={snapshot} />
       </div>
 
+      <ComboHit hits={snapshot.comboHits} />
+
       <div className="pointer-events-none absolute bottom-3 left-3 z-[1]">
         <div className="border-2 border-surface bg-ink px-3 py-2 shadow-[4px_4px_0_0_var(--color-primary)]">
           <div className="flex flex-col gap-0.5 font-semibold tabular-nums text-white">
@@ -64,6 +77,37 @@ export function GameHud({ snapshot }: GameHudProps) {
         </div>
       </div>
     </>
+  );
+}
+
+function ComboHit({ hits }: { hits: number }) {
+  // Retain the last positive number while the wrapper fades out. The wrapper
+  // stays mounted so a new hit smoothly reverses an interrupted fade.
+  const [lastHits, setLastHits] = useState(hits);
+  if (hits > 0 && hits !== lastHits) setLastHits(hits);
+  const shownHits = hits > 0 ? hits : lastHits;
+  const palette = HIT_PALETTES[Math.floor(shownHits / 5) % HIT_PALETTES.length]!;
+  const milestone = shownHits > 0 && shownHits % 5 === 0;
+  const style = {
+    '--combo-light': palette[0],
+    '--combo-color': palette[1],
+  } as CSSProperties;
+
+  return (
+    <div
+      className="combo-hit pointer-events-none absolute top-[32%] left-[5%] z-[1]"
+      style={style}
+      aria-label={`Combo Hit: ${shownHits} successful hits`}
+      aria-hidden={hits === 0}
+      data-active={hits > 0}
+      data-combo-hits={hits}
+    >
+      {shownHits > 0 && <div key={shownHits} className={`combo-hit-pulse ${milestone ? 'combo-hit-milestone' : ''}`}>
+        <span className="combo-hit-label">Combo Hit</span>
+        <span className="combo-hit-number">{shownHits}</span>
+        {milestone && <span aria-hidden className="combo-hit-spark">✦</span>}
+      </div>}
+    </div>
   );
 }
 

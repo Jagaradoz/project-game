@@ -37,6 +37,7 @@ function getAllowedDevOrigins(): string[] {
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  devIndicators: false,
   allowedDevOrigins: getAllowedDevOrigins(),
   async redirects() {
     return [{ source: '/how-to-play', destination: '/#how-to-play', permanent: true }];

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { createGameState, updateGame } from '@/engine/core/state';
+import { createGameState, restartGame, updateGame } from '@/engine/core/state';
 import { CONFIG } from '@/engine/config';
 import { createInput } from '@/engine/core/input';
 import type { GameState } from '@/engine/types';
@@ -17,6 +17,71 @@ test('a tank survives a projectile and reports a hit instead of a kill', () => {
   expect(next.killCount).toBe(0);
   expect(next.bullets).toHaveLength(0);
   expect(next.justImpacts).toHaveLength(1);
+  expect(next.comboHits).toBe(1);
+});
+
+test('hit counter counts all landed shots, persists between hits and resets for a new run', () => {
+  const state = { ...createGameState(3), comboHits: 4, lastEnemyHitMs: 0,
+    enemies: [
+      { id: 1, kind: 'tank' as const, hp: 5, lane: 0, z: -10, previousZ: -10 },
+      { id: 2, kind: 'weak' as const, hp: 1, lane: 1, z: -10, previousZ: -10 },
+    ],
+    bullets: [0, 1, 2].map(lane => ({ lane, z: -9, previousZ: -9 })),
+  };
+  const hit = updateGame(state, idle, 50);
+  expect(hit.comboHits).toBe(6);
+  expect(hit.killCount).toBe(1);
+  expect(hit.bullets).toHaveLength(1);
+  const next = updateGame(hit, idle, 50);
+  expect(next.justImpacts).toHaveLength(0);
+  expect(next.comboHits).toBe(6);
+  expect(restartGame(next).comboHits).toBe(0);
+});
+
+test('hit counter retains a live chain after damage and the final kill', () => {
+  const state = { ...createGameState(3), comboHits: 19, lastEnemyHitMs: 0,
+    enemies: [{ id: 1, kind: 'weak' as const, hp: 1, lane: 1, z: -10, previousZ: -10 }],
+    bullets: [{ lane: 1, z: -9, previousZ: -9 }],
+  };
+  const cleared = updateGame(state, idle, 50, { ...CONFIG.game, goalKills: 1 });
+  expect(cleared.isOver).toBe(true);
+  expect(cleared.comboHits).toBe(20);
+  expect(updateGame(cleared, idle, 50).comboHits).toBe(20);
+  const damaged = updateGame({ ...createGameState(), comboHits: 20, lastEnemyHitMs: 0,
+    enemies: [{ lane: 1, z: 0, previousZ: 0 }],
+  }, idle, 50);
+  expect(damaged.hp).toBeLessThan(CONFIG.game.maxHp);
+  expect(damaged.comboHits).toBe(20);
+});
+
+test('hit combo expires at five seconds without a hit, and a hit on expiry starts a new chain', () => {
+  const state = { ...createGameState(), comboHits: 9, lastEnemyHitMs: 0,
+    elapsedMs: CONFIG.game.hitCombo.timeoutMs - 50,
+    nextSpawnMs: Infinity, nextObstacleMs: Infinity, nextSporeMs: Infinity,
+  };
+  expect(updateGame(state, idle, 49).comboHits).toBe(9);
+  expect(updateGame(state, idle, 50).comboHits).toBe(0);
+  const hit = updateGame({ ...state,
+    enemies: [{ kind: 'tank' as const, hp: 5, lane: 1, z: -10, previousZ: -10 }],
+    bullets: [{ lane: 1, z: -9, previousZ: -9 }],
+  }, idle, 50);
+  expect(hit.comboHits).toBe(1);
+  expect(hit.lastEnemyHitMs).toBe(CONFIG.game.hitCombo.timeoutMs);
+});
+
+test('every successful hit refreshes the combo timeout; missed shots do not', () => {
+  const state = { ...createGameState(), comboHits: 4, lastEnemyHitMs: 0, elapsedMs: 4900,
+    nextSpawnMs: Infinity, nextObstacleMs: Infinity, nextSporeMs: Infinity,
+    enemies: [{ kind: 'tank' as const, hp: 5, lane: 1, z: -10, previousZ: -10 }],
+    bullets: [{ lane: 1, z: -9, previousZ: -9 }],
+  };
+  const hit = updateGame(state, idle, 50);
+  expect(hit.comboHits).toBe(5);
+  expect(hit.lastEnemyHitMs).toBe(4950);
+  const miss = updateGame({ ...hit, enemies: [], bullets: [{ lane: 0, z: -9, previousZ: -9 }] }, idle, 50);
+  expect(miss.lastEnemyHitMs).toBe(4950);
+  expect(miss.comboHits).toBe(5);
+  expect(updateGame({ ...miss, elapsedMs: 9900 }, idle, 50).comboHits).toBe(0);
 });
 
 test('jump clears a road log while grounded contact costs one health', () => {

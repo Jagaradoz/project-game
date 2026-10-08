@@ -177,3 +177,95 @@ h3 {
   35% { transform: scale(1.35); }
   100% { transform: scale(1); }
 }
+
+/* The play route uses the full browser height, including on mobile. */
+.play-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--color-ink);
+}
+
+.play-stage {
+  position: relative;
+  width: min(100%, 75dvh);
+  height: 100%;
+  overflow: hidden;
+  touch-action: manipulation;
+  background: var(--color-bg);
+}
+
+/* Chunky outlined lettering stays readable over the sky and forest. */
+.combo-hit {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 220ms ease-out, visibility 0s linear 220ms;
+  font-family: var(--font-score-popup), Impact, sans-serif;
+  line-height: 1;
+  color: var(--combo-light);
+  filter: drop-shadow(0 3px 0 #271234) drop-shadow(0 0 9px var(--combo-color));
+}
+
+.combo-hit[data-active="true"] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 180ms ease-out, visibility 0s;
+}
+
+.combo-hit-pulse {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transform: rotate(-5deg);
+  transform-origin: left center;
+  animation: combo-hit-bump 240ms ease-out;
+}
+
+.combo-hit-label {
+  font-size: clamp(15px, 2.5dvh, 25px);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  -webkit-text-stroke: 1px #271234;
+  paint-order: stroke fill;
+}
+
+.combo-hit-number {
+  padding-right: 0.1em;
+  font-size: clamp(48px, 8dvh, 80px);
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #ffffff 0%, var(--combo-light) 35%, var(--combo-color) 100%);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 3px #271234;
+  paint-order: stroke fill;
+}
+
+.combo-hit-milestone {
+  animation: combo-hit-milestone 420ms ease-out;
+}
+
+.combo-hit-spark {
+  position: absolute;
+  top: 22%;
+  left: 100%;
+  font-size: 26px;
+  -webkit-text-stroke: 1px #271234;
+  paint-order: stroke fill;
+}
+
+@keyframes combo-hit-bump {
+  0% { transform: rotate(-5deg) scale(1); }
+  35% { transform: rotate(-7deg) scale(1.12); }
+  100% { transform: rotate(-5deg) scale(1); }
+}
+
+@keyframes combo-hit-milestone {
+  0% { transform: rotate(-5deg) scale(0.9); }
+  35% { transform: rotate(-9deg) scale(1.23); }
+  65% { transform: rotate(-3deg) scale(0.98); }
+  100% { transform: rotate(-5deg) scale(1); }
+}

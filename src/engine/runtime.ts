@@ -113,6 +113,8 @@ export interface HudSnapshot {
   bossMaxHp: number;
   bossDefeated: boolean;
   score: number;
+  /** Successful hits in the current chain, independent of the score combo. */
+  comboHits: number;
   /** What the next kill would be multiplied by; 1 when no combo is running. */
   comboMultiplier: number;
   hp: number;
@@ -173,6 +175,7 @@ export interface HudSnapshot {
  */
 const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
   'score',
+  'comboHits',
   'comboMultiplier',
   'hp',
   'isShielding',
@@ -294,6 +297,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       (near, o) => !near || o.z > near.z ? o : near, null);
     return {
       score: game.score,
+      comboHits: game.comboHits,
       comboMultiplier: activeMultiplier(game, game.elapsedMs, rules),
       jumpCount: jump.jumpCount,
       armRaiseCount: armsUp.raiseCount,
@@ -676,6 +680,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           bossDefeated: game.bossDefeated,
           hp: game.hp,
           score: game.score,
+          comboHits: game.comboHits,
           calls: info?.calls ?? null,
           tris: info?.triangles ?? null,
           quality: sceneRefs?.quality ?? null,
