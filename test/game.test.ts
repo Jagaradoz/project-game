@@ -365,7 +365,7 @@ test('game: enemies keep to their spawn lane for their whole life', () => {
   assert.ok(seen.size > 0, 'no enemies were spawned');
 });
 
-test('game: no spawn row ever seals off every lane', () => {
+test('game: spawn rows use distinct lanes and respect the configured width', () => {
   let previousCount = 0;
 
   runGame(createGameState(99), 3600, (_, state) => {
@@ -374,9 +374,7 @@ test('game: no spawn row ever seals off every lane', () => {
       spawnedNow.length <= GAME.maxLanesPerRow,
       `row of ${spawnedNow.length} lanes at the spawn line`,
     );
-    if (spawnedNow.length === 2) {
-      assert.notEqual(spawnedNow[0].lane, spawnedNow[1].lane);
-    }
+    assert.equal(new Set(spawnedNow.map(enemy => enemy.lane)).size, spawnedNow.length);
     previousCount = state.enemies.length;
     return WALKING;
   });
@@ -390,6 +388,120 @@ test('game: walking speed stays constant for the whole run', () => {
 
   assert.ok(Math.abs(early.speed - GAME.walkSpeed) < 1e-6, `early speed was ${early.speed}`);
   assert.ok(Math.abs(late.speed - GAME.walkSpeed) < 1e-6, `late speed was ${late.speed}`);
+});
+
+/* -------------------------------------------- timed enemy spawn stages ---- */
+
+const SPAWNING_CONFIG = {
+  ...GAME,
+  obstacle: { ...GAME.obstacle, firstMs: Infinity },
+  spore: { ...GAME.spore, firstMs: Infinity },
+};
+const SPAWN_STAGE_MS = (GAME.rampDistance / GAME.walkSpeed) * 1000 / 4;
+
+test('game: five timed stages hold their spawn rates until the next boundary', () => {
+  const intervals = [1400, 1200, 1000, 800, 600];
+  for (let stage = 0; stage < intervals.length; stage += 1) {
+    for (const elapsedMs of [stage * SPAWN_STAGE_MS, (stage + 1) * SPAWN_STAGE_MS - 1]) {
+      const next = updateGame(
+        { ...createGameState(1, SPAWNING_CONFIG), elapsedMs, nextSpawnMs: 0 },
+        WALKING, 0, SPAWNING_CONFIG,
+      );
+      assert.equal(next.nextSpawnMs - elapsedMs, intervals[stage]);
+      assert.ok(next.enemies.length >= 1 && next.enemies.length <= GAME.maxLanesPerRow);
+    }
+  }
+});
+
+test('game: spawn stages follow elapsed time, ignore distance, and cap at stage 5', () => {
+  for (const distance of [0, GAME.rampDistance * 10]) {
+    for (const [elapsedMs, interval] of [[0, GAME.spawnIntervalMs], [600_000, GAME.minSpawnIntervalMs]]) {
+      const next = updateGame(
+        { ...createGameState(1, SPAWNING_CONFIG), distance, elapsedMs, nextSpawnMs: 0 },
+        WALKING, 0, SPAWNING_CONFIG,
+      );
+      assert.equal(next.nextSpawnMs - elapsedMs, interval);
+    }
+  }
+});
+
+test('game: each successive stage spawns more enemies over the same time window', () => {
+  const totals: number[] = [];
+  for (let stage = 0; stage < 5; stage += 1) {
+    let total = 0;
+    let rows = 0;
+    let triples = 0;
+    for (let seed = 1; seed <= 16; seed += 1) {
+      const elapsedMs = stage * SPAWN_STAGE_MS + 1;
+      let state = {
+        ...createGameState(seed, SPAWNING_CONFIG), elapsedMs, nextSpawnMs: elapsedMs,
+        speed: GAME.walkSpeed, invulnUntilMs: Infinity,
+      };
+      for (let frame = 0; frame < 400; frame += 1) {
+        const previousId = state.nextId;
+        state = updateGame(state, WALKING, 50, SPAWNING_CONFIG);
+        const row = state.enemies.filter(enemy => enemy.id !== undefined && enemy.id >= previousId);
+        assert.ok(row.length <= GAME.maxLanesPerRow);
+        assert.equal(new Set(row.map(enemy => enemy.lane)).size, row.length);
+        assert.ok(state.enemies.length <= GAME.enemyPoolSize);
+        if (row.length > 0) {
+          rows += 1;
+          triples += Number(row.length === 3);
+          if (stage < 3) assert.ok(row.length <= 2);
+          else assert.ok(row.length >= 2);
+        }
+      }
+      total += state.nextId - 1;
+    }
+    totals.push(total);
+    if (stage > 0) assert.ok(totals[stage] > totals[stage - 1], `spawn totals: ${totals}`);
+    if (stage === 3) assert.ok(triples / rows >= .7 && triples / rows <= .9, `stage 4 triple rows: ${triples}/${rows}`);
+    if (stage === 4) assert.ok(triples / rows >= .9, `stage 5 triple rows: ${triples}/${rows}`);
+  }
+});
+
+test('game: late-stage waves still obey a lower configured lane limit', () => {
+  for (const maxLanesPerRow of [1, 2, 3]) {
+    const config = { ...SPAWNING_CONFIG, maxLanesPerRow };
+    const next = updateGame(
+      { ...createGameState(1, config), elapsedMs: 600_000, nextSpawnMs: 0 },
+      WALKING, 0, config,
+    );
+    assert.equal(next.enemies.length, maxLanesPerRow);
+    assert.equal(new Set(next.enemies.map(enemy => enemy.lane)).size, maxLanesPerRow);
+  }
+});
+
+test('game: full waves wait for pool capacity and reserve one slot for a boss', () => {
+  for (const availableSlots of [0, 2, 3]) {
+    const count = GAME.enemyPoolSize - availableSlots - 1;
+    const enemies = Array.from({ length: count }, (_, index) => ({
+      id: index + 1, lane: index % GAME.laneCount, z: -40, previousZ: -40,
+    }));
+    const state = {
+      ...createGameState(1, SPAWNING_CONFIG), enemies, nextId: count + 1,
+      elapsedMs: 600_000, nextSpawnMs: 0,
+    };
+    const next = updateGame(state, WALKING, 0, SPAWNING_CONFIG);
+    if (availableSlots === 3) {
+      assert.equal(next.enemies.length, GAME.enemyPoolSize - 1);
+      assert.equal(next.nextId, state.nextId + 3);
+    } else {
+      assert.equal(next.enemies.length, count);
+      assert.equal(next.nextId, state.nextId);
+      assert.equal(next.seed, state.seed);
+      assert.equal(next.nextSpawnMs, state.nextSpawnMs);
+    }
+  }
+});
+
+test('game: restarting after stage 5 returns spawning to stage 1', () => {
+  const fresh = restartGame({ ...createGameState(1, SPAWNING_CONFIG), elapsedMs: 600_000 }, SPAWNING_CONFIG);
+  assert.equal(fresh.elapsedMs, 0);
+  assert.equal(fresh.nextSpawnMs, GAME.spawnIntervalMs);
+  const next = updateGame({ ...fresh, nextSpawnMs: 0 }, WALKING, 0, SPAWNING_CONFIG);
+  assert.equal(next.nextSpawnMs, GAME.spawnIntervalMs);
+  assert.equal(next.enemies.length, 1);
 });
 
 test('game: the gun holds fire while the player is in the air', () => {

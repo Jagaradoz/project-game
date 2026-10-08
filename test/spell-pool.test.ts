@@ -72,7 +72,7 @@ test('pooled balls reuse their slots and dispose the shared halo and instanced e
   expect(pool.items).toHaveLength(ballCount);
   expect(pool.items[0]!.mesh).toBe(firstMesh);
   expect(textureDisposed).toBe(true);
-  expect(layersDisposed).toBe(2);
+  expect(layersDisposed).toBe(4);
 });
 
 test('reset hides every ball', () => {
@@ -81,5 +81,77 @@ test('reset hides every ball', () => {
   pool.reset();
 
   expect(pool.items.every((slot) => !slot.mesh.visible)).toBe(true);
+  pool.dispose();
+});
+
+test('comet tails grow behind shots, stop at the muzzle and reach a longer full length', () => {
+  const scene = new THREE.Scene();
+  const pool = addSpellPool(THREE, scene, CONFIG.game);
+  const ribbons = scene.getObjectByName('spell-comet-trails') as THREE.InstancedMesh;
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3(), scale = new THREE.Vector3(), rotation = new THREE.Quaternion();
+  const muzzleZ = CONFIG.game.playerZ - CONFIG.game.playerRadius;
+
+  for (const z of [muzzleZ, muzzleZ - 0.4, muzzleZ - 20]) {
+    pool.sync({ ...firing(), bullets: [{ lane: 0, z, previousZ: z }] }, 0, 'mage');
+    ribbons.getMatrixAt(0, matrix);
+    matrix.decompose(position, rotation, scale);
+    expect(position.z).toBeCloseTo(z);
+    expect(position.z + scale.z).toBeLessThanOrEqual(muzzleZ + 0.00001);
+    expect(scale.z).toBeCloseTo(Math.min(6.8, muzzleZ - z));
+  }
+  expect(scale.z).toBeGreaterThan(6);
+  pool.dispose();
+});
+
+test('removing a shot clears its comet and embers even when another shot reuses its slot', () => {
+  const scene = new THREE.Scene();
+  const pool = addSpellPool(THREE, scene, CONFIG.game);
+  const matrix = new THREE.Matrix4();
+  const state = { ...firing(), bullets: [
+    { lane: 0, z: -20, previousZ: -19 }, { lane: 2, z: -10, previousZ: -9 },
+  ] };
+  pool.sync(state, 0, 'druid');
+  pool.sync({ ...state, bullets: [state.bullets[1]!] }, 0, 'druid');
+  const ribbons = scene.getObjectByName('spell-comet-trails') as THREE.InstancedMesh;
+  ribbons.getMatrixAt(0, matrix);
+  expect(matrix.elements[12]).toBeCloseTo(CONFIG.game.laneWidth);
+  ribbons.getMatrixAt(1, matrix);
+  expect(matrix.elements[0]).toBe(0);
+  expect(matrix.elements[10]).toBe(0);
+  pool.sync({ ...state, bullets: [] }, 0, 'druid');
+  for (const name of ['spell-comet-trails', 'spell-embers']) {
+    const layer = scene.getObjectByName(name) as THREE.InstancedMesh;
+    for (let index = 0; index < layer.count; index += 1) {
+      layer.getMatrixAt(index, matrix);
+      expect(matrix.elements[0]).toBe(0);
+      expect(matrix.elements[10]).toBe(0);
+    }
+  }
+  pool.dispose();
+});
+
+test('impact rings expand, fade and reset without replaying an impact event', () => {
+  const scene = new THREE.Scene();
+  const pool = addSpellPool(THREE, scene, CONFIG.game);
+  const rings = scene.getObjectByName('spell-impact-rings') as THREE.InstancedMesh;
+  const matrix = new THREE.Matrix4(), tint = new THREE.Color();
+  const state = { ...createGameState(), elapsedMs: 100, justImpacts: [{ lane: 1, z: -8 }] };
+  pool.sync(state, 0, 'witch');
+  rings.getMatrixAt(0, matrix);
+  const initialSize = new THREE.Vector3().setFromMatrixScale(matrix).x;
+  rings.getColorAt(0, tint);
+  const initialBrightness = tint.r;
+  pool.sync(state, 0.15, 'witch');
+  rings.getMatrixAt(0, matrix);
+  expect(new THREE.Vector3().setFromMatrixScale(matrix).x).toBeGreaterThan(initialSize);
+  rings.getColorAt(0, tint);
+  expect(tint.r).toBeLessThan(initialBrightness);
+  rings.getMatrixAt(1, matrix);
+  expect(new THREE.Vector3().setFromMatrixScale(matrix).length()).toBe(0);
+  pool.reset();
+  pool.sync({ ...state, justImpacts: [] }, 0, 'witch');
+  rings.getMatrixAt(0, matrix);
+  expect(new THREE.Vector3().setFromMatrixScale(matrix).length()).toBe(0);
   pool.dispose();
 });

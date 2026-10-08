@@ -3,6 +3,7 @@ import { useState, type CSSProperties } from 'react';
 import type { HudSnapshot } from '@/engine/runtime';
 import { useCountUp } from '@/hooks/useCountUp';
 import { formatNumber } from '@/lib/format';
+import pkg from '../../../package.json';
 
 interface GameHudProps {
   snapshot: HudSnapshot;
@@ -28,7 +29,13 @@ export function GameHud({ snapshot }: GameHudProps) {
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-[1] flex flex-col items-center gap-2">
+      <p
+        className="pointer-events-none absolute top-3 right-3 z-[1] m-0 bg-ink/85 px-2 py-1 font-mono text-[10px] leading-none text-white/80 tabular-nums"
+        aria-label={`Development version ${pkg.version}`}
+      >
+        v{pkg.version}
+      </p>
+      <div className="pointer-events-none absolute inset-x-3 top-10 z-[1] flex flex-col items-center gap-2">
         <GoalBar snapshot={snapshot} />
         <div
           key={snapshot.hp}

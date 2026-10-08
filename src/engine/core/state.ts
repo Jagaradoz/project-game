@@ -121,7 +121,7 @@ export function updateGame(
   const stepSec = stepMs / 1000;
   const elapsedMs = state.elapsedMs + stepMs;
 
-  const progress = rampProgress(state.distance, config);
+  const progress = spawnProgress(elapsedMs, config);
   // The walk is constant for the whole run; only the start eases up from a standstill.
   const speed = rampTo(state.speed, config.walkSpeed, stepMs, config.speedLerpMs);
   const distance = state.distance + speed * stepSec;
@@ -298,9 +298,13 @@ function advance(body: GameBody, deltaZ: number): GameBody {
   return { ...body, previousZ: body.z, z: body.z + deltaZ };
 }
 
-/** 0 at the start of a run, 1 once the hardest spawn rate is reached. */
-function rampProgress(distance: number, config: RunConfig): number {
-  return Math.min(1, Math.max(0, distance / config.rampDistance));
+/** Five timed spawn stages, from the normal rate (1) to the highest rate (5). */
+function spawnProgress(elapsedMs: number, config: RunConfig): number {
+  // Keep the existing ramp's duration at walking speed, with four transitions.
+  const stageDurationMs = (config.rampDistance / config.walkSpeed) * 1000 / 4;
+  let stageIndex = 0;
+  while (stageIndex < 4 && elapsedMs >= (stageIndex + 1) * stageDurationMs) stageIndex += 1;
+  return stageIndex / 4;
 }
 
 function spawnIntervalAt(progress: number, config: RunConfig): number {
@@ -402,9 +406,12 @@ function spawnDue(
   { elapsedMs, nextSpawnMs, progress, nextId }: { elapsedMs: number; nextSpawnMs: number; progress: number; nextId: number },
   config: RunConfig,
 ): { enemies: GameBody[]; seed: number; nextSpawnMs: number; nextId: number } {
-  if (elapsedMs < nextSpawnMs || enemies.length >= config.enemyPoolSize - 2) return { enemies, seed, nextSpawnMs, nextId };
+  // Keep one slot for a boss, and wait for enough room to spawn the whole row.
+  const availableSlots = config.enemyPoolSize - enemies.length - 1;
+  if (elapsedMs < nextSpawnMs || availableSlots <= 0) return { enemies, seed, nextSpawnMs, nextId };
 
   const row = pickRow(seed, progress, config);
+  if (row.lanes.length > availableSlots) return { enemies, seed, nextSpawnMs, nextId };
   let liveSeed = row.seed;
   const spawnedEnemies = row.lanes.map((lane) => {
     const roll = random(liveSeed); liveSeed = roll.seed;
@@ -420,7 +427,7 @@ function spawnDue(
   };
 }
 
-/** One or two distinct lanes, never enough to seal the road off. */
+/** Early stages use one or two lanes; stages 4–5 mostly fill all three. */
 function pickRow(
   seed: number,
   progress: number,
@@ -430,8 +437,15 @@ function pickRow(
   const firstLane = Math.min(config.laneCount - 1, Math.floor(first.value * config.laneCount));
 
   const roll = random(first.seed);
+  const tripleChance = progress >= 1 ? config.tripleSpawnChance.stage5
+    : progress >= .75 ? config.tripleSpawnChance.stage4 : 0;
+  if (config.maxLanesPerRow >= 3 && config.laneCount >= 3 && roll.value < tripleChance) {
+    const others = laneIndices(config).filter(lane => lane !== firstLane);
+    return { lanes: [firstLane, ...others.slice(0, 2)], seed: roll.seed };
+  }
   const wantsSecond =
-    config.maxLanesPerRow >= 2 && roll.value < config.doubleSpawnChance * progress;
+    config.maxLanesPerRow >= 2 && config.laneCount >= 2 &&
+    (progress >= .75 || roll.value < config.doubleSpawnChance * progress);
   if (!wantsSecond) return { lanes: [firstLane], seed: roll.seed };
 
   const others = laneIndices(config).filter((lane) => lane !== firstLane);

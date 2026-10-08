@@ -237,13 +237,14 @@ export const CONFIG = {
     hitCombo: { timeoutMs: 5000 },
     bulletPoolSize: 40,
 
-    spawnIntervalMs: 1600,
-    minSpawnIntervalMs: 850,
+    spawnIntervalMs: 1400,
+    minSpawnIntervalMs: 600,
     /** Odds a spawn row gets a second enemy, once the ramp is under way. */
-    doubleSpawnChance: 0.2,
-    /** Never fill a row: one lane must always be survivable. */
-    maxLanesPerRow: 2,
-    /** Distance travelled before the spawn rate reaches its hardest value. Speed stays constant. */
+    doubleSpawnChance: 0.9,
+    /** Late stages mostly fill all three lanes; other late rows fill two. */
+    tripleSpawnChance: { stage4: 0.8, stage5: 0.95 },
+    maxLanesPerRow: 3,
+    /** Sets the five-stage spawn ramp's duration at walkSpeed. Speed stays constant. */
     rampDistance: 1400,
 
     maxHp: 3,
@@ -253,7 +254,7 @@ export const CONFIG = {
     maxFrameMs: 50,
 
     /** Enough meshes for the worst case; the pool is never grown at runtime. */
-    enemyPoolSize: 24,
+    enemyPoolSize: 42,
 
     jump: {
       durationMs: 800, height: 2.4,
