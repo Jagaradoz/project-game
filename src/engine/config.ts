@@ -319,7 +319,7 @@ export const CONFIG = {
     scoreOrbs: {
       perKill: { weak: 3, normal: 4, tank: 6, boss: 14 },
       maxOrbs: 96,
-      spacing: 0.8,
+      spacing: 1.4,
       magnetReach: 5,
     },
     /**

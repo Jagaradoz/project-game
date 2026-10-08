@@ -64,7 +64,8 @@ test('ground orbs sit where the reducer put them and settle onto the trail', () 
 
   const { position, scale } = positionAt(refs.mesh, 0);
   expect(position.z).toBe(-35);
-  expect(Math.abs(position.x - CONFIG.game.laneWidth)).toBeLessThan(CONFIG.game.laneWidth / 2);
+  // Scattered freely around the kill point, regardless of lane edges.
+  expect(Math.abs(position.x - CONFIG.game.laneWidth)).toBeLessThanOrEqual(3.5);
   expect(position.y).toBeGreaterThan(0);
   expect(position.y).toBeLessThan(1);
   expect(scale).toBeGreaterThan(0.5);

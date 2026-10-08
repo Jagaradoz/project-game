@@ -6,8 +6,10 @@
  * a gentle hover while the ground carries them in, and a quick flight into the
  * player once the reducer reports its magnet has taken them, from any lane.
  *
- * Each orb is a gem-coloured core inside a larger, faint additive halo of the
- * same colour. Both are InstancedMeshes that SHARE one matrix buffer and one
+ * Each orb is a glossy, candy-like core inside a larger, faint additive halo of
+ * the same colour. The core's shading comes from a procedural matcap (soft
+ * diffuse, a coloured rim and a hot specular spot), so it reads as lit without
+ * any scene light. Both are InstancedMeshes that SHARE one matrix buffer and one
  * colour buffer: two draw calls and one upload for the whole field, and no
  * lights -- a PointLight per orb would cost every lit material a shader variant.
  */
@@ -20,6 +22,7 @@ import type { Palette } from '@/engine/render/world/palette';
 import type { GameConfig, ScoreOrb, ThreeModule } from '@/engine/types';
 
 const ORB_RADIUS = 0.17;
+const ORB_SEGMENTS = 20;
 /** Resting height of an orb's centre above the trail. */
 const HOVER_Y = 0.45;
 const HOVER_BOB = 0.08;
@@ -28,14 +31,22 @@ const HOVER_RATE = 3.2;
 const POP_HEIGHT = 1.3;
 const BOUNCE_RATE = 9;
 const BOUNCE_DAMPING = 3.2;
-/** Orbs fan out sideways from the lane centre but stay inside the lane. */
-const SPREAD_X = 0.9;
+/**
+ * Full width of the sideways scatter around the kill point. Wider than the
+ * road on purpose: the magnet takes orbs from anywhere, so lanes don't matter.
+ */
+const SPREAD_X = 7;
 const SPREAD_SEC = 0.35;
 
 const HALO_SCALE = 2.4;
 const HALO_OPACITY = 0.35;
-const PULSE_RATE = 7;
-const PULSE_DEPTH = 0.15;
+
+/** Matcap texture edge, in texels. */
+const MATCAP_SIZE = 128;
+/** Texel values above 1 push the tinted highlight towards white. */
+const MATCAP_SPECULAR = 3;
+const MATCAP_SHININESS = 40;
+const MATCAP_RIM = 0.6;
 
 const HOME_START_SPEED = 6;
 const HOME_ACCEL = 90;
@@ -81,6 +92,43 @@ function hashId(id: number): number {
   return Math.imul(id, HASH_MULTIPLIER) >>> 0;
 }
 
+/**
+ * A white-based matcap: instance colour tints it, and the HDR specular spot
+ * saturates past the tint so the highlight reads white on every gem colour.
+ */
+function createMatcap(THREE: ThreeModule): THREE_NS.DataTexture {
+  const data = new Uint16Array(MATCAP_SIZE * MATCAP_SIZE * 4);
+  const light = new THREE.Vector3(-0.45, 0.6, 0.66).normalize();
+  const normal = new THREE.Vector3();
+  const half = new THREE.Vector3();
+  const view = new THREE.Vector3(0, 0, 1);
+  half.copy(light).add(view).normalize();
+
+  for (let row = 0; row < MATCAP_SIZE; row += 1) {
+    for (let column = 0; column < MATCAP_SIZE; column += 1) {
+      const nx = ((column + 0.5) / MATCAP_SIZE) * 2 - 1;
+      const ny = ((row + 0.5) / MATCAP_SIZE) * 2 - 1;
+      const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+      normal.set(nx, ny, nz);
+      const diffuse = 0.45 + 0.55 * Math.max(0, normal.dot(light));
+      const rim = Math.pow(1 - nz, 3) * MATCAP_RIM;
+      const specular = Math.pow(Math.max(0, normal.dot(half)), MATCAP_SHININESS) * MATCAP_SPECULAR;
+      const value = THREE.DataUtils.toHalfFloat(diffuse + rim + specular);
+      const offset = (row * MATCAP_SIZE + column) * 4;
+      data[offset] = value;
+      data[offset + 1] = value;
+      data[offset + 2] = value;
+      data[offset + 3] = THREE.DataUtils.toHalfFloat(1);
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, MATCAP_SIZE, MATCAP_SIZE, THREE.RGBAFormat, THREE.HalfFloatType);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 export function createScoreOrbs(
   THREE: ThreeModule,
   scene: THREE_NS.Scene,
@@ -91,8 +139,8 @@ export function createScoreOrbs(
   const colors = palette.accents.orbs.map((hex) => new THREE.Color(hex));
 
   const mesh = new THREE.InstancedMesh(
-    new THREE.IcosahedronGeometry(ORB_RADIUS, 1),
-    new THREE.MeshBasicMaterial({ toneMapped: false }),
+    new THREE.SphereGeometry(ORB_RADIUS, ORB_SEGMENTS, ORB_SEGMENTS * 0.75),
+    new THREE.MeshMatcapMaterial({ matcap: createMatcap(THREE), toneMapped: false }),
     poolSize,
   );
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(poolSize * 3), 3);
@@ -238,7 +286,7 @@ export function createScoreOrbs(
             continue;
           }
         }
-        write(index, 1 + Math.sin(slot.ageSec * PULSE_RATE + slot.bobPhase) * PULSE_DEPTH);
+        write(index, 1);
       }
       mesh.instanceMatrix.needsUpdate = true;
     },
