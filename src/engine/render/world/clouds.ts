@@ -107,6 +107,8 @@ export async function addClouds(
   }
   mesh.instanceMatrix.needsUpdate = true;
 
+  let lastDistance: number | null = null;
+  let lastElapsedMs: number | null = null;
   return {
     mesh,
 
@@ -115,6 +117,9 @@ export async function addClouds(
      * the run goes on instead of sliding along as one sheet.
      */
     scroll(distance: number, elapsedMs: number) {
+      if (!mesh.visible || (distance === lastDistance && elapsedMs === lastElapsedMs)) return;
+      lastDistance = distance;
+      lastElapsedMs = elapsedMs;
       const seconds = elapsedMs / 1000;
       const array = mesh.instanceMatrix.array;
 

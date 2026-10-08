@@ -49,138 +49,152 @@ export async function createScene(
   camera.lookAt(0, config.camera.lookAtY, config.camera.lookAtZ);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  const shadowMapSize = configureRenderer(THREE, renderer, palette, config.quality);
+  const owners: { dispose(): void }[] = [];
+  let disposed = false;
 
-  const sky = addSky(THREE, scene, palette);
-  const lighting = addLighting(THREE, scene, palette, shadowMapSize);
-  const trailEdge = createTrailEdge(THREE, {
-    ...config.trailEdge,
-    halfWidth: trailHalfWidth(config),
-  });
-  const ground = addGround(THREE, scene, config, palette);
-
-  const loader = new GLTFLoader();
-  const scatter = await addScatter(THREE, scene, config, palette, loader, {
-    span: config.scenery.span,
-    seed: config.scenery.seed,
-  });
-  scatter.setQuality(config.quality ?? 'high');
-  const landmarks = await addLandmarks(THREE, scene, config, palette, {
-    span: config.scenery.span,
-  });
-  const motes = addMotes(THREE, scene, palette);
-  // `clouds` is not a CONFIG key today; addClouds falls back to its own
-  // defaults. Typed as optional so setting it later needs no change here.
-  const cloudOptions = (config as GameConfig & { clouds?: CloudOptions }).clouds;
-  const clouds = await addClouds(THREE, scene, palette, loader, cloudOptions);
-  const player = await addPlayer(THREE, scene, config, palette, loader);
-  const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
-  const bulletPool = addSpellPool(THREE, scene, config);
-  const obstaclePool = await addObstaclePool(THREE, scene, config, loader, palette);
-  const drowningSplash = createDrowningSplash(THREE, scene, palette);
-  const effects = createEffects(THREE, scene, palette);
-  const scoreOrbs = createScoreOrbs(THREE, scene, palette, config);
-  const sporeCloud = await addSporeCloud(THREE, scene, config, loader);
-  const shield = addShieldBubble(THREE, player.group);
-
-  // Short, damped camera impulses give hits and kills physical weight while
-  // leaving the authored runner framing untouched between events.
-  const cameraFeedback = createCameraFeedback(camera, config);
-
-  // Only the ground. The displacement moves where the dirt ENDS, and nothing
-  // else needs to follow it: a grass tuft that sometimes sits on the dirt is
-  // what an encroached path edge looks like, and moving the props in lockstep
-  // with the edge would read as more machined, not less.
-  trailEdge.patchObject(ground.valley.mesh);
-  const riverMask = createRiverMask(THREE, ground.valley.mesh, config);
-
-  function resize() {
-    const width = canvas.clientWidth || 1;
-    const height = canvas.clientHeight || 1;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height, false);
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    const resources = new Set<{ dispose(): void }>();
+    collectResources(scene, resources);
+    for (const owner of owners) owner.dispose();
+    for (const resource of resources) resource.dispose();
+    renderer.dispose();
   }
 
-  function render() {
-    renderer.render(scene, camera);
-  }
+  try {
+    const shadowMapSize = configureRenderer(THREE, renderer, palette, config.quality);
 
-  /**
-   * Drops the shadow budget when the machine cannot keep up. Pose inference is
-   * sharing this device, so the game does not get the whole frame to itself.
-   */
-  function setQuality(level: ShadowQuality) {
-    if (level === quality) return;
-    const mapSize = SHADOW_QUALITY[level] ?? SHADOW_QUALITY.high;
-    const wantsShadows = mapSize > 0;
+    const sky = addSky(THREE, scene, palette);
+    const lighting = addLighting(THREE, scene, palette, shadowMapSize);
+    owners.push({ dispose: () => lighting.sun.shadow.dispose() });
+    const trailEdge = createTrailEdge(THREE, {
+      ...config.trailEdge,
+      halfWidth: trailHalfWidth(config),
+    });
+    const ground = addGround(THREE, scene, config, palette);
 
-    renderer.shadowMap.enabled = wantsShadows;
-    lighting.sun.castShadow = wantsShadows;
-    lighting.sun.shadow.map?.dispose();
-    lighting.sun.shadow.map = null;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY_PIXEL_RATIO[level]));
+    const loader = new GLTFLoader();
+    const scatter = await addScatter(THREE, scene, config, palette, loader, {
+      span: config.scenery.span,
+      seed: config.scenery.seed,
+    });
+    scatter.setQuality(config.quality ?? 'high');
+    const landmarks = await addLandmarks(THREE, scene, config, palette, {
+      span: config.scenery.span,
+    });
+    const motes = addMotes(THREE, scene, palette);
+    // `clouds` is not a CONFIG key today; addClouds falls back to its own
+    // defaults. Typed as optional so setting it later needs no change here.
+    const cloudOptions = (config as GameConfig & { clouds?: CloudOptions }).clouds;
+    const clouds = await addClouds(THREE, scene, palette, loader, cloudOptions);
+    const player = await addPlayer(THREE, scene, config, palette, loader);
+    owners.push(player);
+    const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
+    owners.push(enemyPool);
+    const bulletPool = addSpellPool(THREE, scene, config);
+    owners.push(bulletPool);
+    const obstaclePool = await addObstaclePool(THREE, scene, config, loader, palette);
+    const drowningSplash = createDrowningSplash(THREE, scene, palette);
+    const effects = createEffects(THREE, scene, palette);
+    const scoreOrbs = createScoreOrbs(THREE, scene, palette, config);
+    owners.push(scoreOrbs.popups);
+    const sporeCloud = await addSporeCloud(THREE, scene, config, loader);
+    const shield = addShieldBubble(THREE, player.group);
 
-    if (wantsShadows) {
-      lighting.sun.shadow.mapSize.set(mapSize, mapSize);
+    // Short, damped camera impulses give hits and kills physical weight while
+    // leaving the authored runner framing untouched between events.
+    const cameraFeedback = createCameraFeedback(camera, config);
+    owners.push(cameraFeedback);
+
+    // Only the ground. The displacement moves where the dirt ENDS, and nothing
+    // else needs to follow it: a grass tuft that sometimes sits on the dirt is
+    // what an encroached path edge looks like, and moving the props in lockstep
+    // with the edge would read as more machined, not less.
+    trailEdge.patchObject(ground.valley.mesh);
+    const riverMask = createRiverMask(THREE, ground.valley.mesh, config);
+
+    function resize() {
+      const width = canvas.clientWidth || 1;
+      const height = canvas.clientHeight || 1;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
     }
 
-    renderer.shadowMap.needsUpdate = true;
-    clouds.setVisible(level !== 'low');
-    scatter.setQuality(level);
-    quality = level;
+    function render() {
+      renderer.render(scene, camera);
+    }
+
+    /**
+     * Drops the shadow budget when the machine cannot keep up. Pose inference is
+     * sharing this device, so the game does not get the whole frame to itself.
+     */
+    function setQuality(level: ShadowQuality) {
+      if (level === quality) return;
+      const mapSize = SHADOW_QUALITY[level] ?? SHADOW_QUALITY.high;
+      const wantsShadows = mapSize > 0;
+
+      renderer.shadowMap.enabled = wantsShadows;
+      lighting.sun.castShadow = wantsShadows;
+      lighting.sun.shadow.map?.dispose();
+      lighting.sun.shadow.map = null;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY_PIXEL_RATIO[level]));
+
+      if (wantsShadows) {
+        lighting.sun.shadow.mapSize.set(mapSize, mapSize);
+      }
+
+      renderer.shadowMap.needsUpdate = true;
+      clouds.setVisible(level !== 'low');
+      scatter.setQuality(level);
+      quality = level;
+    }
+
+    let quality: ShadowQuality = config.quality ?? 'high';
+
+    resize();
+
+    return {
+      THREE,
+      scene,
+      camera,
+      renderer,
+      palette,
+      sky,
+      lighting,
+      ground,
+      markers: ground.markers,
+      scatter,
+      landmarks,
+      motes,
+      clouds,
+      player,
+      enemyPool,
+      bulletPool,
+      obstaclePool,
+      riverMask,
+      drowningSplash,
+      effects,
+      scoreOrbs,
+      sporeCloud,
+      shield,
+      cameraFeedback,
+      lastEventsMs: -1,
+      trailEdge,
+      setQuality,
+      get quality() {
+        return quality;
+      },
+      resize,
+      render,
+      dispose,
+    };
+  } catch (error) {
+    // Asset/network failures can occur after WebGL and earlier actors exist.
+    dispose();
+    throw error;
   }
-
-  let quality: ShadowQuality = config.quality ?? 'high';
-
-  resize();
-
-  return {
-    THREE,
-    scene,
-    camera,
-    renderer,
-    palette,
-    sky,
-    lighting,
-    ground,
-    markers: ground.markers,
-    scatter,
-    landmarks,
-    motes,
-    clouds,
-    player,
-    enemyPool,
-    bulletPool,
-    obstaclePool,
-    riverMask,
-    drowningSplash,
-    effects,
-    scoreOrbs,
-    sporeCloud,
-    shield,
-    cameraFeedback,
-    lastEventsMs: -1,
-    trailEdge,
-    setQuality,
-    get quality() {
-      return quality;
-    },
-    resize,
-    render,
-    dispose() {
-      cameraFeedback.dispose();
-      lighting.sun.shadow.dispose();
-      enemyPool.dispose();
-      bulletPool.dispose();
-      scoreOrbs.popups.dispose();
-      const resources = new Set<{ dispose(): void }>();
-      collectResources(scene, resources);
-      player.dispose();
-      for (const resource of resources) resource.dispose();
-      renderer.dispose();
-    },
-  };
 }
 
 function createCameraFeedback(

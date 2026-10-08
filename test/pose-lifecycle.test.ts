@@ -7,7 +7,7 @@ vi.mock('@mediapipe/tasks-vision', () => ({
 }));
 import { closePose, getDelegate, initPose } from '@/engine/pose/pose';
 
-afterEach(() => { closePose(); vi.clearAllMocks(); });
+afterEach(() => { closePose(); vi.clearAllMocks(); mocks.fileset.mockResolvedValue({}); });
 
 test('starting pose again closes the previous model and final teardown closes the replacement', async () => {
   const first = { close: vi.fn() }, second = { close: vi.fn() };
@@ -39,4 +39,15 @@ test('CPU fallback also releases its model on stop', async () => {
     expect((await initPose()).delegate).toBe('CPU');
     closePose(); expect(model.close).toHaveBeenCalledTimes(1);
   } finally { warn.mockRestore(); }
+});
+
+test('cancellation while loading WASM does not start an obsolete model', async () => {
+  let resolve!: (value: object) => void;
+  mocks.fileset.mockReturnValueOnce(new Promise(r => { resolve = r; }));
+  const pending = initPose();
+  const rejected = expect(pending).rejects.toThrow('cancelled');
+  closePose();
+  resolve({});
+  await rejected;
+  expect(mocks.create).not.toHaveBeenCalled();
 });

@@ -218,6 +218,7 @@ export async function addScatter(
     }
   }
 
+  let lastDistance: number | null = null;
   return {
     meshes,
     span,
@@ -226,11 +227,17 @@ export async function addScatter(
     setQuality(level: ShadowQuality) {
       const fraction = DETAIL_FRACTION[level] ?? 1;
       for (const entry of meshes) {
-        if (entry.detail) entry.mesh.count = Math.round(entry.fullCount * fraction);
+        if (entry.detail) {
+          const count = Math.round(entry.fullCount * fraction);
+          if (entry.mesh.count !== count) lastDistance = null;
+          entry.mesh.count = count;
+        }
       }
     },
     /** One float per instance per frame; see the module note. */
     scroll(distance: number) {
+      if (distance === lastDistance) return;
+      lastDistance = distance;
       for (const entry of meshes) {
         const array = entry.mesh.instanceMatrix.array as Float32Array;
         for (let index = 0; index < entry.mesh.count; index += 1) {

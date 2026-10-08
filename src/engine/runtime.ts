@@ -230,6 +230,10 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   const input = createInput();
 
   let sceneRefs: SceneRefs | null = null;
+  let renderedGame: GameState | null = null;
+  let renderedActorsVisible = true;
+  let renderedDrowningMs = -1;
+  let needsRender = true;
   let stream: MediaStream | null = null;
   let connections: PoseConnection[] = [];
 
@@ -238,6 +242,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let isCameraSkipped = false;
   let isCameraStarting = false;
   let cameraRequestId = 0;
+  let cameraAbortController: AbortController | null = null;
   let gameFrameId: number | null = null;
   let poseFrameId: number | null = null;
   let resizeObserver: ResizeObserver | null = null;
@@ -266,6 +271,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let luma: number | null = null;
 
   let pendingCharacter = options.character ?? CONFIG.game.defaultCharacter;
+  let characterRequestId = 0;
   let actorsVisible = true;
 
   /** The config this run steps under: endless Training. Pose mode never reads it. */
@@ -362,12 +368,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
    * Rebuilds the snapshot only when something actually changed, so
    * getSnapshot() stays referentially stable and React does not loop.
    */
-  function publish(nowMs = 0): void {
+  function publish(nowMs = performance.now()): void {
     if (isDisposed) return;
     const next = buildSnapshot();
 
     const forced = FORCE_EMIT_KEYS.some((key) => next[key] !== snapshot[key]);
     if (!forced && nowMs - lastEmitMs < SNAPSHOT_INTERVAL_MS) return;
+    if ((Object.keys(next) as (keyof HudSnapshot)[]).every(key => next[key] === snapshot[key])) return;
 
     lastEmitMs = nowMs;
     snapshot = next;
@@ -387,25 +394,45 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   /* ------------------------------------------------------- game loop ------ */
 
+  function onVisibilityChange(): void {
+    lastGameMs = performance.now();
+    if (!document.hidden) needsRender = true;
+  }
+
   function gameFrame(nowMs: number): void {
     if (isDisposed) return;
 
-    const dtMs = nowMs - lastGameMs;
+    // A resumed tab must not consume input or advance the run for time away.
+    const elapsedMs = nowMs - lastGameMs;
+    const dtMs = elapsedMs > 1000 ? 0 : Math.max(0, elapsedMs);
     lastGameMs = nowMs;
+
+    if (document.hidden) {
+      sampleQuality(dtMs, true);
+      gameFrameId = requestAnimationFrame(gameFrame);
+      return;
+    }
 
     // The run waits for pose tracking or the explicit dev bypass. The scene
     // still paints behind the dialog and remains available to tools/shot.mjs.
     const isPlaying = isPoseRunning || isCameraSkipped;
     const stepMs = isPlaying ? dtMs : 0;
     sampleQuality(dtMs, !isPlaying || previewPaused || game.isOver || document.hidden);
-    if (isPlaying && !previewPaused) {
+    if (isPlaying && !previewPaused && dtMs > 0) {
       game = updateGame(game, input.read(), dtMs, rules);
     }
 
     drowning = updateDrowningPresentation(drowning, game.deathReason, previewPaused ? 0 : dtMs, rules.obstacle.drowningMs);
-    if (sceneRefs) {
+    // The permission dialog and paused previews contain a static world. Paint
+    // on state/character/size changes instead of uploading it every display tick.
+    const hasVisualChange = needsRender || renderedGame !== game || renderedActorsVisible !== actorsVisible || renderedDrowningMs !== drowning.elapsedMs;
+    if (sceneRefs && (hasVisualChange || (isPlaying && !previewPaused))) {
       syncScene(sceneRefs, game, previewPaused ? 0 : stepMs, rules, actorsVisible, drowning);
       sceneRefs.render();
+      renderedGame = game;
+      renderedActorsVisible = actorsVisible;
+      renderedDrowningMs = drowning.elapsedMs;
+      needsRender = false;
     }
 
     publish(nowMs);
@@ -435,7 +462,14 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   }
 
   function poseFrame(): void {
+    poseFrameId = null;
     if (!isPoseRunning || isDisposed) return;
+    if (document.hidden) {
+      lastPoseMs = null;
+      lastFrameMs = 0;
+      schedulePoseFrame();
+      return;
+    }
     const nowMs = performance.now();
 
     const hasFrame =
@@ -444,7 +478,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     if (hasFrame) {
       lastVideoTime = els.video.currentTime;
-      processFrame(nowMs);
+      try {
+        processFrame(nowMs);
+      } catch (error) {
+        releaseCamera();
+        setError(describeCameraError(error));
+        setStatus('Stopped.');
+        console.error(error);
+        return;
+      }
       updateFps(nowMs);
       publish(nowMs);
     }
@@ -530,6 +572,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
       sceneRefs = refs;
       await applyCharacter(pendingCharacter);
+      if (isDisposed) return;
       observeResize();
       exposeTestHook();
       publish();
@@ -541,12 +584,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   }
 
   function observeResize(): void {
+    const resize = () => {
+      sceneRefs?.resize();
+      needsRender = true;
+    };
     if (typeof ResizeObserver === 'function') {
-      resizeObserver = new ResizeObserver(() => sceneRefs?.resize());
+      resizeObserver = new ResizeObserver(resize);
       resizeObserver.observe(els.container);
       return;
     }
-    onResize = () => sceneRefs?.resize();
+    onResize = resize;
     window.addEventListener('resize', onResize);
   }
 
@@ -554,9 +601,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   async function applyCharacter(charId: string): Promise<void> {
     pendingCharacter = Object.hasOwn(CONFIG.game.characters, charId) ? charId : CONFIG.game.defaultCharacter;
     if (!sceneRefs) return;
-    await sceneRefs.player.loadCharacter(pendingCharacter);
-    if (isDisposed) return;
-    sceneRefs.bulletPool.setCharacter(charId);
+    const refs = sceneRefs;
+    const character = pendingCharacter;
+    const requestId = ++characterRequestId;
+    await refs.player.loadCharacter(character);
+    if (isDisposed || refs !== sceneRefs || requestId !== characterRequestId) return;
+    refs.bulletPool.setCharacter(character);
+    needsRender = true;
   }
 
   /* ------------------------------------------------------- test hook ------ */
@@ -720,6 +771,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       detachKeyboard = input.attachKeyboard();
       void bootScene();
       lastGameMs = performance.now();
+      document.addEventListener('visibilitychange', onVisibilityChange);
       gameFrameId = requestAnimationFrame(gameFrame);
     },
 
@@ -727,11 +779,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       if (isDisposed || isPoseRunning || isCameraStarting) return;
       isCameraStarting = true;
       const requestId = ++cameraRequestId;
+      const abortController = new AbortController();
+      cameraAbortController = abortController;
       setError(null);
 
       try {
         setStatus('Requesting camera...');
-        const camera = await startCamera(els.video);
+        const camera = await startCamera(els.video, undefined, abortController.signal);
         if (isDisposed || requestId !== cameraRequestId) {
           stopCamera(camera.stream);
           return;
@@ -740,9 +794,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         cameraLabel = `${camera.width}x${camera.height}`;
 
         setStatus(`Loading pose model (${CONFIG.pose.model})...`);
+        if (isDisposed || requestId !== cameraRequestId) return;
         const pose = await initPose();
         if (isDisposed || requestId !== cameraRequestId) {
-          closePose();
           return;
         }
 
@@ -756,36 +810,26 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         schedulePoseFrame();
       } catch (error) {
         if (isDisposed || requestId !== cameraRequestId) return;
+        releaseCamera();
         setError(describeCameraError(error));
         setStatus('Stopped.');
         console.error(error);
       } finally {
-        isCameraStarting = false;
+        if (requestId === cameraRequestId) {
+          isCameraStarting = false;
+          cameraAbortController = null;
+        }
       }
     },
 
     stopCamera() {
-      resetPoseHolds();
-      cameraRequestId += 1;
-      isPoseRunning = false;
-      cancelPoseFrame();
-      stopCamera(stream);
-      stream = null;
-      closePose();
-      input.clearPose();
-      lastVideoTime = -1;
+      releaseCamera();
       setStatus('Camera stopped.');
     },
 
     skipCamera() {
       if (process.env.NODE_ENV === 'production' || isDisposed || mode !== 'game') return;
-      cameraRequestId += 1;
-      isPoseRunning = false;
-      cancelPoseFrame();
-      stopCamera(stream);
-      stream = null;
-      closePose();
-      input.clearPose();
+      releaseCamera();
       isCameraSkipped = true;
       setError(null);
       setStatus('Development mode: keyboard controls, camera off.');
@@ -847,17 +891,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     dispose() {
       if (isDisposed) return;
       isDisposed = true;
-      cameraRequestId += 1;
-      isPoseRunning = false;
+      releaseCamera();
 
-      if (gameFrameId !== null) cancelAnimationFrame(gameFrameId);
+      if (gameFrameId !== null) {
+        cancelAnimationFrame(gameFrameId);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
       gameFrameId = null;
-      cancelPoseFrame();
-
-      stopCamera(stream);
-      stream = null;
-      closePose();
-
       detachKeyboard?.();
       detachKeyboard = null;
       input.detach();
@@ -886,6 +926,36 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     jump = { ...createJumpState(), jumpCount: jump.jumpCount };
     armsUp = { ...createArmsUpState(), raiseCount: armsUp.raiseCount };
     handsOnHips = { ...createHandsOnHipsState(), holdCount: handsOnHips.holdCount };
+  }
+
+  function releaseCamera(): void {
+    cameraRequestId += 1;
+    cameraAbortController?.abort();
+    cameraAbortController = null;
+    isCameraStarting = false;
+    isPoseRunning = false;
+    cancelPoseFrame();
+    stopCamera(stream);
+    if (stream && els.video.srcObject === stream) {
+      els.video.pause();
+      els.video.srcObject = null;
+    }
+    stream = null;
+    closePose();
+    input.clearPose();
+    resetPoseHolds();
+    lastVideoTime = -1;
+    lastPoseMs = null;
+    lastFrameMs = 0;
+    smoothedFps = null;
+    smoothedInferenceMs = null;
+    delegate = null;
+    poseModel = null;
+    cameraLabel = null;
+    shoulderWidth = null;
+    kneesVisible = false;
+    luma = null;
+    if (ctx) clearOverlay(ctx);
   }
 
   function resetMovementTallies(): void {

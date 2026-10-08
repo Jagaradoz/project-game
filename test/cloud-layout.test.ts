@@ -34,4 +34,17 @@ test('sky clouds use the Blender-authored cloud with baked shading', async () =>
     if (positions.getY(i) < positions.getY(bottom)) bottom = i;
   }
   expect(colors.getY(top)).toBeGreaterThan(colors.getY(bottom) + 0.2);
+
+  clouds.scroll(20, 1000);
+  const version = clouds.mesh.instanceMatrix.version;
+  const before = Array.from(clouds.mesh.instanceMatrix.array);
+  clouds.scroll(20, 1000);
+  expect(clouds.mesh.instanceMatrix.version).toBe(version);
+  clouds.setVisible(false);
+  clouds.scroll(50, 2000);
+  expect(clouds.mesh.instanceMatrix.version).toBe(version);
+  clouds.setVisible(true);
+  clouds.scroll(50, 2000);
+  expect(clouds.mesh.instanceMatrix.version).toBeGreaterThan(version);
+  expect(Array.from(clouds.mesh.instanceMatrix.array)).not.toEqual(before);
 });

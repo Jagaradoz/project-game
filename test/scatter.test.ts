@@ -30,6 +30,29 @@ describe('scenery lane clearance and instancing', () => {
     expect(hasSceneryClearance({ x: 15, z: 19.9, radius: 1 }, [{ x: 10, z: -139.9, radius: 1 }], 160)).toBe(true);
   });
 
+  it('uploads stationary scenery only once and refreshes newly visible detail at the current distance', async () => {
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(.3, .3, .3), new THREE.MeshStandardMaterial()));
+    const loader = { loadAsync: async () => ({ scene: root }) } as unknown as GLTFLoader;
+    const result = await addScatter(THREE, new THREE.Scene(), CONFIG.game, {} as Palette, loader, {
+      span: 160, seed: 12,
+      layers: { grass: { count: 20, band: [10, 35], scale: [1, 1], castShadow: false, detail: true, models: ['grass'] } },
+    });
+    const entry = result.meshes[0]!;
+    result.setQuality('low');
+    result.scroll(80);
+    const version = entry.mesh.instanceMatrix.version;
+    result.scroll(80);
+    expect(entry.mesh.instanceMatrix.version).toBe(version);
+    result.setQuality('high');
+    result.scroll(80);
+    expect(entry.mesh.instanceMatrix.version).toBeGreaterThan(version);
+    expect(entry.mesh.count).toBe(entry.fullCount);
+    for (let i = 0; i < entry.fullCount; i++) {
+      expect(entry.mesh.instanceMatrix.array[i * 16 + 14]).toBeCloseTo(-140 + ((entry.baseZ[i]! + 140 + 80) % 160) + entry.zOffset[i]!, 4);
+    }
+  });
+
   it('batches ground and platform grass, preserves materials and keeps tops attached after scrolling', async () => {
     const material = new THREE.MeshStandardMaterial({ color: 0xabc123 });
     const loader = { loadAsync: async (path: string) => {

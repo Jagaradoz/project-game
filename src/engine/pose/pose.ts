@@ -35,6 +35,7 @@ export async function initPose(config: PoseConfig = CONFIG.pose): Promise<PoseIn
   closePose();
   const requestId = initRequestId;
   const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
+  if (requestId !== initRequestId) throw new Error('Pose initialization cancelled.');
   const modelAssetPath = MODEL_URLS[config.model as PoseModelName];
   if (!modelAssetPath) throw new Error(`Unknown model "${config.model}". Expected one of: ${Object.keys(MODEL_URLS).join(', ')}`);
 

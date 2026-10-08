@@ -40,6 +40,26 @@ async function fixture(skinned = false) {
   return { player, step, loadAsync, model };
 }
 
+test('lane movement takes the same time at 30, 60 and 120 Hz, and freezes at zero elapsed time', async () => {
+  const positions: number[] = [];
+  const state = { ...createGameState(), lane: 2 };
+  for (const fps of [30, 60, 120]) {
+    const { player } = await fixture();
+    const scene = { player, lastEventsMs: -1 } as unknown as SceneRefs;
+    for (let frame = 0; frame < fps / 10; frame++) syncScene(scene, state, 1000 / fps);
+    positions.push(player.group.position.x);
+    const { x } = player.group.position;
+    const { y, z } = player.group.rotation;
+    syncScene(scene, state, 0);
+    expect(player.group.position.x).toBe(x);
+    expect(player.group.rotation.y).toBe(y);
+    expect(player.group.rotation.z).toBe(z);
+    player.dispose();
+  }
+  expect(positions[0]).toBeCloseTo(positions[1]!, 10);
+  expect(positions[1]).toBeCloseTo(positions[2]!, 10);
+});
+
 test('runs by default, completes an attack after release, and fades back to run without idle', async () => {
   const { player, step } = await fixture();
   step(false);

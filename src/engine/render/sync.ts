@@ -118,7 +118,9 @@ function syncPlayer(
   const targetX = laneToX(state.lane, config);
   const currentX = player.group.position.x;
 
-  player.group.position.x += (targetX - currentX) * LANE_LERP;
+  const laneBlend = 1 - Math.pow(1 - LANE_LERP, dtSec * 60);
+  const bankBlend = 1 - Math.pow(0.8, dtSec * 60);
+  player.group.position.x += (targetX - currentX) * laneBlend;
   player.group.position.z = config.playerZ;
   player.group.position.y = TRAIL_Y + state.jumpHeight;
   if (drowning.active) {
@@ -131,9 +133,9 @@ function syncPlayer(
   // Bank into a lane change, then settle back upright.
   const deltaX = targetX - currentX;
   const targetRoll = -deltaX * 0.25;
-  player.group.rotation.z += (targetRoll - player.group.rotation.z) * 0.2;
+  player.group.rotation.z += (targetRoll - player.group.rotation.z) * bankBlend;
   const targetYaw = deltaX * 0.15;
-  player.group.rotation.y += (targetYaw - player.group.rotation.y) * 0.2;
+  player.group.rotation.y += (targetYaw - player.group.rotation.y) * bankBlend;
 
   const isBlinkOn = Math.floor(state.elapsedMs / BLINK_PERIOD_MS) % 2 === 1;
   const opacity = !state.isOver && isInvulnerable(state) && isBlinkOn ? BLINK_OPACITY : 1;
