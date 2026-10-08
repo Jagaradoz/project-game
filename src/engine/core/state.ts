@@ -20,13 +20,14 @@
 import { CONFIG } from '@/engine/config';
 import { advanceHazards, hasSafeHazardArrival } from '@/engine/core/hazards';
 import { advanceOrbs, collectAll, dropOrbs } from '@/engine/core/orbs';
-import { chainKills, stepPoints } from '@/engine/core/scoring';
+import { chainKills } from '@/engine/core/scoring';
 import {
   advanceSpores,
   canSpawnSpore,
   createSporeCloud,
   hasPendingSpore,
   isInsideSpore,
+  shieldPoints,
   sporeDamage,
 } from '@/engine/core/spores';
 import type {
@@ -56,6 +57,8 @@ export function createGameState(seed = 1, config: RunConfig = CONFIG.game): Game
     lastKillMs: -Infinity,
     orbs: [],
     justCollected: [],
+    nextShieldPointMs: 0,
+    justBonus: 0,
     distance: 0,
     speed: 0,
     enemies: [],
@@ -109,8 +112,8 @@ export function updateGame(
   config: RunConfig = CONFIG.game,
 ): GameState {
   if (state.isOver) {
-    if (!state.justHit && !state.justFired && state.justKilled.length === 0 && !state.justImpacts.length && !state.justCollected.length) return state;
-    return { ...state, justHit: false, justFired: false, justKilled: [], justImpacts: [], justCollected: [] };
+    if (!state.justHit && !state.justFired && state.justKilled.length === 0 && !state.justImpacts.length && !state.justCollected.length && !state.justBonus) return state;
+    return { ...state, justHit: false, justFired: false, justKilled: [], justImpacts: [], justCollected: [], justBonus: 0 };
   }
 
   const stepMs = Math.min(Math.max(dtMs, 0), config.maxFrameMs);
@@ -118,12 +121,11 @@ export function updateGame(
   const elapsedMs = state.elapsedMs + stepMs;
 
   const progress = rampProgress(state.distance, config);
-  const speed = approach(state.speed, speedAt(progress, config), stepMs, config.speedLerpMs);
+  // The walk is constant for the whole run; only the start eases up from a standstill.
+  const speed = rampTo(state.speed, config.walkSpeed, stepMs, config.speedLerpMs);
   const distance = state.distance + speed * stepSec;
   const lane = clampLane(input.lane, config);
   const isShielding = Boolean(input.isShielding);
-  // Hands on hips is not a jog: the shield and the gun never run together.
-  const isFiring = Boolean(input.isFiring) && !isShielding;
 
   const wantsJump = Boolean(input.jump);
   const tookOff = wantsJump && !state.jumpHeld && state.jumpStartedMs === null;
@@ -133,6 +135,9 @@ export function updateGame(
   if (jumpStartedMs !== null && elapsedMs - jumpStartedMs >= config.jump.durationMs) jumpStartedMs = null;
   const jumpPhase = jumpStartedMs === null ? 0 : (elapsedMs - jumpStartedMs) / config.jump.durationMs;
   const jumpHeight = jumpStartedMs === null ? 0 : Math.sin(Math.PI * jumpPhase) * config.jump.height;
+  // Hands on hips is not a jog: the shield and the gun never run together. Nor
+  // does a jump: arms up to jump must not spray bullets on the way over.
+  const isFiring = Boolean(input.isFiring) && !isShielding && jumpStartedMs === null;
   const crossed = advanceHazards(state.obstacles, lane, speed * stepSec, state.elapsedMs, elapsedMs, lastTakeoffMs, config);
   // The boss is just a big enemy: it walks in, and contact costs one HP.
   const movedEnemies = state.enemies.map((enemy) => {
@@ -142,6 +147,7 @@ export function updateGame(
   const spores = advanceSpores(state.spores, speed * stepSec, config);
   const isInSpore = isInsideSpore(spores);
   const spore = sporeDamage(state, isInSpore, isShielding, elapsedMs, config);
+  const braved = shieldPoints(state, isInSpore, isShielding, elapsedMs, config);
   const sporePending = hasPendingSpore(spores);
   const movedBullets = state.bullets.map((bullet) => advance(bullet, -config.bulletSpeed * stepSec));
 
@@ -160,8 +166,9 @@ export function updateGame(
 
   const liveEnemies = survivors.filter((enemy) => enemy.z <= config.despawnZ);
   const liveBoss = liveEnemies.find(e => e.kind === 'boss');
-  // A cloud ahead holds back new enemies until the player is through it.
-  const spawned = sporePending
+  // A cloud ahead holds back new enemies until the player is through it, and
+  // the boss walks in with only the enemies already on the trail.
+  const spawned = sporePending || liveBoss
     ? { enemies: liveEnemies, seed: state.seed, nextSpawnMs: Math.max(state.nextSpawnMs, elapsedMs), nextId: state.nextId }
     : spawnDue(
       { enemies: liveEnemies, seed: state.seed },
@@ -193,11 +200,10 @@ export function updateGame(
   const nextBossKills = !shouldSpawnBoss ? state.nextBossKills
     : config.goalKills !== undefined ? Number.POSITIVE_INFINITY : killCount + config.boss.triggerKills;
   if (shouldSpawnBoss) {
-    spawned.enemies = spawned.enemies.filter(e => e.z > -30);
+    // Enemies already on the trail stay; only a row spawned this very step,
+    // still on the spawn line where the boss stands, makes way for it.
+    spawned.enemies = spawned.enemies.filter(e => e.id === undefined || e.id < state.nextId);
     spawned.enemies.push({ id: nextId++, kind: 'boss', hp: config.enemyTypes.boss.hp, lane: 1, z: config.spawnZ, previousZ: config.spawnZ });
-  } else if (liveBoss) {
-    // The boss walks alone: ordinary spawns wait until it is dealt with.
-    spawned.enemies = spawned.enemies.filter(e => e.kind === 'boss' || e.z > -30);
   }
   let nextObstacleMs = state.nextObstacleMs;
   // Keep a hazard until its verdict is in, even if a fast step carried it past despawnZ first.
@@ -228,13 +234,8 @@ export function updateGame(
   const dropped = dropOrbs(rolled.orbs, shots.killed, chained.values, nextId, config);
   nextId = dropped.nextId;
   const swept = isCleared ? collectAll(dropped.orbs) : { collected: 0, collectedIds: [] };
-  const score = state.score + stepPoints({
-    fromDistance: state.distance,
-    toDistance: distance,
-    hazardsCleared: crossed.cleared,
-    justCleared: isCleared,
-    collected: rolled.collected + dropped.banked + swept.collected,
-  }, config);
+  // Orbs, plus braving a spore cloud behind the shield; see core/scoring.ts.
+  const score = state.score + rolled.collected + dropped.banked + swept.collected + braved.points;
 
   return {
     ...state,
@@ -250,6 +251,8 @@ export function updateGame(
     ...chained.chain,
     orbs: isCleared ? [] : dropped.orbs,
     justCollected: [...rolled.collectedIds, ...swept.collectedIds],
+    nextShieldPointMs: braved.nextPointMs,
+    justBonus: braved.points,
     distance,
     speed,
     enemies: spawned.enemies,
@@ -291,13 +294,9 @@ function advance(body: GameBody, deltaZ: number): GameBody {
   return { ...body, previousZ: body.z, z: body.z + deltaZ };
 }
 
-/** 0 at the start of a run, 1 once the hardest speed and spawn rate are reached. */
+/** 0 at the start of a run, 1 once the hardest spawn rate is reached. */
 function rampProgress(distance: number, config: RunConfig): number {
   return Math.min(1, Math.max(0, distance / config.rampDistance));
-}
-
-function speedAt(progress: number, config: RunConfig): number {
-  return config.walkSpeed + (config.maxSpeed - config.walkSpeed) * progress;
 }
 
 function spawnIntervalAt(progress: number, config: RunConfig): number {
@@ -305,12 +304,24 @@ function spawnIntervalAt(progress: number, config: RunConfig): number {
 }
 
 /**
- * Frame-rate independent ease towards a target. A plain per-frame factor would
- * make the world accelerate faster on a 120 Hz display than on a 30 Hz one.
+ * Steps towards a target at a fixed rate -- `target` per `rampMs` -- and lands
+ * on it exactly, so the walk holds one constant speed once it is up to pace.
+ * Measured in ms rather than frames, so every refresh rate ramps alike.
  */
-function approach(current: number, target: number, stepMs: number, lerpMs: number): number {
-  const alpha = lerpMs <= 0 ? 1 : Math.min(1, stepMs / lerpMs);
-  return current + (target - current) * alpha;
+function rampTo(current: number, target: number, stepMs: number, rampMs: number): number {
+  if (rampMs <= 0) return target;
+  const step = (Math.abs(target) * stepMs) / rampMs;
+  return current < target ? Math.min(target, current + step) : Math.max(target, current - step);
+}
+
+/**
+ * Whether an enemy's body covers `lane`. Most stand in one lane; a kind with a
+ * `laneSpan` (the boss) is that many lanes wide, centred on its own lane, and
+ * blocks -- and can be shot -- in all of them.
+ */
+export function occupiesLane(enemy: GameBody, lane: number, config: RunConfig): boolean {
+  const span = enemy.kind ? config.enemyTypes[enemy.kind].laneSpan : 1;
+  return Math.abs(lane - enemy.lane) <= (span - 1) / 2;
 }
 
 /**
@@ -318,7 +329,7 @@ function approach(current: number, target: number, stepMs: number, lerpMs: numbe
  * only the new z would let a fast enemy tunnel straight through on a long frame.
  */
 function isHit(enemy: GameBody, lane: number, config: RunConfig): boolean {
-  if (enemy.lane !== lane) return false;
+  if (!occupiesLane(enemy, lane, config)) return false;
   const reach = config.playerRadius + (enemy.kind ? config.enemyTypes[enemy.kind].radius : config.enemyRadius);
   return enemy.z >= config.playerZ - reach && enemy.previousZ <= config.playerZ + reach;
 }
@@ -343,7 +354,7 @@ function resolveShots(
     const targetIndex = updated.findIndex(
       (enemy, enemyIndex) =>
         !deadEnemies.has(enemyIndex) &&
-        enemy.lane === bullet.lane &&
+        occupiesLane(enemy, bullet.lane, config) &&
         bullet.z - ((enemy.kind ? config.enemyTypes[enemy.kind].radius : config.enemyRadius) + config.bulletRadius) <= enemy.z &&
         bullet.previousZ + ((enemy.kind ? config.enemyTypes[enemy.kind].radius : config.enemyRadius) + config.bulletRadius) >= enemy.previousZ,
     );
@@ -351,7 +362,8 @@ function resolveShots(
     const target = updated[targetIndex]!;
     target.hp = (target.hp ?? 1) - 1;
     target.lastHitMs = elapsedMs;
-    impacts.push({ lane: target.lane, z: target.z, kind: target.kind });
+    // Burst where the bullet struck: on a wide boss that is the bullet's lane.
+    impacts.push({ lane: bullet.lane, z: target.z, kind: target.kind });
     if (target.hp <= 0) deadEnemies.add(targetIndex);
     spentBullets.add(bulletIndex);
   });

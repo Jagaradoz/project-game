@@ -75,8 +75,27 @@ test('the boss walks into the player like any enemy: contact costs one HP and us
   const hit = updateGame(state, idle, 50);
   expect(hit.hp).toBe(2);
   expect(hit.enemies.some(e => e.kind === 'boss')).toBe(false);
-  const dodged = updateGame(state, { ...idle, lane: 0 }, 50);
-  expect(dodged.hp).toBe(3);
+});
+
+test('the boss spans all three lanes: no lane dodges it, and every lane can shoot it', () => {
+  const boss = { id: 99, kind: 'boss' as const, hp: 10, lane: 1, z: -3, previousZ: -3 };
+  const state = { ...createGameState(3), speed: 11, bossSpawned: true, enemies: [boss] };
+  for (const lane of [0, 2]) expect(updateGame(state, { ...idle, lane }, 50).hp).toBe(2);
+
+  const far = { ...boss, z: -20, previousZ: -20 };
+  for (const lane of [0, 2]) {
+    const shot = updateGame({ ...state, enemies: [far], bullets: [{ lane, z: -19, previousZ: -19 }] }, { ...idle, lane }, 16);
+    expect(shot.enemies.find(e => e.kind === 'boss')!.hp).toBe(9);
+    expect(shot.justImpacts[0]!.lane).toBe(lane);
+  }
+});
+
+test('enemies already on the trail stay when the boss arrives, and new ones wait', () => {
+  const walking = { id: 7, kind: 'weak' as const, hp: 1, lane: 0, z: -60, previousZ: -60 };
+  const boss = { id: 99, kind: 'boss' as const, hp: 10, lane: 1, z: -70, previousZ: -70 };
+  const state = { ...createGameState(3), speed: 11, bossSpawned: true, enemies: [walking, boss], nextSpawnMs: 0 };
+  const next = updateGame(state, { ...idle, lane: 2 }, 16);
+  expect(next.enemies.map(e => e.id).sort()).toEqual([7, 99]);
 });
 
 test('the boss never holds still: it keeps walking towards the player', () => {

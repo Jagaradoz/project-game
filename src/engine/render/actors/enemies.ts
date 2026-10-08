@@ -15,6 +15,8 @@ export interface EnemySlot {
   id?: number; lastHitMs?: number; aura: T.Mesh; health: T.Mesh; model?: T.Object3D; elapsed?: number;
 }
 const OVERLAYS = ['Hit', 'Attack'];
+/** Share of its lanes a multi-lane enemy's body spans, leaving a sliver at the edges. */
+const BOSS_SPAN_FILL = .9;
 /** Golden-ratio step: spreads loop phases across a crowd so neighbours never march in lockstep. */
 const PHASE_STEP = .618034;
 
@@ -53,8 +55,14 @@ export async function addEnemyPool(THREE: ThreeModule, scene: T.Scene, config: G
     const template = templates.get(kind), def = config.enemyTypes[kind];
     const model = template ? clone(template.scene) : new THREE.Mesh(fallbackGeo, materials.get(kind));
     const bounds = new THREE.Box3().setFromObject(model);
-    const scale = def.height / Math.max(.01, bounds.getSize(new THREE.Vector3()).y);
-    model.scale.setScalar(scale); model.position.y = -bounds.min.y * scale;
+    const size = bounds.getSize(new THREE.Vector3());
+    const heightScale = def.height / Math.max(.01, size.y);
+    // A multi-lane kind (the boss) is also stretched across the lanes it blocks,
+    // so what the player sees matches its hitbox; width only, height stays.
+    const spanWidth = def.laneSpan * config.laneWidth * BOSS_SPAN_FILL;
+    const widthScale = def.laneSpan > 1 ? spanWidth / Math.max(.01, Math.max(size.x, size.z)) : heightScale;
+    model.scale.set(Math.max(heightScale, widthScale), heightScale, Math.max(heightScale, widthScale));
+    model.position.y = -bounds.min.y * heightScale;
     model.traverse(o => { const mesh = o as T.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.frustumCulled = false; } });
     slot.group.add(model); slot.model = model; slot.kind = kind;
     slot.aura.material = materials.get(kind)!; slot.health.material = materials.get(kind)!;

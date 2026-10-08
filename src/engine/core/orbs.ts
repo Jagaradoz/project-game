@@ -21,8 +21,9 @@ export function splitValue(value: number, count: number): number[] {
 }
 
 /**
- * Drops each kill's orbs, strung out along the kill's lane. A full field banks
- * the points directly instead -- a crowded screen must never cost the player.
+ * Drops each kill's orbs, strung out along the kill's lane: one orb per point,
+ * up to the kind's `perKill`. A full field banks the points directly instead
+ * -- a crowded screen must never cost the player.
  */
 export function dropOrbs(
   orbs: ScoreOrb[],
@@ -38,7 +39,7 @@ export function dropOrbs(
 
   kills.forEach((kill, killIndex) => {
     const value = values[killIndex] ?? 0;
-    const count = Math.min(perKill[kill.kind ?? 'normal'], maxOrbs - dropped.length);
+    const count = Math.min(value, perKill[kill.kind ?? 'normal'], maxOrbs - dropped.length);
     if (count <= 0) {
       banked += value;
       return;

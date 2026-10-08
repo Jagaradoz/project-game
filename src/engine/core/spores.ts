@@ -54,6 +54,24 @@ export function sporeDamage(
 }
 
 /**
+ * Points for braving a cloud behind the shield: one every `shieldPointMs` held
+ * inside it. Letting the shield drop or leaving the cloud restarts the count,
+ * so the first point always takes a full interval of holding.
+ */
+export function shieldPoints(
+  state: Pick<GameState, 'nextShieldPointMs'>,
+  isInside: boolean,
+  isShielding: boolean,
+  elapsedMs: number,
+  config: RunConfig,
+): { points: number; nextPointMs: number } {
+  const interval = config.spore.shieldPointMs;
+  if (!isInside || !isShielding) return { points: 0, nextPointMs: elapsedMs + interval };
+  if (elapsedMs < state.nextShieldPointMs) return { points: 0, nextPointMs: state.nextShieldPointMs };
+  return { points: 1, nextPointMs: elapsedMs + interval };
+}
+
+/**
  * Whether a new cloud may start this frame. Not during the boss fight, and not
  * on top of a trail hazard still near the spawn line -- the player cannot jump
  * while holding the shield pose, so the two must never overlap.

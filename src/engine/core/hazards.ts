@@ -14,6 +14,9 @@ function hazardReach(hazard: TrailHazard, config: RunConfig): number {
  * `jump.leniency` stretches the window both ways for webcam latency: a jump that landed up to
  * `landingGraceMs` before still counts, and so does one taking off up to `takeoffGraceMs` after the
  * centre passed. The verdict waits for that late window to close.
+ *
+ * A river is stricter: touching down on the water is falling in, so the jump must still be in the air
+ * (give or take `landingGraceMs`) when the far bank passes. A wider river is a harder jump.
  */
 export function advanceHazards(
   hazards: TrailHazard[], lane: number, deltaZ: number,
@@ -33,10 +36,17 @@ export function advanceHazards(
     const entryZ = config.playerZ - hazardReach(source, config);
     if (source.status === 'cleared') return obstacle;
     if (obstacle.z < entryZ) { obstacle.status = 'approaching'; return obstacle; }
+    const isRiver = source.kind === 'river';
     const enteredMs = reachedAt(source.z, entryZ);
     if (obstacle.centredMs === undefined && obstacle.z >= config.playerZ) obstacle.centredMs = reachedAt(source.z, config.playerZ);
-    const closesMs = obstacle.centredMs === undefined ? Infinity : obstacle.centredMs + leniency.takeoffGraceMs;
-    const airborne = lastTakeoffMs !== null && lastTakeoffMs <= Math.min(toMs, closesMs) && landedByMs >= enteredMs;
+    const farBankZ = config.playerZ + config.obstacle.riverRadius;
+    if (isRiver && obstacle.farBankMs === undefined && obstacle.z >= farBankZ) obstacle.farBankMs = reachedAt(source.z, farBankZ);
+    const takeoffClosesMs = obstacle.centredMs === undefined ? Infinity : obstacle.centredMs + leniency.takeoffGraceMs;
+    // A river's verdict also waits for its far bank, which may pass after the takeoff window shuts.
+    const closesMs = !isRiver ? takeoffClosesMs
+      : obstacle.farBankMs === undefined ? Infinity : Math.max(takeoffClosesMs, obstacle.farBankMs);
+    const mustLandAfterMs = isRiver ? obstacle.farBankMs ?? Infinity : enteredMs;
+    const airborne = lastTakeoffMs !== null && lastTakeoffMs <= Math.min(toMs, takeoffClosesMs) && landedByMs >= mustLandAfterMs;
     obstacle.covered = Boolean(source.covered) || airborne || !hazardBlocksLane(obstacle, lane);
     if (toMs < closesMs) { obstacle.status = 'crossing'; return obstacle; }
     if (!obstacle.covered) {

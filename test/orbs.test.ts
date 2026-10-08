@@ -11,6 +11,8 @@ const GAME = CONFIG.game;
 const { perKill, magnetReach, maxOrbs, spacing } = GAME.scoreOrbs;
 const QUIET: RunConfig = { ...GAME, spawnIntervalMs: 1e9, obstacle: { ...GAME.obstacle, firstMs: 1e9 }, spore: { ...GAME.spore, firstMs: 1e9 } };
 const orb = (id: number, lane: number, z: number, value = 10): ScoreOrb => ({ id, lane, z, previousZ: z, value });
+/** A normal kill at x1: one orb per point, capped by perKill. */
+const NORMAL_ORBS = Math.min(GAME.scoring.kill.normal, perKill.normal);
 const total = (orbs: ScoreOrb[]) => orbs.reduce((sum, item) => sum + item.value, 0);
 
 test('a value splits into whole parts that sum to it exactly', () => {
@@ -29,6 +31,13 @@ test('a kill drops its orbs in its own lane, strung out around where it fell', (
   const zs = dropped.orbs.map((item) => item.z);
   expect(Math.max(...zs) - Math.min(...zs)).toBeCloseTo((perKill.tank - 1) * spacing);
   expect(zs.reduce((a, b) => a + b, 0) / zs.length).toBeCloseTo(-30);
+});
+
+test('a small kill drops one orb per point', () => {
+  const dropped = dropOrbs([], [{ lane: 1, z: -30, kind: 'normal' }], [GAME.scoring.kill.normal], 1, GAME);
+
+  expect(dropped.orbs).toHaveLength(GAME.scoring.kill.normal);
+  expect(dropped.orbs.every((item) => item.value === 1)).toBe(true);
 });
 
 test('a full field banks a kill\'s points instead of losing them', () => {
@@ -92,23 +101,21 @@ function afterKill(lane: number): GameState {
 
 test('a kill pays nothing until its orbs reach the magnet', () => {
   const killed = afterKill(1);
-  expect(killed.orbs).toHaveLength(perKill.normal);
-  const before = killed.score;
+  expect(killed.orbs).toHaveLength(NORMAL_ORBS);
+  expect(killed.score).toBe(0);
 
   const { state, collected } = run(killed, 1, 180);
-  expect(collected).toHaveLength(perKill.normal);
+  expect(collected).toHaveLength(NORMAL_ORBS);
   expect(state.orbs).toHaveLength(0);
-  expect(state.score - before - (Math.floor(state.distance) - Math.floor(killed.distance)) * GAME.scoring.perMetre)
-    .toBe(GAME.scoring.kill.normal);
+  expect(state.score).toBe(GAME.scoring.kill.normal);
 });
 
 test('the magnet pulls in orbs from another lane without the player moving', () => {
   const killed = afterKill(2);
   const { state, collected } = run(killed, 0, 240);
 
-  expect(collected).toHaveLength(perKill.normal);
-  expect(state.score - killed.score - (Math.floor(state.distance) - Math.floor(killed.distance)) * GAME.scoring.perMetre)
-    .toBe(GAME.scoring.kill.normal);
+  expect(collected).toHaveLength(NORMAL_ORBS);
+  expect(state.score - killed.score).toBe(GAME.scoring.kill.normal);
 });
 
 test('far orbs wait on the trail until they come within reach', () => {
@@ -116,7 +123,7 @@ test('far orbs wait on the trail until they come within reach', () => {
   const { state, collected } = run(killed, 1, 10);
 
   expect(collected).toHaveLength(0);
-  expect(state.orbs).toHaveLength(perKill.normal);
+  expect(state.orbs).toHaveLength(NORMAL_ORBS);
 });
 
 test('clearing the stage collects the orbs still on the ground', () => {
@@ -130,6 +137,6 @@ test('clearing the stage collects the orbs still on the ground', () => {
 
   expect(cleared.isCleared).toBe(true);
   expect(cleared.orbs).toHaveLength(0);
-  expect(cleared.justCollected).toHaveLength(perKill.normal);
-  expect(cleared.score).toBe(GAME.scoring.kill.normal + GAME.scoring.stageCleared);
+  expect(cleared.justCollected).toHaveLength(NORMAL_ORBS);
+  expect(cleared.score).toBe(GAME.scoring.kill.normal);
 });

@@ -170,3 +170,10 @@ h3 {
 .mirrored {
   transform: scaleX(-1);
 }
+
+/* Score orb pickups: the HUD score swells. */
+@keyframes score-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}

@@ -3,7 +3,8 @@ import { expect, test } from 'vitest';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CONFIG } from '@/engine/config';
-import { addShieldBubble, addSporeCloud } from '@/engine/render/actors/spores';
+import { addShieldBubble } from '@/engine/render/actors/shield';
+import { addSporeCloud } from '@/engine/render/actors/spores';
 
 function fileLoader(loaded: string[]) {
   const loader = new GLTFLoader();
@@ -50,7 +51,9 @@ test('shield bubble fades in while shielding and out after', () => {
   expect(shield.mesh.visible).toBe(false);
   for (let i = 0; i < 20; i++) shield.update(true, i * 16, 0.016);
   expect(shield.mesh.visible).toBe(true);
-  expect((shield.mesh.material as THREE.MeshBasicMaterial).opacity).toBeGreaterThan(0.2);
+  expect((shield.bubble.material as THREE.ShaderMaterial).uniforms.uOpacity!.value).toBeGreaterThan(0.2);
+  expect(shield.bubble.scale.x).toBeGreaterThan(0.9);
+  expect(shield.sparks.visible).toBe(true);
   for (let i = 0; i < 40; i++) shield.update(false, i * 16, 0.016);
   expect(shield.mesh.visible).toBe(false);
 });

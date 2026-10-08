@@ -226,8 +226,7 @@ export const CONFIG = {
      * decides whether they SHOOT, not whether they move.
      */
     walkSpeed: 11,
-    maxSpeed: 18,
-    /** The ramp eases in over this long rather than snapping to a new speed. */
+    /** The walk eases up from a standstill over this long at the start of a run, then holds. */
     speedLerpMs: 400,
 
     /** Bullets only leave the barrel while the body is jogging. */
@@ -242,7 +241,7 @@ export const CONFIG = {
     doubleSpawnChance: 0.2,
     /** Never fill a row: one lane must always be survivable. */
     maxLanesPerRow: 2,
-    /** Distance travelled before speed and spawn rate reach their hardest values. */
+    /** Distance travelled before the spawn rate reaches its hardest value. Speed stays constant. */
     rampDistance: 1400,
 
     maxHp: 3,
@@ -266,7 +265,11 @@ export const CONFIG = {
     },
     obstacle: {
       firstMs: 8500, intervalMs: 8500, radius: 0.7, poolSize: 4,
-      riverRadius: 1.5,
+      /**
+       * Half the river's width along the trail. A river is only cleared by a jump
+       * still in the air as its far bank passes (core/hazards.ts), so wider is harder.
+       */
+      riverRadius: 2.5,
       // Relative odds per spawn: logs, rockfalls and rivers are equally likely.
       logWeight: 1, stoneWeight: 1, riverWeight: 1,
       drowningMs: 650,
@@ -289,6 +292,8 @@ export const CONFIG = {
     spore: {
       firstMs: 30000, intervalMs: 45000,
       length: 60, tickMs: 1500, entryGraceMs: 600,
+      /** Holding the shield inside a cloud earns a point this often (~1.7 a second). */
+      shieldPointMs: 600,
       /** Trail hazards must be at least this far ahead of the spawn line. */
       spawnClearance: 25,
       /** HUD warning starts this far before the front edge reaches the player. */
@@ -296,25 +301,26 @@ export const CONFIG = {
     },
     boss: { triggerKills: 15 },
     /**
-     * Score rules; see core/scoring.ts. Kill values scale with how long each kind
-     * takes to bring down, so a tank is worth its hp. The combo rewards keeping
-     * up the jog: every `comboStep` kills inside the window raise the multiplier.
+     * Score rules; see core/scoring.ts. Points come from score orbs alone, so
+     * the score counts what the player actually picked up. Kill values are small
+     * on purpose -- roughly one orb, one point -- and scale with how long each
+     * kind takes to bring down. The combo rewards keeping up the jog: every
+     * `comboStep` kills inside the window raise the multiplier.
      */
     scoring: {
-      kill: { weak: 100, normal: 250, tank: 600, boss: 3000 },
+      kill: { weak: 1, normal: 2, tank: 4, boss: 20 },
       comboWindowMs: 2500,
       comboStep: 5,
       multiplierStep: 0.5,
       maxMultiplier: 3,
-      perMetre: 5,
-      hazardCleared: 150,
-      stageCleared: 2000,
     },
     /**
      * Score orbs (core/orbs.ts). A kill's points drop as orbs where the enemy
      * fell and count once the player's magnet pulls them in: any lane, within
-     * `magnetReach` ahead. `spacing` strings a kill's orbs out along its lane.
-     * `maxOrbs` caps the field; past it, a kill's points are banked directly.
+     * `magnetReach` ahead. A kill drops one orb per point, up to `perKill` orbs;
+     * past that the points are shared out. `spacing` strings a kill's orbs out
+     * along its lane. `maxOrbs` caps the field; past it, a kill's points are
+     * banked directly.
      */
     scoreOrbs: {
       perKill: { weak: 3, normal: 4, tank: 6, boss: 14 },
@@ -329,10 +335,10 @@ export const CONFIG = {
      * faster kinds stride quicker instead of gliding.
      */
     enemyTypes: {
-      weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, walkRate: 1.6, height: 3.4, radius: 1, color: '#9bdd66' },
-      normal: { name: 'Bramble Skeleton', path: '/assets/models/enemies/animated/BrambleSkeleton.glb', hp: 2, approachSpeed: 2, walkRate: 1.25, height: 3.7, radius: 1.05, color: '#e5d7b1' },
-      tank: { name: 'Shroom Brute', path: '/assets/models/enemies/animated/ShroomBrute.glb', hp: 6, approachSpeed: 1, walkRate: 1, height: 3.9, radius: 1.3, color: '#e9a15b' },
-      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 12, approachSpeed: 0.5, walkRate: 0.9, height: 8, radius: 2, color: '#df7650' },
+      weak: { name: 'Goblin Scout', path: '/assets/models/enemies/animated/GoblinScout.glb', hp: 1, approachSpeed: 3.5, walkRate: 1.6, height: 3.4, radius: 1, color: '#9bdd66', laneSpan: 1 },
+      normal: { name: 'Bramble Skeleton', path: '/assets/models/enemies/animated/BrambleSkeleton.glb', hp: 2, approachSpeed: 2, walkRate: 1.25, height: 3.7, radius: 1.05, color: '#e5d7b1', laneSpan: 1 },
+      tank: { name: 'Shroom Brute', path: '/assets/models/enemies/animated/ShroomBrute.glb', hp: 6, approachSpeed: 1, walkRate: 1, height: 3.9, radius: 1.3, color: '#e9a15b', laneSpan: 1 },
+      boss: { name: 'Elder Treant', path: '/assets/models/enemies/animated/ElderTreant.glb', hp: 12, approachSpeed: 0.5, walkRate: 0.9, height: 8, radius: 2, color: '#df7650', laneSpan: 3 },
     },
 
     enemy: {

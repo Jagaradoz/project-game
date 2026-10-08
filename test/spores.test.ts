@@ -139,3 +139,29 @@ test('input: holding S or Shift shields from the keyboard', () => {
   input.detach();
   vi.unstubAllGlobals();
 });
+
+test('holding the shield inside a cloud earns a point every shieldPointMs', () => {
+  let state = inCloud();
+  let earned = 0;
+  let bonusFrames = 0;
+  const steps = Math.round(3000 / STEP);
+  for (let i = 0; i < steps; i += 1) {
+    state = updateGame(state, { ...idle, isShielding: true }, STEP);
+    earned += state.justBonus;
+    if (state.justBonus > 0) bonusFrames += 1;
+  }
+  expect(earned).toBe(Math.floor(3000 / SPORE.shieldPointMs));
+  expect(bonusFrames).toBe(earned);
+  expect(state.score).toBe(earned);
+});
+
+test('no shield-in-cloud points without the shield, or outside a cloud', () => {
+  let bare = inCloud();
+  let clear = inCloud({ spores: [] });
+  for (let i = 0; i < 40; i += 1) {
+    bare = updateGame(bare, idle, STEP);
+    clear = updateGame(clear, { ...idle, isShielding: true }, STEP);
+  }
+  expect(bare.score).toBe(0);
+  expect(clear.score).toBe(0);
+});

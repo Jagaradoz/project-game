@@ -43,12 +43,6 @@ const {
   groundColor: GROUND_COLOR, groundOpacity: GROUND_OPACITY, edgeFade: EDGE_FADE,
 } = CLOUD_LAYOUT.spore;
 
-const SHIELD_COLOR = '#7fe3ff';
-const SHIELD_RADIUS = 1.6;
-const SHIELD_CENTRE_Y = 1.7;
-const SHIELD_OPACITY = 0.28;
-const SHIELD_FADE_PER_SEC = 6;
-
 /** First mesh in a loaded asset; the spore assets are each a single mesh. */
 function firstMesh(root: T.Object3D): T.Mesh {
   let found: T.Mesh | undefined;
@@ -125,26 +119,4 @@ export async function addSporeCloud(THREE: ThreeModule, scene: T.Scene, config: 
   }
 
   return { group, sync, hide: () => { group.visible = false; } };
-}
-
-export function addShieldBubble(THREE: ThreeModule, parent: T.Object3D) {
-  const material = new THREE.MeshBasicMaterial({ color: SHIELD_COLOR, transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false });
-  const bubble = new THREE.Mesh(new THREE.SphereGeometry(SHIELD_RADIUS, 20, 14), material);
-  bubble.position.y = SHIELD_CENTRE_Y;
-  bubble.visible = false;
-  parent.add(bubble);
-  let strength = 0;
-
-  function update(isShielding: boolean, elapsedMs: number, dtSec: number) {
-    const target = isShielding ? 1 : 0;
-    const stepAmount = SHIELD_FADE_PER_SEC * dtSec;
-    strength = Math.abs(target - strength) <= stepAmount ? target : strength + Math.sign(target - strength) * stepAmount;
-    bubble.visible = strength > 0;
-    const pulse = 1 + Math.sin(elapsedMs * 0.006) * 0.04;
-    bubble.scale.setScalar((0.7 + strength * 0.3) * pulse);
-    material.opacity = strength * SHIELD_OPACITY;
-  }
-
-  return { mesh: bubble, update };
 }

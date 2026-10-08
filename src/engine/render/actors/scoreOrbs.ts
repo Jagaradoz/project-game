@@ -3,8 +3,10 @@
  *
  * The reducer owns every orb -- where it lies, and whether it was picked up.
  * This module only dresses them: a pop and a few bounces where the enemy fell,
- * a gentle hover while the ground carries them in, and a quick flight into the
- * player once the reducer reports its magnet has taken them, from any lane.
+ * a gentle hover and twinkle while the ground carries them in, and -- once the
+ * reducer reports its magnet has taken them, from any lane -- a swell, an
+ * arcing flight into the player, and a splash where each one lands (orbSplash.ts)
+ * with its "+N" floating up beside the character (scorePopups.ts).
  *
  * Each orb is a glossy, candy-like core inside a larger, faint additive halo of
  * the same colour. The core's shading comes from a procedural matcap (soft
@@ -17,16 +19,22 @@
 import type * as THREE_NS from 'three';
 
 import { laneToX } from '@/engine/core/state';
+import { createGlossyMatcap } from '@/engine/render/actors/matcap';
+import { createOrbSplash, type OrbSplashRefs } from '@/engine/render/actors/orbSplash';
+import { createScorePopups, type ScorePopupRefs } from '@/engine/render/actors/scorePopups';
 import { TRAIL_Y } from '@/engine/render/world/ground';
 import type { Palette } from '@/engine/render/world/palette';
 import type { GameConfig, ScoreOrb, ThreeModule } from '@/engine/types';
 
-const ORB_RADIUS = 0.17;
+const ORB_RADIUS = 0.24;
 const ORB_SEGMENTS = 20;
 /** Resting height of an orb's centre above the trail. */
 const HOVER_Y = 0.45;
 const HOVER_BOB = 0.08;
 const HOVER_RATE = 3.2;
+/** A slow breathing of each orb's size, out of step with its neighbours. */
+const TWINKLE = 0.1;
+const TWINKLE_RATE = 5.5;
 /** Death height the pop starts from, above the resting height. */
 const POP_HEIGHT = 1.3;
 const BOUNCE_RATE = 9;
@@ -38,18 +46,21 @@ const BOUNCE_DAMPING = 3.2;
 const SPREAD_X = 7;
 const SPREAD_SEC = 0.35;
 
-const HALO_SCALE = 2.4;
-const HALO_OPACITY = 0.35;
+const HALO_SCALE = 1.3;
+const HALO_OPACITY = 0.6;
 
-/** Matcap texture edge, in texels. */
-const MATCAP_SIZE = 128;
-/** Texel values above 1 push the tinted highlight towards white. */
-const MATCAP_SPECULAR = 3;
-const MATCAP_SHININESS = 40;
-const MATCAP_RIM = 0.6;
-
-const HOME_START_SPEED = 6;
-const HOME_ACCEL = 90;
+const HOME_START_SPEED = 4;
+const HOME_ACCEL = 110;
+/** The upward, outward flick an orb gets when the magnet takes it, decaying as it homes in. */
+const KICK_UP = 5;
+const KICK_SIDE = 2.5;
+const KICK_DECAY = 7;
+/** Pickup swell: the orb grows this much over the first moments of its flight... */
+const SWELL = 0.6;
+const SWELL_SEC = 0.12;
+/** ...then shrinks towards this size as it reaches the player. */
+const ARRIVE_SCALE = 0.45;
+const ARRIVE_RANGE = 2.5;
 const COLLECT_DISTANCE = 0.4;
 /** A collected orb that somehow never arrives is retired after this long. */
 const MAX_FLIGHT_SEC = 1;
@@ -70,7 +81,11 @@ interface Slot {
   offsetX: number;
   bobPhase: number;
   seenFrame: number;
+  colorIndex: number;
+  /** Points this orb carries, for its "+N" label. */
+  value: number;
   position: THREE_NS.Vector3;
+  kick: THREE_NS.Vector3;
 }
 
 export interface OrbTarget {
@@ -82,6 +97,8 @@ export interface OrbTarget {
 export interface ScoreOrbRefs {
   mesh: THREE_NS.InstancedMesh;
   halo: THREE_NS.InstancedMesh;
+  splash: OrbSplashRefs;
+  popups: ScorePopupRefs;
   update(orbs: readonly ScoreOrb[], collectedIds: readonly number[], dtSec: number, target: OrbTarget): void;
   hide(): void;
   /** Orbs drawn this frame, on the ground or flying home. */
@@ -90,43 +107,6 @@ export interface ScoreOrbRefs {
 
 function hashId(id: number): number {
   return Math.imul(id, HASH_MULTIPLIER) >>> 0;
-}
-
-/**
- * A white-based matcap: instance colour tints it, and the HDR specular spot
- * saturates past the tint so the highlight reads white on every gem colour.
- */
-function createMatcap(THREE: ThreeModule): THREE_NS.DataTexture {
-  const data = new Uint16Array(MATCAP_SIZE * MATCAP_SIZE * 4);
-  const light = new THREE.Vector3(-0.45, 0.6, 0.66).normalize();
-  const normal = new THREE.Vector3();
-  const half = new THREE.Vector3();
-  const view = new THREE.Vector3(0, 0, 1);
-  half.copy(light).add(view).normalize();
-
-  for (let row = 0; row < MATCAP_SIZE; row += 1) {
-    for (let column = 0; column < MATCAP_SIZE; column += 1) {
-      const nx = ((column + 0.5) / MATCAP_SIZE) * 2 - 1;
-      const ny = ((row + 0.5) / MATCAP_SIZE) * 2 - 1;
-      const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
-      normal.set(nx, ny, nz);
-      const diffuse = 0.45 + 0.55 * Math.max(0, normal.dot(light));
-      const rim = Math.pow(1 - nz, 3) * MATCAP_RIM;
-      const specular = Math.pow(Math.max(0, normal.dot(half)), MATCAP_SHININESS) * MATCAP_SPECULAR;
-      const value = THREE.DataUtils.toHalfFloat(diffuse + rim + specular);
-      const offset = (row * MATCAP_SIZE + column) * 4;
-      data[offset] = value;
-      data[offset + 1] = value;
-      data[offset + 2] = value;
-      data[offset + 3] = THREE.DataUtils.toHalfFloat(1);
-    }
-  }
-
-  const texture = new THREE.DataTexture(data, MATCAP_SIZE, MATCAP_SIZE, THREE.RGBAFormat, THREE.HalfFloatType);
-  texture.magFilter = THREE.LinearFilter;
-  texture.minFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-  return texture;
 }
 
 export function createScoreOrbs(
@@ -140,7 +120,7 @@ export function createScoreOrbs(
 
   const mesh = new THREE.InstancedMesh(
     new THREE.SphereGeometry(ORB_RADIUS, ORB_SEGMENTS, ORB_SEGMENTS * 0.75),
-    new THREE.MeshMatcapMaterial({ matcap: createMatcap(THREE), toneMapped: false }),
+    new THREE.MeshMatcapMaterial({ matcap: createGlossyMatcap(THREE), toneMapped: false }),
     poolSize,
   );
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(poolSize * 3), 3);
@@ -166,8 +146,10 @@ export function createScoreOrbs(
 
   const slots: Slot[] = Array.from({ length: poolSize }, () => ({
     phase: 'idle', id: -1, ageSec: 0, flightSec: 0, speed: 0, offsetX: 0, bobPhase: 0, seenFrame: -1,
-    position: new THREE.Vector3(),
+    colorIndex: 0, value: 0, position: new THREE.Vector3(), kick: new THREE.Vector3(),
   }));
+  const splash = createOrbSplash(THREE, scene);
+  const popups = createScorePopups(THREE, scene);
   const free = slots.map((_, index) => poolSize - 1 - index);
   const slotById = new Map<number, number>();
   const matrix = new THREE.Matrix4();
@@ -203,7 +185,9 @@ export function createScoreOrbs(
     slot.ageSec = 0;
     slot.offsetX = (((hash >>> 8) % 1000) / 1000 - 0.5) * SPREAD_X;
     slot.bobPhase = ((hash >>> 4) % 628) / 100;
-    mesh.setColorAt(index, colors[hash % colors.length]!);
+    slot.colorIndex = hash % colors.length;
+    slot.value = orb.value;
+    mesh.setColorAt(index, colors[slot.colorIndex]!);
     mesh.instanceColor!.needsUpdate = true;
     slotById.set(orb.id, index);
     activeCount += 1;
@@ -223,8 +207,26 @@ export function createScoreOrbs(
     );
   }
 
-  /** True once the orb has reached the player. */
+  /** Size on the ground: a slow, per-orb twinkle. */
+  function groundSize(slot: Slot): number {
+    return 1 + Math.sin(slot.ageSec * TWINKLE_RATE + slot.bobPhase * 2) * TWINKLE;
+  }
+
+  /** Size in flight: a quick swell on pickup, shrinking as it reaches the player. */
+  function flightSize(slot: Slot, target: OrbTarget): number {
+    const swell = 1 + SWELL * Math.sin(Math.min(1, slot.flightSec / SWELL_SEC) * Math.PI * 0.5);
+    toTarget.set(target.x, target.y, target.z).sub(slot.position);
+    const near = Math.min(1, toTarget.length() / ARRIVE_RANGE);
+    return swell * (ARRIVE_SCALE + (1 - ARRIVE_SCALE) * near);
+  }
+
+  /**
+   * True once the orb has reached the player. The kick flings it up and out,
+   * and the homing pull -- accelerating every frame -- bends that into an arc.
+   */
   function flyHome(slot: Slot, dtSec: number, target: OrbTarget): boolean {
+    slot.position.addScaledVector(slot.kick, dtSec);
+    slot.kick.multiplyScalar(Math.exp(-KICK_DECAY * dtSec));
     toTarget.set(target.x, target.y, target.z).sub(slot.position);
     const distance = toTarget.length();
     if (distance <= COLLECT_DISTANCE) return true;
@@ -238,6 +240,8 @@ export function createScoreOrbs(
       if (slots[index]!.phase !== 'idle') retire(index);
       else write(index, HIDDEN_SCALE);
     }
+    splash.hide();
+    popups.hide();
     mesh.instanceMatrix.needsUpdate = true;
   }
 
@@ -246,8 +250,12 @@ export function createScoreOrbs(
   return {
     mesh,
     halo,
+    splash,
+    popups,
 
     update(orbs, collectedIds, dtSec, target) {
+      splash.update(dtSec);
+      popups.update(dtSec);
       if (activeCount === 0 && orbs.length === 0) return;
       frame += 1;
 
@@ -259,6 +267,7 @@ export function createScoreOrbs(
         slot.phase = 'home';
         slot.flightSec = 0;
         slot.speed = HOME_START_SPEED;
+        slot.kick.set(Math.sign(slot.position.x - target.x) * KICK_SIDE, KICK_UP, 0);
       }
 
       for (const orb of orbs) {
@@ -282,18 +291,22 @@ export function createScoreOrbs(
           slot.ageSec += dtSec;
           slot.flightSec += dtSec;
           if (flyHome(slot, dtSec, target) || slot.flightSec >= MAX_FLIGHT_SEC) {
+            splash.splash(target, colors[slot.colorIndex]!, slot.id);
+            popups.spawn(slot.value, target, colors[slot.colorIndex]!, slot.id);
             retire(index);
             continue;
           }
+          write(index, flightSize(slot, target));
+          continue;
         }
-        write(index, 1);
+        write(index, groundSize(slot));
       }
       mesh.instanceMatrix.needsUpdate = true;
     },
 
     /** Called every frame the actors are hidden, so it is free when nothing is showing. */
     hide() {
-      if (activeCount > 0) hideAll();
+      if (activeCount > 0 || splash.liveCount > 0 || popups.liveCount > 0) hideAll();
     },
 
     get activeCount() {

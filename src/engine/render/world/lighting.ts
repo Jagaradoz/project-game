@@ -38,7 +38,9 @@ export function configureRenderer(
 ): number {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // Neutral rather than ACES: ACES rolls bright saturated colours off towards
+  // white and shifts their hue, which flattened the neon orbs, spells and sky.
+  renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = palette.light.exposure;
 
   const mapSize = SHADOW_QUALITY[quality] ?? SHADOW_QUALITY.high;

@@ -3,6 +3,9 @@ import type { GameConfig, ThreeModule } from '@/engine/types';
 import type { Palette } from '@/engine/render/world/palette';
 import { createHeightSampler } from '@/engine/render/world/ground';
 
+/** Half-width of the river as authored in river_crossing.glb (tools/build_trail_obstacles_catalog.py). */
+const AUTHORED_RIVER_RADIUS = 1.5;
+
 /**
  * The river is authored in Blender (`river_crossing.glb`, tools/export_river_asset.py) from this very
  * valley profile: opaque water filling the hole the terrain mask cuts, vertical banks, mud, foam, reeds and
@@ -17,6 +20,9 @@ export function buildRiver(THREE: ThreeModule, config: GameConfig, palette: Pale
   const depth = config.obstacle.riverRadius * 2;
   const heightAt = createHeightSampler(config);
   const channel = template.clone(true);
+  // The asset's banks are baked at the original half-width; stretch it along the
+  // trail to wherever the gameplay river (and the terrain cut) now ends.
+  channel.scale.z = config.obstacle.riverRadius / AUTHORED_RIVER_RADIUS;
   channel.traverse(node => {
     const mesh = node as T.Mesh;
     if (!mesh.isMesh) return;

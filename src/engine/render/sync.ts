@@ -31,8 +31,10 @@ import type { DrowningPresentation } from '@/engine/core/drowning';
 const BLINK_PERIOD_MS = 160;
 const BLINK_OPACITY = 0.25;
 const LANE_LERP = 0.35;
-/** Chest height above the player's feet, where score orbs are absorbed. */
+/** The middle of the character above its feet, where score orbs are absorbed and splash. */
 const ORB_TARGET_HEIGHT = 1.6;
+/** Shield cyan, for the "+N" earned holding the shield inside a spore cloud. */
+const BONUS_COLOR = '#00e1ff';
 
 export function syncScene(
   sceneRefs: SceneRefs,
@@ -64,7 +66,10 @@ export function syncScene(
     if (newEvents) stageKills(sceneRefs, state, config);
     sceneRefs.enemyPool?.updateCorpses(dtSec, state.speed);
     sceneRefs.effects?.update(dtSec, state.speed);
-    sceneRefs.scoreOrbs?.update(state.orbs, newEvents ? state.justCollected : [], dtSec, orbTarget(sceneRefs, state, config));
+    const target = orbTarget(sceneRefs, state, config);
+    // Shield-in-spore points have no orb, so their "+N" appears on its own.
+    if (newEvents && state.justBonus > 0) sceneRefs.scoreOrbs?.popups.spawn(state.justBonus, target, BONUS_COLOR, state.elapsedMs);
+    sceneRefs.scoreOrbs?.update(state.orbs, newEvents ? state.justCollected : [], dtSec, target);
     sceneRefs.bulletPool?.sync(state, dtSec, sceneRefs.player?.characterId ?? config.defaultCharacter);
   } else {
     if (sceneRefs.enemyPool) {

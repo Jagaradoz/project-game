@@ -30,7 +30,8 @@ import { createRiverMask } from '@/engine/render/world/riverMask';
 import { addPlayer } from '@/engine/render/actors/player';
 import { createEffects } from '@/engine/render/actors/effects';
 import { createScoreOrbs } from '@/engine/render/actors/scoreOrbs';
-import { addShieldBubble, addSporeCloud } from '@/engine/render/actors/spores';
+import { addShieldBubble } from '@/engine/render/actors/shield';
+import { addSporeCloud } from '@/engine/render/actors/spores';
 
 const MOTE_COUNT = 26;
 const MOTE_SPAN = 180;
@@ -73,7 +74,7 @@ export async function createScene(
   const clouds = await addClouds(THREE, scene, palette, loader, cloudOptions);
   const player = await addPlayer(THREE, scene, config, palette, loader);
   const enemyPool = await addEnemyPool(THREE, scene, config, palette, loader);
-  const bulletPool = await addSpellPool(THREE, scene, config, loader);
+  const bulletPool = addSpellPool(THREE, scene, config);
   const obstaclePool = await addObstaclePool(THREE, scene, config, loader, palette);
   const drowningSplash = createDrowningSplash(THREE, scene, palette);
   const effects = createEffects(THREE, scene, palette);
@@ -169,6 +170,7 @@ export async function createScene(
       cameraFeedback.dispose();
       enemyPool.dispose();
       bulletPool.dispose();
+      scoreOrbs.popups.dispose();
       const resources = new Set<{ dispose(): void }>();
       scene.traverse((object) => {
         const mesh = object as THREE_NS.Mesh;

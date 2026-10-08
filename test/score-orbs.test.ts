@@ -34,7 +34,7 @@ function positionAt(mesh: THREE.InstancedMesh, index: number) {
 test('core and halo share one matrix buffer and one colour buffer, with no shadows', () => {
   const { scene, refs } = orbs();
 
-  expect(scene.children).toEqual([refs.mesh, refs.halo]);
+  expect(scene.children).toEqual([refs.mesh, refs.halo, refs.splash.dots, refs.popups.group]);
   expect(refs.halo.instanceMatrix).toBe(refs.mesh.instanceMatrix);
   expect(refs.halo.instanceColor).toBe(refs.mesh.instanceColor);
   expect(refs.halo.castShadow || refs.mesh.castShadow).toBe(false);
@@ -87,6 +87,41 @@ test('a collected orb flies into the player and is retired', () => {
 
   for (let frame = 0; frame < 30 && refs.activeCount > 0; frame += 1) refs.update([], [], STEP_SEC, PLAYER);
   expect(refs.activeCount).toBe(0);
+});
+
+test('a landed orb splashes, and the splash fades out on its own', () => {
+  const { refs } = orbs();
+  refs.update(field(1, 1, -3), [], STEP_SEC, PLAYER);
+  refs.update([], [1], STEP_SEC, PLAYER);
+  for (let frame = 0; frame < 60 && refs.activeCount > 0; frame += 1) refs.update([], [], STEP_SEC, PLAYER);
+
+  expect(refs.splash.liveCount).toBeGreaterThan(0);
+  expect(positionAt(refs.splash.dots, 0).scale).toBeGreaterThan(0.5);
+  // Bursts from the character's centre, not from wherever the orb was.
+  expect(positionAt(refs.splash.dots, 0).position.distanceTo(new THREE.Vector3(PLAYER.x, PLAYER.y, PLAYER.z))).toBeLessThan(0.2);
+  for (let frame = 0; frame < 60; frame += 1) refs.update([], [], STEP_SEC, PLAYER);
+  expect(refs.splash.liveCount).toBe(0);
+  expect(positionAt(refs.splash.dots, 0).scale).toBeLessThan(0.01);
+});
+
+test('a landed orb shows its points beside the character, rising and fading away', () => {
+  const { refs } = orbs();
+  refs.update(field(1, 1, -3), [], STEP_SEC, PLAYER);
+  refs.update([], [1], STEP_SEC, PLAYER);
+  for (let frame = 0; frame < 60 && refs.activeCount > 0; frame += 1) refs.update([], [], STEP_SEC, PLAYER);
+
+  const label = refs.popups.group.children.find((child) => child.visible) as THREE.Sprite;
+  expect(refs.popups.liveCount).toBe(1);
+  expect(Math.abs(label.position.x - PLAYER.x)).toBeLessThan(2);
+  const startY = label.position.y;
+
+  for (let frame = 0; frame < 20; frame += 1) refs.update([], [], STEP_SEC, PLAYER);
+  expect(label.position.y).toBeGreaterThan(startY);
+  expect(label.scale.y).toBeGreaterThan(0);
+
+  for (let frame = 0; frame < 60; frame += 1) refs.update([], [], STEP_SEC, PLAYER);
+  expect(refs.popups.liveCount).toBe(0);
+  expect(label.visible).toBe(false);
 });
 
 test('an orb that leaves the field uncollected just disappears', () => {

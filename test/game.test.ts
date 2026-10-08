@@ -197,7 +197,7 @@ test('game: an enemy that leaps clean over the player in one step still hits', (
   const reach = GAME.playerRadius + GAME.enemyRadius;
   const flying = {
     ...createGameState(1),
-    speed: GAME.maxSpeed * 5,
+    speed: GAME.walkSpeed * 5,
     enemies: [{ lane: 1, z: -reach - 1, previousZ: -reach - 1 }],
   };
   const state = updateGame(flying, { lane: 1, isFiring: false }, GAME.maxFrameMs);
@@ -207,7 +207,7 @@ test('game: an enemy that leaps clean over the player in one step still hits', (
 });
 
 test('game: tuning keeps one clamped frame shorter than the collision band', () => {
-  const travelPerFrame = GAME.maxSpeed * (GAME.maxFrameMs / 1000);
+  const travelPerFrame = GAME.walkSpeed * (GAME.maxFrameMs / 1000);
   const bandWidth = 2 * (GAME.playerRadius + GAME.enemyRadius);
 
   assert.ok(travelPerFrame < bandWidth, `${travelPerFrame} vs ${bandWidth}`);
@@ -384,12 +384,22 @@ test('game: no spawn row ever seals off every lane', () => {
   assert.ok(previousCount >= 0);
 });
 
-test('game: speed ramps up with distance, then stops', () => {
+test('game: walking speed stays constant for the whole run', () => {
   const early = runGame(createGameState(3), 120, constantInput(WALKING));
   const late = runGame({ ...early, distance: GAME.rampDistance * 2 }, 120, constantInput(WALKING));
 
-  assert.ok(late.speed > early.speed, `${late.speed} vs ${early.speed}`);
-  assert.ok(late.speed <= GAME.maxSpeed + 1e-9, `speed was ${late.speed}`);
+  assert.ok(Math.abs(early.speed - GAME.walkSpeed) < 1e-6, `early speed was ${early.speed}`);
+  assert.ok(Math.abs(late.speed - GAME.walkSpeed) < 1e-6, `late speed was ${late.speed}`);
+});
+
+test('game: the gun holds fire while the player is in the air', () => {
+  const grounded = updateGame(createGameState(1), { lane: 1, isFiring: true }, STEP_MS);
+  const airborne = updateGame(createGameState(1), { lane: 1, isFiring: true, jump: true }, STEP_MS);
+
+  assert.equal(grounded.isFiring, true);
+  assert.ok(grounded.bullets.length > 0);
+  assert.equal(airborne.isFiring, false);
+  assert.equal(airborne.bullets.length, 0);
 });
 
 test('game: a long stalled frame is clamped instead of teleporting the world', () => {

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Luckiest_Guy, Plus_Jakarta_Sans } from 'next/font/google';
 
 import './globals.css';
 
@@ -12,6 +12,18 @@ const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800'],
   variable: '--font-plus-jakarta',
+  display: 'swap',
+});
+
+/**
+ * The chunky cartoon face of the in-game "+N" score labels. The engine draws
+ * those on a canvas, so it reads the family from this CSS variable (see
+ * src/engine/render/actors/scorePopups.ts) rather than from a class.
+ */
+const luckiestGuy = Luckiest_Guy({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-score-popup',
   display: 'swap',
 });
 
@@ -69,7 +81,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={plusJakarta.variable}>
+    <html lang="en" className={`${plusJakarta.variable} ${luckiestGuy.variable}`}>
       <body className="m-0 min-h-dvh antialiased">{children}</body>
     </html>
   );

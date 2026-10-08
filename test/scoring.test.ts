@@ -3,15 +3,14 @@
 import { expect, test } from 'vitest';
 
 import { CONFIG } from '@/engine/config';
-import { activeMultiplier, chainKills, comboMultiplier, distancePoints, killPoints, stepPoints } from '@/engine/core/scoring';
-import type { ComboChain, StepPoints } from '@/engine/core/scoring';
+import { activeMultiplier, chainKills, comboMultiplier, killPoints } from '@/engine/core/scoring';
+import type { ComboChain } from '@/engine/core/scoring';
 import { createGameState, restartGame, updateGame } from '@/engine/core/state';
 import type { GameState, KillMark, TrailHazard } from '@/engine/types';
 
 const GAME = CONFIG.game;
 const { scoring } = GAME;
 const FRESH: ComboChain = { combo: 0, lastKillMs: -Infinity };
-const NOTHING: StepPoints = { fromDistance: 0, toDistance: 0, hazardsCleared: 0, justCleared: false, collected: 0 };
 const kill = (kind?: KillMark['kind']): KillMark => ({ lane: 1, z: -10, ...(kind ? { kind } : {}) });
 
 test('each enemy kind is worth its configured points, and an untyped enemy scores as normal', () => {
@@ -28,15 +27,6 @@ test('the combo multiplier steps up every comboStep kills and stops at the cap',
   expect(comboMultiplier(1000, GAME)).toBe(scoring.maxMultiplier);
 });
 
-test('distance pays only for whole metres, so frame slicing never changes the total', () => {
-  expect(distancePoints(0, 0.9, GAME)).toBe(0);
-  expect(distancePoints(0.9, 1.1, GAME)).toBe(scoring.perMetre);
-
-  let sliced = 0;
-  for (let metres = 0; metres < 100; metres += 0.37) sliced += distancePoints(metres, Math.min(100, metres + 0.37), GAME);
-  expect(sliced).toBe(distancePoints(0, 100, GAME));
-});
-
 test('kills inside the window build a chain that raises later kills', () => {
   let chain = FRESH;
   const values: number[] = [];
@@ -47,7 +37,7 @@ test('kills inside the window build a chain that raises later kills', () => {
   }
 
   expect(chain.combo).toBe(scoring.comboStep + 1);
-  expect(values.at(-1)).toBe(scoring.kill.weak * (1 + scoring.multiplierStep));
+  expect(values.at(-1)).toBe(Math.round(scoring.kill.weak * (1 + scoring.multiplierStep)));
   expect(values.slice(0, -1).every((value) => value === scoring.kill.weak)).toBe(true);
 });
 
@@ -63,12 +53,6 @@ test('taking damage breaks the chain after the step\'s own kills are valued', ()
 
   expect(hit.values).toEqual([scoring.kill.weak * scoring.maxMultiplier]);
   expect(hit.chain.combo).toBe(0);
-});
-
-test('a step adds distance, hazard, goal and collected-orb points', () => {
-  expect(stepPoints({ ...NOTHING, hazardsCleared: 2, justCleared: true, collected: 75 }, GAME))
-    .toBe(2 * scoring.hazardCleared + scoring.stageCleared + 75);
-  expect(stepPoints(NOTHING, GAME)).toBe(0);
 });
 
 test('the HUD multiplier previews the next kill and falls back to 1 once the window closes', () => {
@@ -88,7 +72,7 @@ function stepUntilHazardsSettle(state: GameState, lane: number): GameState {
   return current;
 }
 
-test('the reducer pays the hazard bonus for a safe crossing but not for a hit', () => {
+test('crossing a hazard safely or being hit by it pays nothing', () => {
   const log: TrailHazard = { id: 70, kind: 'log', startLane: 0, laneCount: 2, z: -1, previousZ: -1, status: 'approaching' };
   const start = { ...createGameState(3), speed: 11, obstacles: [log] };
 
@@ -97,15 +81,15 @@ test('the reducer pays the hazard bonus for a safe crossing but not for a hit', 
 
   expect(dodged.hp).toBe(GAME.maxHp);
   expect(struck.hp).toBe(GAME.maxHp - 1);
-  expect(dodged.score - struck.score).toBe(scoring.hazardCleared);
+  expect([dodged.score, struck.score]).toEqual([0, 0]);
 });
 
-test('the reducer pays for distance walked', () => {
+test('walking earns no points on its own', () => {
   let state = createGameState(1, { ...GAME, spawnIntervalMs: 1e9, obstacle: { ...GAME.obstacle, firstMs: 1e9 } });
   for (let index = 0; index < 120; index += 1) state = updateGame(state, { lane: 1, isFiring: false }, 1000 / 60);
 
   expect(state.distance).toBeGreaterThan(1);
-  expect(state.score).toBe(Math.floor(state.distance) * scoring.perMetre);
+  expect(state.score).toBe(0);
 });
 
 test('a restart clears the chain and the orbs along with the score', () => {

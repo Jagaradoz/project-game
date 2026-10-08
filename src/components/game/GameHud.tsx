@@ -19,22 +19,6 @@ export function GameHud({ snapshot }: GameHudProps) {
     <>
       <div className="pointer-events-none absolute inset-x-3 top-3 z-[1] flex flex-col items-center gap-2">
         <GoalBar snapshot={snapshot} />
-        {snapshot.bossHp !== null && (
-          <div className="w-full max-w-[320px] border-2 border-surface bg-ink px-3 py-2 text-white">
-            <div className="flex justify-between text-xs font-black uppercase"><span>Elder Treant</span><span>{snapshot.bossHp}/{snapshot.bossMaxHp}</span></div>
-            <progress className="mt-1 h-2 w-full accent-orange-500" max={snapshot.bossMaxHp} value={snapshot.bossHp} aria-label="Elder Treant health" />
-          </div>
-        )}
-        <SporeBanner snapshot={snapshot} />
-        {snapshot.obstacleDistance !== null && snapshot.obstacleDistance < 35 && (
-          <div role="status" className="border-2 border-ink bg-primary px-3 py-2 text-sm font-black text-ink">
-            {snapshot.isAirborne ? 'Jumping' : snapshot.obstacleKind === 'river'
-              ? 'River ahead — raise both arms to jump! Missing it ends the run.'
-              : `${snapshot.obstacleKind === 'log' ? 'Log' : 'Stones'} ahead — ${snapshot.obstacleOpenLane === null ? 'raise both arms to jump!' : `raise both arms to jump, or use the ${snapshot.obstacleOpenLane === 0 ? 'left' : 'right'} lane!`}`}
-            {' '}· {Math.ceil(snapshot.obstacleDistance)} m
-          </div>
-        )}
-
         <div
           key={snapshot.hp}
           className="flex items-center justify-center gap-1 border-2 border-surface bg-ink px-3 py-1 shadow-[3px_3px_0_0_var(--color-primary)] animate-[pulse_280ms_ease-out_1] motion-reduce:animate-none"
@@ -59,13 +43,13 @@ export function GameHud({ snapshot }: GameHudProps) {
             />
           ))}
         </div>
+        <BossBar snapshot={snapshot} />
       </div>
 
       <div className="pointer-events-none absolute bottom-3 left-3 z-[1]">
         <div className="border-2 border-surface bg-ink px-3 py-2 shadow-[4px_4px_0_0_var(--color-primary)]">
           <div className="flex flex-col gap-0.5 font-semibold tabular-nums text-white">
-            {/* Keyed on kills, not score: walking adds points every metre and would pulse it constantly. */}
-            <Stat label="Score" value={formatNumber(shownScore)} reactiveKey={snapshot.killCount} accent />
+            <ScoreStat score={snapshot.score} shownScore={shownScore} />
             {snapshot.comboMultiplier > 1 && (
               <span
                 key={snapshot.comboMultiplier}
@@ -83,27 +67,13 @@ export function GameHud({ snapshot }: GameHudProps) {
   );
 }
 
-/**
- * Spore cloud warning: ahead, then inside. Only the shield gets the player
- * through, so the copy always names the pose rather than the game action.
- */
-function SporeBanner({ snapshot }: { snapshot: HudSnapshot }) {
-  if (snapshot.isOver) return null;
-  if (snapshot.isInSpore) {
-    return snapshot.isShielding ? (
-      <div role="status" className="border-2 border-white bg-sky-700 px-3 py-2 text-sm font-black text-white">
-        Shield up — keep your hands on your hips until the cloud passes
-      </div>
-    ) : (
-      <div role="status" className="border-2 border-white bg-purple-800 px-3 py-2 text-sm font-black text-white">
-        Poison spores! Put your hands on your hips to shield
-      </div>
-    );
-  }
-  if (snapshot.sporeDistance === null) return null;
+/** The Elder Treant's health, under the player's own while the boss is up. */
+function BossBar({ snapshot }: { snapshot: HudSnapshot }) {
+  if (snapshot.bossHp === null) return null;
   return (
-    <div role="status" className="border-2 border-white bg-purple-700 px-3 py-2 text-sm font-black text-white">
-      Poison spores ahead — get ready: hands on hips! · {Math.ceil(snapshot.sporeDistance)} m
+    <div className="w-full max-w-[320px] border-2 border-surface bg-ink px-3 py-2 text-white">
+      <div className="flex justify-between text-xs font-black uppercase"><span>Elder Treant</span><span>{snapshot.bossHp}/{snapshot.bossMaxHp}</span></div>
+      <progress className="mt-1 h-2 w-full accent-orange-500" max={snapshot.bossMaxHp} value={snapshot.bossHp} aria-label="Elder Treant health" />
     </div>
   );
 }
@@ -153,32 +123,31 @@ function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
   );
 }
 
-function Stat({
-  label,
-  value,
-  reactiveKey,
-  accent = false,
-}: {
-  label: string;
-  value: string;
-  reactiveKey?: number;
-  accent?: boolean;
-}) {
+/**
+ * The score only moves when orbs land, so every change is a pickup: the number
+ * swells. The "+N" for each orb floats up in the world, beside the character.
+ */
+function ScoreStat({ score, shownScore }: { score: number; shownScore: number }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-[11px] font-bold tracking-[0.08em] text-white/80 uppercase">Score</span>
+      <span
+        key={score}
+        className="inline-block origin-left text-base leading-tight tracking-tight text-primary animate-[score-bump_260ms_ease-out_1] motion-reduce:animate-none"
+      >
+        {formatNumber(shownScore)}
+      </span>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-[11px] font-bold tracking-[0.08em] text-white/80 uppercase">
         {label}
       </span>
-      <span
-        key={reactiveKey}
-        className={`text-base leading-tight tracking-tight ${
-          accent
-            ? 'text-primary animate-[pulse_300ms_ease-out_1] motion-reduce:animate-none'
-            : ''
-        }`}
-      >
-        {value}
-      </span>
+      <span className="text-base leading-tight tracking-tight">{value}</span>
     </div>
   );
 }

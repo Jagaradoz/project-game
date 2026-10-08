@@ -105,6 +105,9 @@ export function isLandmarkZone(z: number, farZ: number, span: number, radius = 1
 }
 
 /**
+ * Deliberately sparse: fewer, larger props in wider clusters, so the verges read
+ * as a few bold shapes rather than a busy carpet, while still filling the bands.
+ *
  * Nearby substantial props cast shadows: an InstancedMesh is culled as a
  * single unit, so every instance of a
  * shadow-casting layer is drawn into the shadow map whether or not it is inside
@@ -112,51 +115,51 @@ export function isLandmarkZone(z: number, farZ: number, span: number, radius = 1
  */
 const FOREST_LAYERS: ScatterLayers = {
   groundcover: {
-    count: 480, band: [5.6, 24], scale: [1.8, 3.0], castShadow: false,
-    models: ['grass', 'plant_flatTall'], clusterSize: 14, clusterSpread: 9,
+    count: 264, band: [5.6, 24], scale: [2.25, 3.75], castShadow: false,
+    models: ['grass', 'plant_flatTall'], clusterSize: 14, clusterSpread: 12,
   },
   flowers: {
-    count: 70, band: [5.7, 9], scale: [1.2, 1.9], castShadow: false,
+    count: 38, band: [5.7, 9], scale: [1.5, 2.38], castShadow: false,
     models: ['flower_redA', 'flower_yellowB', 'flower_purpleB'],
   },
   shoulder: {
-    count: 85, band: [0, 0], scale: [0.45, 0.8], castShadow: false, shoulder: true,
+    count: 47, band: [0, 0], scale: [0.45, 0.8], castShadow: false, shoulder: true,
     models: ['stone_smallPair', 'stone_smallPile', 'grass'],
   },
   verge: {
-    count: 60, band: [5.2, 9.5], scale: [1.2, 2.1], castShadow: false,
+    count: 33, band: [5.2, 9.5], scale: [1.5, 2.62], castShadow: false,
     models: ['flower_redA', 'flower_yellowB', 'flower_purpleB',
       'mushroom_red', 'mushroom_redGroup', 'mushroom_tanTall', ...SMALL_STONES],
-    clusterSize: 10, clusterSpread: 6,
+    clusterSize: 10, clusterSpread: 8,
   },
   understory: {
-    count: 65, band: [6, 12], scale: [1.6, 2.5], castShadow: true,
+    count: 36, band: [6, 12], scale: [2, 3.12], castShadow: true,
     models: ['plant_bush', 'plant_bushLarge', 'stump_old', 'stump_round'],
-    clusterSize: 7, clusterSpread: 8,
+    clusterSize: 7, clusterSpread: 10,
   },
   boulders: {
-    count: 18, band: [6.5, 14], scale: [2.0, 3.0], castShadow: true,
-    models: BIG_STONES, clusterSize: 3, clusterSpread: 5,
+    count: 10, band: [6.5, 14], scale: [2.5, 3.75], castShadow: true,
+    models: BIG_STONES, clusterSize: 3, clusterSpread: 6,
   },
   midground: {
-    count: 65, band: [7, 17], scale: [2.2, 3.4], castShadow: true,
-    models: BROADLEAF_TREES, clusterSize: 5, clusterSpread: 10,
+    count: 36, band: [7, 17], scale: [2.75, 4.25], castShadow: true,
+    models: BROADLEAF_TREES, clusterSize: 5, clusterSpread: 13,
   },
   palms: {
-    count: 16, band: [17, 35], scale: [2.5, 3.6], castShadow: false,
-    models: PALM_TREES, clusterSize: 4, clusterSpread: 6,
+    count: 9, band: [17, 35], scale: [3.12, 4.5], castShadow: false,
+    models: PALM_TREES, clusterSize: 4, clusterSpread: 8,
   },
   canopy: {
-    count: 70, band: [15, 48], scale: [2.8, 4.2], castShadow: false,
+    count: 38, band: [15, 48], scale: [3.5, 5.25], castShadow: false,
     models: [...BROADLEAF_TREES, 'tree_pineRoundD', 'tree_pineSmallB'],
-    clusterSize: 6, clusterSpread: 13,
+    clusterSize: 6, clusterSpread: 17,
   },
   farForest: {
-    count: 300, band: [40, 100], scale: [3.0, 4.6], castShadow: false,
-    models: DISTANT_TREES, clusterSize: 8, clusterSpread: 16, detail: true,
+    count: 165, band: [40, 100], scale: [3.75, 5.75], castShadow: false,
+    models: DISTANT_TREES, clusterSize: 8, clusterSpread: 21, detail: true,
   },
   meadow: {
-    count: 1500, band: [20, 95], scale: [2.2, 3.6], castShadow: false,
+    count: 825, band: [20, 95], scale: [2.75, 4.5], castShadow: false,
     models: ['grass', 'plant_flatTall'], detail: true, overlap: true,
   },
 };

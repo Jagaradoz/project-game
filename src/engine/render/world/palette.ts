@@ -17,36 +17,38 @@ import type { ThreeModule } from '@/engine/types';
 export const UNMANAGED_MATERIALS = new Set(['_defaultMat']);
 
 const FOREST_KIT = {
-  grass: '#63834a',
-  leafsGreen: '#537d3f',
-  leafsDark: '#2e5433',
-  leafsFall: '#e48b3a',
-  dirt: '#a98055',
-  dirtDark: '#715338',
+  grass: '#4fa83c',
+  leafsGreen: '#3fb04a',
+  leafsDark: '#1f7d42',
+  leafsFall: '#ff8a1f',
+  dirt: '#c98a4e',
+  dirtDark: '#8a5530',
   stone: '#b8b1a2',
   stoneDark: '#726b60',
   stoneMid: '#958e80',
   stoneWarm: '#c6b498',
-  wood: '#b9864a',
-  woodBark: '#765033',
-  woodBarkDark: '#493322',
+  wood: '#d08a45',
+  woodBark: '#7d4a28',
+  woodBarkDark: '#4f2e1a',
   woodDark: '#17120e',
   woodBirch: '#fff3e2',
   woodInner: '#d3a36b',
-  water: '#5e9ea5',
-  waterDeep: '#3f7f89',
-  waterLight: '#86c3c6',
-  corn: '#e8bb63',
-  colorRed: '#fe6601',
-  colorRedDark: '#a84314',
-  colorYellow: '#f5c75b',
-  colorPurple: '#9972a5',
+  water: '#2fc6e0',
+  waterDeep: '#1597b8',
+  waterLight: '#7fe6f2',
+  corn: '#ffcc33',
+  colorRed: '#ff3b4f',
+  colorRedDark: '#c0213a',
+  colorYellow: '#ffd23a',
+  colorPurple: '#b05cff',
   colorWhite: '#fff3e2',
-  colorTan: '#e7c395',
+  colorTan: '#ffcf8f',
 };
 
 /**
- * Graphic woodland: cream distance, layered sage ridges, deep green canopy.
+ * Storybook woodland in full colour: a clear blue sky, minty ridges, bright
+ * saturated greens and a warm orange trail, so neon orbs and spells sit in a
+ * world that is just as cheerful.
  * The horizon band of the sky is deliberately the same colour as the fog so
  * that ground, trees and sky meet without a seam.
  */
@@ -58,57 +60,61 @@ export const GOLDEN_FOREST = {
   name: 'Whispering Pines',
 
   sky: {
-    haze: '#fff3e2',
-    glow: '#ffd6a3',
-    mid: '#e9ddc9',
-    zenith: '#c9d2bc',
+    haze: '#e3f6ff',
+    glow: '#fff3b0',
+    mid: '#9ddcff',
+    zenith: '#3fa9ff',
   },
 
   light: {
-    sun: '#fff0d7',
-    sunIntensity: 3.1,
-    hemiSky: '#fff3e2',
-    hemiGround: '#5c7144',
-    hemiIntensity: 1.15,
-    rim: '#ffe0b8',
-    rimIntensity: 0.55,
-    exposure: 1.0,
+    sun: '#fff2cf',
+    sunIntensity: 3.3,
+    hemiSky: '#c4e9ff',
+    hemiGround: '#4f8f3a',
+    hemiIntensity: 1.25,
+    rim: '#ffd6f2',
+    rimIntensity: 0.65,
+    exposure: 1.05,
   },
 
   // Short on purpose: the forest is dense to the fog line and nothing past it
   // is drawn. The scatter span is sized so props recycle inside full fog.
   fog: {
-    color: '#fff3e2',
+    color: '#e3f6ff',
     near: 30,
     far: 150,
   },
 
   ground: {
-    trail: '#9e754b',
+    trail: '#c98a4e',
     // Damp soil where the dirt meets the grass, not an outline.
-    trailEdge: '#5e4229',
-    verge: '#6c8044',
-    grass: '#547345',
-    grassDeep: '#314f32',
-    meadow: '#75915a',
-    pebble: '#cfc2a3',
+    trailEdge: '#7a4524',
+    verge: '#62b33c',
+    grass: '#4aa63a',
+    grassDeep: '#237a36',
+    meadow: '#86d651',
+    pebble: '#f0e2c2',
   },
 
   ridge: {
-    near: '#8da17f',
-    mid: '#b5c2a6',
-    far: '#dcdac6',
+    near: '#55b87a',
+    mid: '#8fd3b8',
+    far: '#c3ebf0',
   },
 
   accents: {
     marker: '#fe6601',
-    mote: '#fead61',
+    mote: '#ffe36b',
     player: '#fe6601',
     enemy: '#fff3e2',
     enemyTrim: '#17120e',
     bullet: '#fff3e2',
-    /** Score orbs pick from these by id, so a burst reads as a handful of gems. */
-    orbs: ['#ffd34d', '#5ce1ff', '#ff5cb8', '#7dff6b', '#b98cff', '#ff9a3d'],
+    /**
+     * Score orbs pick from these by id, so a burst reads as a handful of gems.
+     * Fully saturated neon on purpose: the forest is all soft greens and browns,
+     * and a pickup should be the loudest colour on screen.
+     */
+    orbs: ['#ffe100', '#00e1ff', '#ff1f9d', '#2bff4f', '#9d4dff', '#ff6a00'],
   },
 
   kit: FOREST_KIT,

@@ -160,6 +160,8 @@ interface HazardBody {
   hit?: boolean;
   /** When the hazard's centre passed the player; the verdict waits `jump.leniency.takeoffGraceMs` past it. */
   centredMs?: number;
+  /** When a river's far bank passed the player; rivers must be jumped clear of it. */
+  farBankMs?: number;
   /** The player jumped (or stood clear of its lanes) at some point in the crossing window. */
   covered?: boolean;
 }
@@ -214,6 +216,10 @@ export interface GameState {
   spores: SporeCloud[];
   nextSporeMs: number;
   nextSporeTickMs: number;
+  /** When holding the shield inside a cloud next earns a point; see core/spores.ts. */
+  nextShieldPointMs: number;
+  /** Points earned this frame outside of orbs (the spore shield), so the view can show a "+N". */
+  justBonus: number;
   isInSpore: boolean;
   /** The hands-on-hips shield is up this frame. Blocks spores, stops firing. */
   isShielding: boolean;

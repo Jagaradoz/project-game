@@ -6,12 +6,11 @@
  * that if the rules are small enough to port. Every input here is something the
  * reducer already knows; nothing reads the clock or the scene.
  *
- *   kill      config.scoring.kill[kind] x the combo multiplier at that kill,
- *             paid out as score orbs dropped where the enemy fell -- the points
- *             count only when the player walks through them (see core/orbs.ts)
- *   distance  `perMetre` for every whole metre walked
- *   hazard    `hazardCleared` for each log, rockfall or river crossed safely
- *   goal      `stageCleared` once, on the step a goal run is cleared
+ * The score is the sum of the score orbs the player picks up -- nothing else
+ * pays. Each kill is worth config.scoring.kill[kind] x the combo multiplier at
+ * that kill, dropped as orbs where the enemy fell; the points count only once
+ * the player's magnet pulls them in (see core/orbs.ts). Walking, hazards and
+ * clearing the goal earn nothing directly.
  *
  * The combo counts kills that land within `comboWindowMs` of the previous one.
  * Taking damage breaks it, after this step's kills are valued.
@@ -24,15 +23,6 @@ export interface ComboChain {
   combo: number;
   /** When the chain's latest kill landed. */
   lastKillMs: number;
-}
-
-export interface StepPoints {
-  fromDistance: number;
-  toDistance: number;
-  hazardsCleared: number;
-  justCleared: boolean;
-  /** Points carried by the orbs picked up this step. */
-  collected: number;
 }
 
 /** Multiplier for the `combo`-th kill in a chain: one step up every `comboStep` kills, capped. */
@@ -50,11 +40,6 @@ export function activeMultiplier(chain: ComboChain, elapsedMs: number, config: R
 
 export function killPoints(kill: KillMark, multiplier: number, config: RunConfig): number {
   return Math.round(config.scoring.kill[kill.kind ?? 'normal'] * multiplier);
-}
-
-/** Whole metres only, so the total never depends on how the run was sliced into frames. */
-export function distancePoints(fromDistance: number, toDistance: number, config: RunConfig): number {
-  return (Math.floor(toDistance) - Math.floor(fromDistance)) * config.scoring.perMetre;
 }
 
 /**
@@ -82,12 +67,4 @@ export function chainKills(
     },
     values,
   };
-}
-
-/** Everything a step adds to the score. Kills pay only through `collected`. */
-export function stepPoints(events: StepPoints, config: RunConfig): number {
-  return distancePoints(events.fromDistance, events.toDistance, config)
-    + events.hazardsCleared * config.scoring.hazardCleared
-    + (events.justCleared ? config.scoring.stageCleared : 0)
-    + events.collected;
 }

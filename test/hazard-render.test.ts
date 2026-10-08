@@ -59,7 +59,7 @@ test('real exported assets cover their lanes, keep an open lane, and reuse four 
   const size = new THREE.Box3().setFromObject(river.group).getSize(new THREE.Vector3());
   // Authored channel: fills the masked hole exactly, with scenery just outside it.
   expect(size.z).toBeGreaterThanOrEqual(CONFIG.game.obstacle.riverRadius * 2);
-  expect(size.z).toBeLessThan(6);
+  expect(size.z).toBeLessThan(CONFIG.game.obstacle.riverRadius * 4);
   expect(size.x).toBeGreaterThan(1000);
   pool.hide();
   expect(groups.every(group => !group.visible)).toBe(true);

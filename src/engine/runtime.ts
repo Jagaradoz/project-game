@@ -176,12 +176,13 @@ export interface HudSnapshot {
   error: string | null;
 }
 
-/** Changes a player would notice immediately; these bypass the throttle. */
 /**
- * `score` is deliberately absent: walking earns points every metre, so forcing
- * it would publish every frame. A kill still shows at once through `killCount`.
+ * Changes a player would notice immediately; these bypass the throttle.
+ * `score` moves only when an orb is picked up, so the HUD can react the moment
+ * an orb lands without publishing every frame.
  */
 const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
+  'score',
   'comboMultiplier',
   'hp',
   'isShielding',
@@ -648,13 +649,18 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
        * drives the actual game logic, so what gets photographed is a state the
        * game can really be in.
        */
-      simulate(seconds: number, simOptions: { lane?: number; firing?: boolean; jump?: boolean } = {}) {
+      simulate(seconds: number, simOptions: { lane?: number; firing?: boolean; jump?: boolean; shield?: boolean } = {}) {
         const stepMs = 1000 / 60;
         const steps = Math.max(0, Math.round(((Number(seconds) || 0) * 1000) / stepMs));
         for (let step = 0; step < steps; step += 1) {
           game = updateGame(
             game,
-            { lane: simOptions.lane ?? game.lane, isFiring: simOptions.firing !== false, jump: step === 0 && simOptions.jump },
+            {
+              lane: simOptions.lane ?? game.lane,
+              isFiring: simOptions.firing !== false,
+              jump: step === 0 && simOptions.jump,
+              isShielding: simOptions.shield,
+            },
               stepMs,
               rules,
             );

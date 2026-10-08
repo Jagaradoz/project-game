@@ -86,7 +86,7 @@ for (const lane of [0, 1, 2]) {
   });
 }
 
-test('a river is crossed by any overlapping jump, including one that lands mid-crossing', () => {
+test('a river is crossed by a jump still in the air as its far bank passes', () => {
   const state = settle({ ...approaching(hazard('river')), jumpStartedMs: -250 });
   expect(state.hp).toBe(3);
   expect(state.obstacles[0].status).toBe('cleared');
@@ -94,18 +94,26 @@ test('a river is crossed by any overlapping jump, including one that lands mid-c
   expect(settle(approaching(hazard('river')), { ...idle, jump: true }).deathReason).toBeNull();
 });
 
+test('landing before the far bank of a river passes is falling in, though the same jump clears a log', () => {
+  // Lands at 0 ms (+ landing grace); the far bank only passes at (1 + riverRadius) / 11 s.
+  const early = { jumpStartedMs: -CONFIG.game.jump.durationMs };
+  expect(settle({ ...approaching(hazard('river')), ...early }).deathReason).toBe('drowned');
+  expect(settle({ ...approaching(hazard('log', 0, 3)), ...early }).hp).toBe(3);
+});
+
 test('wider river banks use their own contact bounds without enlarging solid hazards', () => {
   const check = (kind: TrailHazard['kind'], z: number) =>
     advanceHazards([hazard(kind, 0, 3, z)], 1, 0, 0, 50, null, CONFIG.game).obstacles[0].status;
-  expect(check('river', -1.9)).toBe('crossing');
-  expect(check('river', -2.5)).toBe('approaching');
+  const riverReach = CONFIG.game.playerRadius + CONFIG.game.obstacle.riverRadius;
+  expect(check('river', -riverReach + 0.1)).toBe('crossing');
+  expect(check('river', -riverReach - 0.5)).toBe('approaching');
   expect(check('log', -1.6)).toBe('approaching');
   expect(check('stones', -1.6)).toBe('approaching');
   expect(check('stones', -1.4)).toBe('crossing');
 });
 
 test('a missed river is caught even when the entire hazard passes in one step', () => {
-  const config = { ...CONFIG.game, walkSpeed: 200, maxSpeed: 200 };
+  const config = { ...CONFIG.game, walkSpeed: 200 };
   const next = settle({ ...approaching(hazard('river', 0, 3, -3)), speed: 200 }, idle, config);
   expect(next.deathReason).toBe('drowned');
 });
