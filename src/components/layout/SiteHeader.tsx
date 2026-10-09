@@ -136,7 +136,7 @@ export function SiteHeader({ variant = 'game', hasCta = variant === 'game' }: Si
                   />
                 </Link>
                 {hasCta && (
-                  <LinkButton href="/play" variant="primary" size="sm" icon={<Play size={15} />}>
+                  <LinkButton href="/characters" variant="primary" size="sm" icon={<Play size={15} />}>
                     Play
                   </LinkButton>
                 )}

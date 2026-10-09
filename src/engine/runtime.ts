@@ -38,7 +38,7 @@ import { createExposureSampler } from '@/engine/pose/exposure';
 import { ema } from '@/engine/util/smooth';
 import { measureBody } from '@/engine/util/landmarks';
 import { createScene } from '@/engine/render/scene';
-import { createQualityMonitor } from '@/engine/render/quality';
+import { createFrameBudget, createQualityMonitor, GRAPHICS_PRESETS } from '@/engine/render/quality';
 import { syncScene } from '@/engine/render/sync';
 import type { SceneRefs } from '@/engine/render/sync';
 import { BIOMES } from '@/engine/render/world/biomes';
@@ -62,6 +62,59 @@ const SIM_SYNC_TAIL_MS = 1500;
 /** A HUD does not need 60 Hz. Anything not in FORCE_EMIT_KEYS waits for this. */
 const SNAPSHOT_INTERVAL_MS = 100;
 
+/** Selection previews have no camera or game state; this owner releases their loop. */
+export function createCharacterPreviewRuntime(
+  canvas: HTMLCanvasElement,
+  container: HTMLElement,
+  onStatus: (id: string, status: import('@/engine/render/characterPreview').CharacterPreviewStatus) => void,
+) {
+  let disposed = false;
+  let started = false;
+  let frameId: number | null = null;
+  let preview: Awaited<ReturnType<typeof import('@/engine/render/characterPreview').createCharacterPreviewScene>> | null = null;
+  let previousTime: number | null = null;
+  const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const slots = Array.from(container.querySelectorAll<HTMLElement>('[data-character-preview]'))
+    .map(element => ({ id: element.dataset.characterPreview!, element }));
+
+  function frame(time: number) {
+    if (disposed) return;
+    const dt = previousTime === null || motion.matches || document.hidden ? 0 : Math.min((time - previousTime) / 1000, 0.05);
+    previousTime = time;
+    if (!document.hidden) preview?.render(dt);
+    frameId = requestAnimationFrame(frame);
+  }
+
+  return {
+    async start() {
+      if (disposed || started) return;
+      started = true;
+      try {
+        const { createCharacterPreviewScene } = await import('@/engine/render/characterPreview');
+        if (disposed) return;
+        const loaded = await createCharacterPreviewScene(canvas, slots, (id, status) => {
+          if (!disposed) onStatus(id, status);
+        });
+        if (disposed) {
+          loaded.dispose();
+          return;
+        }
+        preview = loaded;
+        frameId = requestAnimationFrame(frame);
+      } catch {
+        if (!disposed) for (const slot of slots) onStatus(slot.id, 'error');
+      }
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      preview?.dispose();
+      preview = null;
+    },
+  };
+}
+
 /**
  * 'game' is the full runner. 'pose' runs the camera and the detectors and
  * nothing else -- no WebGL context, no reducer, no keyboard.
@@ -84,6 +137,7 @@ export interface RuntimeOptions {
   /** Passed in rather than generated here, so a server render and a client render agree. */
   seed?: number;
   character?: string;
+  graphicsQuality?: ShadowQuality;
   mode?: RuntimeMode;
   onError?: (message: string) => void;
 }
@@ -187,6 +241,7 @@ const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
   'killCount',
   'isCameraRunning',
   'isSceneReady',
+  'quality',
   'status',
   'error',
 ];
@@ -201,6 +256,7 @@ export interface GameRuntime {
   setDevFire(active: boolean): void;
   restart(): void;
   setCharacter(charId: string): Promise<void>;
+  setGraphicsQuality(quality: ShadowQuality): void;
   /** What /result submits. Read after the run ends. */
   getRunSummary(): RunSummary;
   /** Stable between changes, so it is safe for useSyncExternalStore. */
@@ -250,12 +306,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let onResize: (() => void) | null = null;
 
   let lastGameMs = 0;
+  let lastQualityMs = 0;
   let lastVideoTime = -1;
   let lastFrameMs = 0;
   let smoothedFps: number | null = null;
   let smoothedInferenceMs: number | null = null;
 
   const qualityMonitor = createQualityMonitor();
+  const frameBudget = createFrameBudget();
+  let pendingQuality = options.graphicsQuality ?? CONFIG.game.quality;
 
   /**
    * Movement tallies. Counted here rather than in the detectors because they
@@ -396,19 +455,18 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   function onVisibilityChange(): void {
     lastGameMs = performance.now();
+    lastQualityMs = lastGameMs;
+    frameBudget.reset();
     if (!document.hidden) needsRender = true;
   }
 
   function gameFrame(nowMs: number): void {
     if (isDisposed) return;
 
-    // A resumed tab must not consume input or advance the run for time away.
-    const elapsedMs = nowMs - lastGameMs;
-    const dtMs = elapsedMs > 1000 ? 0 : Math.max(0, elapsedMs);
-    lastGameMs = nowMs;
-
     if (document.hidden) {
-      sampleQuality(dtMs, true);
+      lastGameMs = lastQualityMs = nowMs;
+      frameBudget.reset();
+      qualityMonitor.reset();
       gameFrameId = requestAnimationFrame(gameFrame);
       return;
     }
@@ -416,8 +474,21 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     // The run waits for pose tracking or the explicit dev bypass. The scene
     // still paints behind the dialog and remains available to tools/shot.mjs.
     const isPlaying = isPoseRunning || isCameraSkipped;
+    // Measure display callbacks, not the intentional 30/45fps cap. Otherwise
+    // Medium would mistake its own budget for a slow device and downgrade.
+    sampleQuality(nowMs - lastQualityMs, !isPlaying || previewPaused || game.isOver);
+    lastQualityMs = nowMs;
+    if (sceneRefs && !frameBudget.consume(nowMs, sceneRefs.quality) && !needsRender) {
+      gameFrameId = requestAnimationFrame(gameFrame);
+      return;
+    }
+
+    // Step and sync together so one-frame combat events are never skipped.
+    // Accumulate the real elapsed time across skipped callbacks.
+    const elapsedMs = nowMs - lastGameMs;
+    const dtMs = elapsedMs > 1000 ? 0 : Math.max(0, elapsedMs);
+    lastGameMs = nowMs;
     const stepMs = isPlaying ? dtMs : 0;
-    sampleQuality(dtMs, !isPlaying || previewPaused || game.isOver || document.hidden);
     if (isPlaying && !previewPaused && dtMs > 0) {
       game = updateGame(game, input.read(), dtMs, rules);
     }
@@ -442,7 +513,11 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   function sampleQuality(dtMs: number, suspended: boolean): void {
     if (!sceneRefs) return;
     const next = qualityMonitor.sample(dtMs, sceneRefs.quality, suspended);
-    if (next) sceneRefs.setQuality(next);
+    if (next) {
+      sceneRefs.setQuality(next);
+      frameBudget.reset();
+      needsRender = true;
+    }
   }
 
   /* ------------------------------------------------------- pose loop ------ */
@@ -561,7 +636,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   async function bootScene(): Promise<void> {
     try {
-      const refs = await createScene(els.gameCanvas);
+      const refs = await createScene(els.gameCanvas, { ...CONFIG.game, quality: pendingQuality });
 
       // Disposed while the scene was loading: throw it away rather than
       // attaching a renderer nobody will ever tear down.
@@ -571,6 +646,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       }
 
       sceneRefs = refs;
+      // Preferences may have changed while the assets were loading.
+      refs.setQuality(pendingQuality);
       await applyCharacter(pendingCharacter);
       if (isDisposed) return;
       observeResize();
@@ -735,6 +812,17 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           calls: info?.calls ?? null,
           tris: info?.triangles ?? null,
           quality: sceneRefs?.quality ?? null,
+          graphics: sceneRefs ? {
+            sceneryInstances: sceneRefs.scatter.meshes.reduce((sum, entry) => sum + entry.mesh.count, 0),
+            detailInstances: sceneRefs.scatter.meshes.filter(entry => entry.detail).reduce((sum, entry) => sum + entry.mesh.count, 0),
+            motes: sceneRefs.motes.items.filter(item => item.mesh.visible).length,
+            cloudsVisible: sceneRefs.clouds.mesh.visible,
+            shadows: sceneRefs.renderer.shadowMap.enabled,
+            shadowMapSize: sceneRefs.lighting.sun.shadow.mapSize.x,
+            shadowCameraLeft: sceneRefs.lighting.sun.shadow.camera.left,
+            pixelRatio: sceneRefs.renderer.getPixelRatio(),
+            maxFps: GRAPHICS_PRESETS[sceneRefs.quality].maxFps,
+          } : null,
           corpses: sceneRefs?.enemyPool?.corpses?.filter((c) => c.group.visible).length ?? 0,
           enemyAnims: (sceneRefs?.enemyPool?.items ?? []).filter(s => s.group.visible).map(s => ({
             kind: s.kind, clip: s.current, time: s.action?.time ?? null, z: s.group.position.z, height: s.model?.scale.y ?? null,
@@ -771,6 +859,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       detachKeyboard = input.attachKeyboard();
       void bootScene();
       lastGameMs = performance.now();
+      lastQualityMs = lastGameMs;
       document.addEventListener('visibilitychange', onVisibilityChange);
       gameFrameId = requestAnimationFrame(gameFrame);
     },
@@ -858,6 +947,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     setCharacter(charId: string) {
       return applyCharacter(charId);
+    },
+
+    setGraphicsQuality(quality: ShadowQuality) {
+      if (isDisposed) return;
+      pendingQuality = quality;
+      qualityMonitor.reset();
+      frameBudget.reset();
+      sceneRefs?.setQuality(quality);
+      needsRender = true;
+      publish();
     },
 
     getRunSummary(): RunSummary {

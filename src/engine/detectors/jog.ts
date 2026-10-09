@@ -43,10 +43,17 @@ export function updateJog(
 ): JogState {
   const body = measureBody(landmarks);
 
-  // Knees out of frame or low confidence: keep the state machine frozen but let
-  // the jogging flag time out on its own, so it cannot latch on forever.
+  // Missing knees reset the phase so returning on the other foot cannot invent
+  // a step. Recent real steps still time out normally.
   if (!body || !body.kneesVisible || !body.leftKnee || !body.rightKnee) {
-    return { ...state, hasKnees: false, ...deriveJogging(state.stepTimestamps, nowMs, config) };
+    return {
+      ...state,
+      hasKnees: false,
+      kneeDelta: 0,
+      upKnee: UP_KNEE.NONE,
+      peakSinceTransition: 0,
+      ...deriveJogging(state.stepTimestamps, nowMs, config),
+    };
   }
 
   const rawDelta = (body.rightKnee.y - body.leftKnee.y) / body.torsoLength;

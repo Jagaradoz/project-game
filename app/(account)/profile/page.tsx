@@ -194,7 +194,7 @@ function ProfileHero({
             </Button>
           </>
         )}
-        <LinkButton href="/play" size="sm" icon={<Play size={16} />}>
+        <LinkButton href="/characters" size="sm" icon={<Play size={16} />}>
           Train
         </LinkButton>
       </div>

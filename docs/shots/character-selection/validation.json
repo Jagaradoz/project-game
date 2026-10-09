@@ -1,0 +1,27 @@
+{
+  "roster": [
+    "mage",
+    "druid",
+    "skeletonMage",
+    "witch",
+    "magicalGirl"
+  ],
+  "privacy": {
+    "videoOpacity": "0",
+    "overlayOpacity": "1",
+    "background": "rgb(0, 0, 0)",
+    "paused": false,
+    "sameStream": true,
+    "trackState": "live",
+    "overlayWidth": 640,
+    "overlayHeight": 480,
+    "mirroredTogether": true,
+    "time": 75.068271,
+    "detectorFrames": 1,
+    "detectorFramesAfter": 5
+  },
+  "wasmSource": "installed @mediapipe/tasks-vision 1.0.1",
+  "modelSource": "cached official pose_landmarker_lite/float16/1 model",
+  "mobileOverflow": false,
+  "errors": []
+}

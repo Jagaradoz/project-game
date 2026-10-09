@@ -17,7 +17,7 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
         title="No runs yet"
         icon={<Map size={22} />}
         action={
-          <LinkButton href="/play" variant="primary" icon={<Map size={18} />}>
+          <LinkButton href="/characters" variant="primary" icon={<Map size={18} />}>
             Start training
           </LinkButton>
         }
@@ -49,7 +49,7 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
         return (
           <li key={run.id}>
             <Link
-              href="/play"
+              href="/characters"
               aria-label={label}
               className="relative block aspect-3/4 overflow-hidden rounded-none border-2 border-ink text-white no-underline shadow-[4px_4px_0_0_var(--color-ink)]"
             >

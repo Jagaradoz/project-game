@@ -8,6 +8,45 @@ import { trailHalfWidth } from '@/engine/render/world/ground';
 import type { Palette } from '@/engine/render/world/palette';
 
 describe('scenery lane clearance and instancing', () => {
+  it('reduces nearby trees and grass, removes distant filler, and restores the same placements', async () => {
+    const loader = { loadAsync: async () => {
+      const root = new THREE.Group();
+      root.add(new THREE.Mesh(new THREE.BoxGeometry(.3, .3, .3), new THREE.MeshStandardMaterial()));
+      return { scene: root };
+    } } as unknown as GLTFLoader;
+    const result = await addScatter(THREE, new THREE.Scene(), CONFIG.game, {} as Palette, loader, {
+      span: 160, seed: 18,
+      layers: {
+        trees: { count: 20, band: [12, 35], scale: [1, 1], castShadow: true, models: ['tree_pineSmallB'] },
+        grass: { count: 40, band: [10, 35], scale: [1, 1], castShadow: false, models: ['grass'] },
+        distantGrass: { count: 40, band: [40, 70], scale: [1, 1], castShadow: false, detail: true, models: ['grass'] },
+      },
+    });
+    const near = result.meshes.filter(entry => !entry.detail);
+    result.setQuality('high'); result.scroll(80);
+    const fullMatrices = near.map(entry => Array.from(entry.mesh.instanceMatrix.array));
+    result.setQuality('medium'); result.scroll(80);
+    const mediumCounts = near.map(entry => entry.mesh.count);
+    result.setQuality('low'); result.scroll(80);
+    near.forEach((entry, index) => {
+      expect(entry.mesh.count).toBeGreaterThan(0);
+      expect(entry.mesh.count).toBeLessThan(mediumCounts[index]!);
+      expect(mediumCounts[index]).toBeLessThan(entry.fullCount);
+    });
+    const detail = result.meshes.find(entry => entry.detail)!;
+    expect(detail.mesh.count).toBe(0);
+    expect(detail.mesh.visible).toBe(false);
+    const version = detail.mesh.instanceMatrix.version;
+    result.scroll(90);
+    expect(detail.mesh.instanceMatrix.version).toBe(version);
+    result.setQuality('high'); result.scroll(80);
+    near.forEach((entry, index) => {
+      expect(entry.mesh.count).toBe(entry.fullCount);
+      expect(Array.from(entry.mesh.instanceMatrix.array)).toEqual(fullMatrices[index]);
+    });
+    expect(detail.mesh.visible).toBe(true);
+    expect(detail.mesh.count).toBe(detail.fullCount);
+  });
   it('keeps dirt shoulder footprints outside every physical lane with varied lane dimensions', () => {
     for (const [laneCount, laneWidth] of [[3, 2.4], [5, 3.2]]) {
       const config = { ...CONFIG.game, laneCount: laneCount!, laneWidth: laneWidth! };

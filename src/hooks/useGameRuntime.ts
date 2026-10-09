@@ -21,7 +21,7 @@ import { CONFIG } from '@/engine/config';
 import { createGameRuntime } from '@/engine/runtime';
 import type { GameRuntime, HudSnapshot, RuntimeMode } from '@/engine/runtime';
 import { LATERAL } from '@/engine/detectors/lateral';
-import type { RunSummary } from '@/engine/types';
+import type { RunSummary, ShadowQuality } from '@/engine/types';
 
 /** Stable reference, so a render before the engine exists cannot loop. */
 const IDLE_SNAPSHOT: HudSnapshot = {
@@ -78,6 +78,7 @@ export interface GameRuntimeRefs {
 
 export interface UseGameRuntimeOptions {
   character?: string;
+  graphicsQuality?: ShadowQuality;
   /** 'pose' skips the renderer and the reducer -- see RuntimeMode. */
   mode?: RuntimeMode;
 }
@@ -96,7 +97,8 @@ export interface GameActions {
 }
 
 export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOptions = {}) {
-  const { character, mode = 'game' } = options;
+  const { character, graphicsQuality, mode = 'game' } = options;
+  const initialQuality = useRef(graphicsQuality);
 
   const runtimeRef = useRef<GameRuntime | null>(null);
   const snapshotRef = useRef<HudSnapshot>(IDLE_SNAPSHOT);
@@ -119,7 +121,7 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
     // stops a character change from rebuilding the whole scene.
     const instance = createGameRuntime(
       { gameCanvas, video, overlay, container },
-      { seed, mode },
+      { seed, mode, graphicsQuality: initialQuality.current },
     );
 
     runtimeRef.current = instance;
@@ -162,6 +164,10 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
   useEffect(() => {
     if (character) void runtimeRef.current?.setCharacter(character);
   }, [character]);
+
+  useEffect(() => {
+    if (graphicsQuality) runtimeRef.current?.setGraphicsQuality(graphicsQuality);
+  }, [graphicsQuality]);
 
   const actions = useMemo<GameActions>(
     () => ({

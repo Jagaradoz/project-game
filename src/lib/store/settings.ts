@@ -13,10 +13,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { CONFIG } from '@/engine/config';
+import { isGraphicsQuality } from '@/engine/render/quality';
+import type { ShadowQuality } from '@/engine/types';
 
 interface SettingsState {
   character: string;
   setCharacter: (character: string) => void;
+  hideCamera: boolean;
+  setHideCamera: (hideCamera: boolean) => void;
+  graphicsQuality: ShadowQuality;
+  setGraphicsQuality: (quality: ShadowQuality) => void;
 }
 
 export const useSettings = create<SettingsState>()(
@@ -26,6 +32,10 @@ export const useSettings = create<SettingsState>()(
       setCharacter: (character) => set({
         character: Object.hasOwn(CONFIG.game.characters, character) ? character : CONFIG.game.defaultCharacter,
       }),
+      hideCamera: false,
+      setHideCamera: (hideCamera) => set({ hideCamera }),
+      graphicsQuality: CONFIG.game.quality,
+      setGraphicsQuality: (graphicsQuality) => set({ graphicsQuality }),
     }),
     {
       // Bumped from _v2 when the stage and difficulty fields were removed, so a
@@ -39,6 +49,8 @@ export const useSettings = create<SettingsState>()(
           character: saved?.character && Object.hasOwn(CONFIG.game.characters, saved.character)
             ? saved.character
             : CONFIG.game.defaultCharacter,
+          hideCamera: typeof saved?.hideCamera === 'boolean' ? saved.hideCamera : false,
+          graphicsQuality: isGraphicsQuality(saved?.graphicsQuality) ? saved.graphicsQuality : CONFIG.game.quality,
         };
       },
     },

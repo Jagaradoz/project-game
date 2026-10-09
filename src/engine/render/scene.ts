@@ -11,6 +11,7 @@ import type * as THREE_NS from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { CONFIG } from '@/engine/config';
+import { GRAPHICS_PRESETS } from '@/engine/render/quality';
 import type { GameConfig, ShadowQuality, ThreeModule } from '@/engine/types';
 import type { CloudOptions } from '@/engine/render/world/clouds';
 import type { Palette } from '@/engine/render/world/palette';
@@ -126,10 +127,7 @@ export async function createScene(
       renderer.render(scene, camera);
     }
 
-    /**
-     * Drops the shadow budget when the machine cannot keep up. Pose inference is
-     * sharing this device, so the game does not get the whole frame to itself.
-     */
+    /** Apply a preset without rebuilding WebGL or interrupting a run. */
     function setQuality(level: ShadowQuality) {
       if (level === quality) return;
       const mapSize = SHADOW_QUALITY[level] ?? SHADOW_QUALITY.high;
@@ -148,10 +146,13 @@ export async function createScene(
       renderer.shadowMap.needsUpdate = true;
       clouds.setVisible(level !== 'low');
       scatter.setQuality(level);
+      const moteCount = Math.round(motes.items.length * GRAPHICS_PRESETS[level].moteFraction);
+      motes.items.forEach((item, index) => { item.mesh.visible = index < moteCount; });
       quality = level;
     }
 
-    let quality: ShadowQuality = config.quality ?? 'high';
+    let quality: ShadowQuality;
+    setQuality(config.quality);
 
     resize();
 

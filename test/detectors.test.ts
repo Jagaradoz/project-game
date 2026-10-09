@@ -255,10 +255,9 @@ test('jog: a shuffle barely lifting the knees is detected', () => {
   assert.ok(state.stepCount >= CONFIG.jog.minStepsInWindow, `stepCount was ${state.stepCount}`);
 });
 
-test('jog: alternation too shallow to clear the peak gate is rejected', () => {
-  // 0.045 crosses crossThreshold (0.035) so the state machine flips, but never
-  // reaches peakThreshold (0.06), so no step is committed.
-  const { state } = run(createJogState(), updateJog, 96, alternatingKnees(0.045, 400));
+test('jog: alternation below the noise gate is rejected', () => {
+  // Crossings alone are not enough; the signal must reach the amplitude gate.
+  const { state } = run(createJogState(), updateJog, 96, alternatingKnees(0.035, 400));
 
   assert.equal(state.stepCount, 0);
   assert.equal(state.isJogging, false);

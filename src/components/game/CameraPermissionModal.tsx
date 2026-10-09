@@ -8,23 +8,26 @@
  * gesture. This dialog is that gesture: it cannot auto-fire on mount.
  */
 
-import { Keyboard, Map, Video } from 'lucide-react';
+import { Keyboard, Map, Video, VideoOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { Button, LinkButton } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
+import { GraphicsSettings } from '@/components/game/GraphicsSettings';
 
 interface CameraPermissionModalProps {
   error: string | null;
   status?: string | null;
   onAllow: () => void | Promise<void>;
   onSkip?: () => void;
+  isCameraHidden?: boolean;
+  onToggleCamera?: () => void;
 }
 
 type PermissionHint = 'prompt' | 'granted' | 'denied' | 'unknown';
 
-export function CameraPermissionModal({ error, status, onAllow, onSkip }: CameraPermissionModalProps) {
+export function CameraPermissionModal({ error, status, onAllow, onSkip, isCameraHidden = false, onToggleCamera }: CameraPermissionModalProps) {
   const router = useRouter();
   const titleId = useId();
   const descriptionId = useId();
@@ -74,7 +77,7 @@ export function CameraPermissionModal({ error, status, onAllow, onSkip }: Camera
       if (event.key !== 'Tab' || !panelRef.current) return;
 
       const focusable = panelRef.current.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled])',
+        'a[href], button:not([disabled]), input:checked',
       );
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -119,7 +122,7 @@ export function CameraPermissionModal({ error, status, onAllow, onSkip }: Camera
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         aria-busy={isRequesting || undefined}
-        className="flex w-full max-w-md flex-col gap-4 border-2 border-ink bg-surface p-5 shadow-[7px_7px_0_0_var(--color-primary)] sm:p-6"
+        className="flex max-h-[calc(100dvh_-_2rem)] w-full max-w-md flex-col gap-4 overflow-y-auto border-2 border-ink bg-surface p-5 shadow-[7px_7px_0_0_var(--color-primary)] sm:p-6"
       >
         <div className="flex items-start gap-3">
           <span
@@ -139,6 +142,26 @@ export function CameraPermissionModal({ error, status, onAllow, onSkip }: Camera
         <p id={descriptionId} className="m-0 text-sm leading-relaxed text-muted">
           {copy.body}
         </p>
+
+        <GraphicsSettings />
+
+        {onToggleCamera && (
+          <div className="flex flex-col gap-2">
+            <Button
+              variant={isCameraHidden ? 'navy' : 'secondary'}
+              icon={<VideoOff size={18} />}
+              aria-pressed={isCameraHidden}
+              disabled={isRequesting}
+              onClick={onToggleCamera}
+            >
+              Hide camera image
+            </Button>
+            <p className="m-0 text-xs leading-relaxed text-muted">
+              {isCameraHidden ? 'Camera image hidden. ' : 'Enable to keep the camera area black. '}
+              Movement detection stays active and detector lines stay visible.
+            </p>
+          </div>
+        )}
 
         {error && (
           <Notice tone="error" title="Could not open the camera">
@@ -161,8 +184,8 @@ export function CameraPermissionModal({ error, status, onAllow, onSkip }: Camera
           >
             {isRequesting ? loadingLabel(status) : copy.cta}
           </Button>
-          <LinkButton href="/" icon={<Map size={18} />} className="flex-1">
-            Back to home
+          <LinkButton href="/characters" icon={<Map size={18} />} className="flex-1">
+            Change magician
           </LinkButton>
         </div>
         {onSkip && (

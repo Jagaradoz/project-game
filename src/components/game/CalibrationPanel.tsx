@@ -129,7 +129,7 @@ export default function CalibrationPanel() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <LinkButton
-              href="/play"
+              href="/characters"
               variant="primary"
               icon={<Map size={18} />}
               className={`flex-1 ${isReady ? '' : 'pointer-events-none opacity-50'}`}

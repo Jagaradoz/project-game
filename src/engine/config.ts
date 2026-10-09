@@ -87,11 +87,11 @@ export const CONFIG = {
      * |kneeDelta| (in torso-lengths) needed to flip the up-knee state machine.
      * Deliberately low: the game asks for a light shuffle, not real knee lifts.
      */
-    crossThreshold: 0.035,
-    /** A state must also peak above this before its transition counts as a step. */
-    peakThreshold: 0.06,
-    /** EMA weight for kneeDelta. */
-    smoothing: 0.5,
+    crossThreshold: 0.025,
+    /** Noise gate: a state must reach this amplitude before its transition counts. */
+    peakThreshold: 0.05,
+    /** EMA weight for kneeDelta. Responsive enough for 180 steps/min at 15 fps. */
+    smoothing: 0.65,
     /** Steps are counted within this trailing window. */
     windowMs: 2500,
     /** Minimum steps inside the window to call it jogging. */
@@ -197,8 +197,8 @@ export const CONFIG = {
     laneCount: 3,
     laneWidth: 2.4,
 
-    /** Shadow map budget. 'high' | 'medium' | 'low' (low disables shadows). */
-    quality: 'high' as 'high' | 'medium' | 'low',
+    /** Default graphics budget; the player's saved preset overrides this. */
+    quality: 'medium' as 'high' | 'medium' | 'low',
 
     /**
      * How far the dirt's edge wanders, in world units. Purely a vertex-shader

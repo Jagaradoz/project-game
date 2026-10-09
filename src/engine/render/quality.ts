@@ -1,5 +1,31 @@
 import type { ShadowQuality } from '@/engine/types';
 
+/** Rendering budgets only; pose accuracy, hazards and enemies stay the same. */
+export const GRAPHICS_PRESETS = {
+  low: { pixelRatio: 1, shadowMapSize: 0, sceneryFraction: 0.3, detailFraction: 0, moteFraction: 0, maxFps: 30 },
+  medium: { pixelRatio: 1.5, shadowMapSize: 1024, sceneryFraction: 0.65, detailFraction: 0.5, moteFraction: 0.5, maxFps: 45 },
+  high: { pixelRatio: 2, shadowMapSize: 2048, sceneryFraction: 1, detailFraction: 1, moteFraction: 1, maxFps: 60 },
+} as const satisfies Record<ShadowQuality, object>;
+
+export function isGraphicsQuality(value: unknown): value is ShadowQuality {
+  return value === 'low' || value === 'medium' || value === 'high';
+}
+
+/** Keep fractional frame intervals so 45fps does not collapse to 30 on a 60Hz display. */
+export function createFrameBudget() {
+  let nextMs: number | null = null;
+  return {
+    reset() { nextMs = null; },
+    consume(nowMs: number, quality: ShadowQuality): boolean {
+      const interval = 1000 / GRAPHICS_PRESETS[quality].maxFps;
+      if (nextMs !== null && nowMs + 0.01 < nextMs) return false;
+      const deadline = nextMs ?? nowMs;
+      nextMs = deadline + (Math.floor(Math.max(0, nowMs - deadline) / interval) + 1) * interval;
+      return true;
+    },
+  };
+}
+
 const WARMUP_MS = 1000;
 const WINDOW_MS = 3000;
 const MAX_SAMPLE_MS = 1000;
@@ -19,6 +45,7 @@ export function createQualityMonitor() {
   }
 
   return {
+    reset,
     sample(dtMs: number, current: ShadowQuality, suspended = false): ShadowQuality | null {
       if (suspended || !Number.isFinite(dtMs) || dtMs <= 0 || dtMs > MAX_SAMPLE_MS) {
         reset();

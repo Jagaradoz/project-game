@@ -71,7 +71,7 @@ export default function ResultPage() {
           title="No runs yet"
           icon={<ChartColumn size={22} />}
           action={
-            <LinkButton href="/play" variant="primary" icon={<Map size={18} />}>
+            <LinkButton href="/characters" variant="primary" icon={<Map size={18} />}>
               Start training
             </LinkButton>
           }
@@ -124,7 +124,7 @@ export default function ResultPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <LinkButton
-              href="/play"
+              href="/characters"
               variant="primary"
               icon={<RotateCcw size={18} />}
               className="flex-1"

@@ -225,11 +225,12 @@ function orbTarget(sceneRefs: SceneRefs, state: GameState, config: GameConfig) {
 }
 
 /** Shared by every layer of discrete meshes that scrolls with the run. */
-function syncRecycled(layer: ScrollLayer | null | undefined, distance: number): void {
+function syncRecycled(layer: ScrollLayer | null | undefined, distance: number, visibleOnly = false): void {
   if (!layer) return;
   const offset = distance % layer.span;
 
   for (const item of layer.items) {
+    if (visibleOnly && !item.mesh.visible) continue;
     const shifted = item.baseZ - layer.startZ + offset;
     item.mesh.position.z = layer.startZ + (shifted % layer.span);
   }
@@ -238,9 +239,10 @@ function syncRecycled(layer: ScrollLayer | null | undefined, distance: number): 
 /** Dust motes drift as they scroll, so the air does not read as static. */
 function syncMotes(motes: MoteLayer | null | undefined, distance: number, elapsedMs: number): void {
   if (!motes) return;
-  syncRecycled(motes, distance);
+  syncRecycled(motes, distance, true);
 
   for (const item of motes.items) {
+    if (!item.mesh.visible) continue;
     item.mesh.position.y = item.initialY + Math.sin(elapsedMs * 0.0025 + item.phase) * 0.35;
     item.mesh.position.x = item.initialX + Math.cos(elapsedMs * 0.0018 + item.phase) * 0.3;
   }

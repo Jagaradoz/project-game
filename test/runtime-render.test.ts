@@ -22,13 +22,15 @@ function tick(dt = 16.67) {
 }
 
 function sceneFixture() {
+  let quality = 'high';
   return {
     player: { loadCharacter: vi.fn().mockResolvedValue(true), playAnimation: vi.fn(), characterId: 'mage' },
     bulletPool: { setCharacter: vi.fn(), reset: vi.fn() },
     enemyPool: { reset: vi.fn() },
     riverMask: { hide: vi.fn() },
     drowningSplash: { update: vi.fn() },
-    quality: 'high', setQuality: vi.fn(), render: vi.fn(), resize: vi.fn(), dispose: vi.fn(),
+    get quality() { return quality; },
+    setQuality: vi.fn((next: string) => { quality = next; }), render: vi.fn(), resize: vi.fn(), dispose: vi.fn(),
   };
 }
 
@@ -107,6 +109,42 @@ test('a late character request cannot replace the newest projectile style', asyn
   expect(refs.bulletPool.setCharacter).toHaveBeenLastCalledWith('witch');
   await handle.setCharacter('unknown');
   expect(refs.bulletPool.setCharacter).toHaveBeenLastCalledWith('mage');
+});
+
+test('Low reduces scene updates and live changes preserve elapsed play and the same scene', async () => {
+  const refs = await start();
+  handle.setGraphicsQuality('low');
+  handle.skipCamera();
+  const startMs = handle.getRunSummary().durationMs;
+  for (let frame = 0; frame < 60; frame++) tick(1000 / 60);
+  expect(refs.render.mock.calls.length).toBeGreaterThanOrEqual(30);
+  expect(refs.render.mock.calls.length).toBeLessThanOrEqual(31);
+  expect(mocks.syncScene.mock.calls.length).toBe(refs.render.mock.calls.length);
+  expect(handle.getRunSummary().durationMs - startMs).toBeGreaterThan(950);
+  const duration = handle.getRunSummary().durationMs;
+  const renderCount = refs.render.mock.calls.length;
+  handle.setGraphicsQuality('high');
+  expect(handle.getSnapshot().quality).toBe('high');
+  expect(handle.getRunSummary().durationMs).toBe(duration);
+  for (let frame = 0; frame < 60; frame++) tick(1000 / 60);
+  expect(refs.render.mock.calls.length - renderCount).toBe(60);
+  expect(mocks.createScene).toHaveBeenCalledOnce();
+  expect(refs.dispose).not.toHaveBeenCalled();
+});
+
+test('graphics chosen during scene loading are applied before its first paint', async () => {
+  const refs = sceneFixture();
+  let resolve!: (value: typeof refs) => void;
+  mocks.createScene.mockReturnValue(new Promise(r => { resolve = r; }));
+  const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
+  handle = createGameRuntime({ gameCanvas: canvas, overlay: canvas, video: {} as HTMLVideoElement, container: {} as HTMLElement }, { graphicsQuality: 'low' });
+  handle.start();
+  expect(mocks.createScene.mock.calls[0]?.[1].quality).toBe('low');
+  handle.setGraphicsQuality('high');
+  resolve(refs);
+  await vi.waitFor(() => expect(handle.getSnapshot().isSceneReady).toBe(true));
+  expect(refs.setQuality).toHaveBeenLastCalledWith('high');
+  expect(handle.getSnapshot().quality).toBe('high');
 });
 
 test('disposal during character startup prevents resize and debug-hook registration', async () => {

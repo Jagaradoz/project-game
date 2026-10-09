@@ -1,0 +1,20 @@
+# Local and generated files
+.git/
+.vercel/
+node_modules/
+.next/
+coverage/
+tsconfig.tsbuildinfo
+.env
+.env.local
+.env.*.local
+!.env.example
+**/__pycache__/
+**/*.pyc
+
+# Preserve Blender sources and backups locally; ship exported runtime assets.
+public/assets/**/*.blend*
+.agents/
+docs/
+test/
+tools/

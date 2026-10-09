@@ -14,6 +14,7 @@ import type * as THREE_NS from 'three';
 
 import type { Palette } from '@/engine/render/world/palette';
 import type { ShadowQuality, ThreeModule } from '@/engine/types';
+import { GRAPHICS_PRESETS } from '@/engine/render/quality';
 
 const SHADOW_EXTENT_X = 42;
 const SHADOW_EXTENT_Z = 58;
@@ -25,12 +26,14 @@ const SUN_POSITION = { x: -34, y: 20, z: -30 };
 const RIM_POSITION = { x: 26, y: 14, z: 34 };
 
 export const SHADOW_QUALITY: Record<ShadowQuality, number> = {
-  high: 2048,
-  medium: 1024,
-  low: 0,
+  high: GRAPHICS_PRESETS.high.shadowMapSize,
+  medium: GRAPHICS_PRESETS.medium.shadowMapSize,
+  low: GRAPHICS_PRESETS.low.shadowMapSize,
 };
 
-export const QUALITY_PIXEL_RATIO: Record<ShadowQuality, number> = { high: 2, medium: 1.5, low: 1 };
+export const QUALITY_PIXEL_RATIO: Record<ShadowQuality, number> = {
+  high: GRAPHICS_PRESETS.high.pixelRatio, medium: GRAPHICS_PRESETS.medium.pixelRatio, low: GRAPHICS_PRESETS.low.pixelRatio,
+};
 
 export function configureRenderer(
   THREE: ThreeModule,
@@ -69,22 +72,20 @@ export function addLighting(
   scene.add(sun);
   scene.add(sun.target);
 
-  if (mapSize > 0) {
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(mapSize, mapSize);
-    sun.shadow.camera.left = -SHADOW_EXTENT_X;
-    sun.shadow.camera.right = SHADOW_EXTENT_X;
-    sun.shadow.camera.top = SHADOW_EXTENT_Z;
-    sun.shadow.camera.bottom = -SHADOW_EXTENT_Z;
-    sun.shadow.camera.near = SHADOW_NEAR;
-    sun.shadow.camera.far = SHADOW_FAR;
-    // Slope-scaled offset beats a flat bias here: the trail is nearly parallel
-    // to the light, which is exactly where constant bias causes peter-panning.
-    sun.shadow.bias = -0.0004;
-    sun.shadow.normalBias = 0.035;
-    sun.shadow.camera.updateProjectionMatrix();
-  }
-
+  // Configure the frustum even when starting on Low: shadows can be enabled live.
+  sun.castShadow = mapSize > 0;
+  sun.shadow.mapSize.set(mapSize || SHADOW_QUALITY.high, mapSize || SHADOW_QUALITY.high);
+  sun.shadow.camera.left = -SHADOW_EXTENT_X;
+  sun.shadow.camera.right = SHADOW_EXTENT_X;
+  sun.shadow.camera.top = SHADOW_EXTENT_Z;
+  sun.shadow.camera.bottom = -SHADOW_EXTENT_Z;
+  sun.shadow.camera.near = SHADOW_NEAR;
+  sun.shadow.camera.far = SHADOW_FAR;
+  // Slope-scaled offset beats a flat bias here: the trail is nearly parallel
+  // to the light, which is exactly where constant bias causes peter-panning.
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.035;
+  sun.shadow.camera.updateProjectionMatrix();
   const hemi = new THREE.HemisphereLight(
     palette.light.hemiSky,
     palette.light.hemiGround,

@@ -9,7 +9,10 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+
+import { createCharacterPreviewRuntime } from '@/engine/runtime';
+import type { CharacterPreviewStatus } from '@/engine/render/characterPreview';
 
 import { useGameRuntime } from '@/hooks/useGameRuntime';
 import { usePlayDebugTools } from '@/hooks/usePlayDebugTools';
@@ -20,6 +23,7 @@ import { CameraPermissionModal } from '@/components/game/CameraPermissionModal';
 import { CameraStage } from '@/components/game/CameraStage';
 import { GameHud } from '@/components/game/GameHud';
 import { GameOverOverlay } from '@/components/game/GameOverOverlay';
+import { GraphicsSettings } from '@/components/game/GraphicsSettings';
 import { Notice } from '@/components/ui/Notice';
 
 export default function GameCanvas() {
@@ -30,6 +34,9 @@ export default function GameCanvas() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
 
   const character = useSettings((state) => state.character);
+  const graphicsQuality = useSettings((state) => state.graphicsQuality);
+  const hideCamera = useSettings((state) => state.hideCamera);
+  const setHideCamera = useSettings((state) => state.setHideCamera);
   // Keep the optional local camera bypass on the startup dialog only.
   const showDebugTools = usePlayDebugTools();
 
@@ -42,7 +49,7 @@ export default function GameCanvas() {
       video: videoRef,
       overlay: overlayRef,
     },
-    { character },
+    { character, graphicsQuality },
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,15 +132,24 @@ export default function GameCanvas() {
       <div id="gameStage" ref={containerRef} className="play-stage">
         <canvas ref={gameCanvasRef} className="block h-full w-full" />
         <GameHud snapshot={snapshot} />
+        <details className="absolute bottom-32 left-3 z-30 max-w-[calc(100%_-_24px)] border-2 border-ink bg-surface shadow-[3px_3px_0_var(--color-primary)]">
+          <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-bold text-accent-text focus-visible:outline-2 focus-visible:outline-primary">
+            Graphics · {graphicsQuality[0].toUpperCase() + graphicsQuality.slice(1)}
+          </summary>
+          <div className="w-80 max-w-full border-t-2 border-ink p-3">
+            <GraphicsSettings activeQuality={snapshot.quality} />
+          </div>
+        </details>
         <CameraStage
           videoRef={videoRef}
           overlayRef={overlayRef}
           isCameraRunning={snapshot.isCameraRunning}
           isCameraSkipped={snapshot.isCameraSkipped}
+          isCameraHidden={hideCamera}
         />
         <GameOverOverlay
           snapshot={snapshot}
-          onRestart={restart}
+          onRestart={() => router.push('/characters')}
           onSeeResult={seeResult}
           isSubmitting={isSubmitting}
         />
@@ -153,9 +169,32 @@ export default function GameCanvas() {
           error={snapshot.error}
           status={snapshot.status}
           onAllow={actions.startCamera}
+          isCameraHidden={hideCamera}
+          onToggleCamera={() => setHideCamera(!hideCamera)}
           onSkip={showDebugTools && process.env.NODE_ENV !== 'production' ? actions.skipCamera : undefined}
         />
       )}
     </main>
   );
+}
+
+/** The selection page shares this sole React/engine boundary. */
+export function MagicianPreviewCanvas({
+  containerRef,
+  onStatus,
+}: {
+  containerRef: RefObject<HTMLDivElement | null>;
+  onStatus: (id: string, status: CharacterPreviewStatus) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+    const runtime = createCharacterPreviewRuntime(canvas, container, onStatus);
+    void runtime.start();
+    return () => runtime.dispose();
+  }, [containerRef, onStatus]);
+
+  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[1] h-dvh w-screen" />;
 }

@@ -17,6 +17,7 @@ import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Palette } from '@/engine/render/world/palette';
 import type { GameConfig, ShadowQuality, ThreeModule } from '@/engine/types';
 import type { Rng } from '@/engine/render/world/rng';
+import { GRAPHICS_PRESETS } from '@/engine/render/quality';
 
 /** One band of props at a fixed distance range from the trail. */
 interface ScatterLayer {
@@ -28,7 +29,7 @@ interface ScatterLayer {
   /** Props arrive in readable groves instead of uniform procedural noise. */
   clusterSize?: number;
   clusterSpread?: number;
-  /** Thinned by the quality level; see DETAIL_FRACTION. Only for layers that are pure filler. */
+  /** Pure filler is removed on Low; other vegetation is thinned on Low and Medium. */
   detail?: boolean;
   /**
    * Skips the footprint clearance check. For dense low grass only: overlapping
@@ -60,7 +61,7 @@ interface ScatterMeshEntry {
   mesh: THREE_NS.InstancedMesh;
   baseZ: Float32Array;
   zOffset: Float32Array;
-  /** Instances built; `mesh.count` may draw fewer when the layer is a detail layer. */
+  /** Instances built; graphics settings draw and update a subset. */
   fullCount: number;
   detail: boolean;
 }
@@ -87,9 +88,9 @@ import {
  * change at runtime with no rebuild -- the runtime's auto-quality uses this.
  */
 export const DETAIL_FRACTION: Record<ShadowQuality, number> = {
-  high: 1,
-  medium: 0.5,
-  low: 0,
+  high: GRAPHICS_PRESETS.high.detailFraction,
+  medium: GRAPHICS_PRESETS.medium.detailFraction,
+  low: GRAPHICS_PRESETS.low.detailFraction,
 };
 const Z_TRANSLATION_OFFSET = 14;
 /** Landmarks sit within this distance of the trail centre; props further out need not avoid them. */
@@ -223,15 +224,15 @@ export async function addScatter(
     meshes,
     span,
     startZ: farZ,
-    /** Thins every detail layer to the level's share. */
+    /** Reduce trees, grass and bushes as well as distant filler. */
     setQuality(level: ShadowQuality) {
-      const fraction = DETAIL_FRACTION[level] ?? 1;
       for (const entry of meshes) {
-        if (entry.detail) {
-          const count = Math.round(entry.fullCount * fraction);
-          if (entry.mesh.count !== count) lastDistance = null;
-          entry.mesh.count = count;
-        }
+        const preset = GRAPHICS_PRESETS[level];
+        const fraction = entry.detail ? preset.detailFraction : preset.sceneryFraction;
+        const count = Math.round(entry.fullCount * fraction);
+        if (entry.mesh.count !== count) lastDistance = null;
+        entry.mesh.count = count;
+        entry.mesh.visible = count > 0;
       }
     },
     /** One float per instance per frame; see the module note. */
@@ -239,6 +240,7 @@ export async function addScatter(
       if (distance === lastDistance) return;
       lastDistance = distance;
       for (const entry of meshes) {
+        if (!entry.mesh.visible) continue;
         const array = entry.mesh.instanceMatrix.array as Float32Array;
         for (let index = 0; index < entry.mesh.count; index += 1) {
           array[index * 16 + Z_TRANSLATION_OFFSET] = wrappedSceneryZ(entry.baseZ[index]!, distance, farZ, span) + entry.zOffset[index]!;
