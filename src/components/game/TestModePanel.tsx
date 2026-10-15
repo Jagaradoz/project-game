@@ -19,6 +19,21 @@ function promptFor(trial: ActiveTrial): string {
   return PROMPTS[trial.target ?? trial.pose] ?? '';
 }
 
+const LANE_NAMES: Record<HudSnapshot['lateralLabel'], string> = { LEFT: 'Left lane', CENTER: 'Centre lane', RIGHT: 'Right lane' };
+
+/** The single headline action the character is performing, plus a short context line. */
+function actionFor(snapshot: HudSnapshot): { label: string; detail: string } | null {
+  if (!snapshot.isCameraRunning) return null;
+  if (!snapshot.hasBody) return { label: 'No body', detail: 'Stand where the camera can see your head and knees.' };
+  if (!snapshot.isCalibrated) return { label: 'Calibrating', detail: 'Stand still in the middle.' };
+  const lane = LANE_NAMES[snapshot.lateralLabel];
+  if (snapshot.isAirborne) return { label: 'Jumping', detail: lane };
+  if (snapshot.isHandsOnHips || snapshot.isShielding) return { label: 'Shielding', detail: lane };
+  if (snapshot.isJogging) return { label: 'Running', detail: lane };
+  if (snapshot.lateralLabel !== 'CENTER') return { label: snapshot.lateralLabel === 'LEFT' ? 'Moving left' : 'Moving right', detail: lane };
+  return { label: 'Idle', detail: lane };
+}
+
 function formatLatency(latency: LatencySummary): string {
   return latency.samples ? `${latency.meanMs!.toFixed(0)} / ${latency.p95Ms!.toFixed(0)} ms` : '—';
 }
@@ -32,13 +47,7 @@ function formatError(tally: TrialTally | null): string {
 }
 
 export function TestModePanel({ runtimeRefs: { container: containerRef, gameCanvas: gameCanvasRef, video: videoRef, overlay: overlayRef }, snapshot, actions }: { runtimeRefs: GameRuntimeRefs; snapshot: HudSnapshot; actions: GameActions }) {
-  const movementId = snapshot.isAirborne ? 'clap' : snapshot.isHandsOnHips ? 'hips' : snapshot.isJogging ? 'knees'
-    : snapshot.lateralLabel !== 'CENTER' ? 'lateral' : null;
-  const movement = MOVEMENTS.find(m => m.id === movementId);
-  const detected = !snapshot.isCameraRunning ? null : !snapshot.hasBody ? 'Body not detected'
-    : !snapshot.isCalibrated ? 'Calibrating centre' : snapshot.isAirborne ? 'Overhead clap · jump'
-      : [snapshot.lateralLabel !== 'CENTER' ? snapshot.lateralLabel : '', snapshot.isJogging ? 'Knee lifts · attack' : '',
-        snapshot.isHandsOnHips ? 'Hands on hips · shield' : ''].filter(Boolean).join(' + ') || 'Standing still · centre';
+  const action = actionFor(snapshot);
   const active = snapshot.trial.active;
   const activeTitle = MOVEMENTS.find(m => m.id === active?.pose)?.title;
   const canTest = snapshot.isCameraRunning && snapshot.hasBody && snapshot.isCalibrated;
@@ -58,16 +67,15 @@ export function TestModePanel({ runtimeRefs: { container: containerRef, gameCanv
           <canvas ref={gameCanvasRef} className="absolute inset-0 h-full w-full" aria-label="Animated game character responding to detected movements" />
           <h2 className="pointer-events-none absolute inset-x-0 top-0 m-0 bg-surface/90 px-3 py-2 text-sm font-bold">Character response</h2>
           {!snapshot.isSceneReady && <p className="absolute inset-0 m-0 grid place-content-center p-4 text-center text-sm">{snapshot.error || 'Loading character…'}</p>}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-surface/95 px-3 py-2">
-            {active ? <>
-              <p className="m-0 text-xs text-muted">{activeTitle} · attempt {Math.min(CONFIG.trial.attempts, trialResult(active.tally).attempts + 1)} / {CONFIG.trial.attempts}</p>
-              <p role="status" className="m-0 text-lg font-black text-accent-text">{promptFor(active)}</p>
-            </> : <>
-              {detected && <p role="status" className="m-0 text-sm font-black text-accent-text">{detected}</p>}
-              <p className="mt-1 mb-0 text-xs leading-relaxed">{snapshot.hasBody && snapshot.isCalibrated && movement
-                ? movement.effect : snapshot.isCameraRunning ? 'Stand where the camera can see your head and knees.' : 'Your movements will drive the character automatically.'}</p>
+          {snapshot.isSceneReady && <div className="pointer-events-none absolute inset-x-0 top-11 grid justify-items-center gap-1 px-3 text-center">
+            {action && <>
+              <p className="m-0 text-3xl font-black uppercase leading-none tracking-tight text-ink [text-shadow:0_2px_0_var(--color-surface)] sm:text-4xl">{action.label}</p>
+              <p className="m-0 text-xs font-bold text-muted">{action.detail}</p>
             </>}
-          </div>
+            {active && <p role="status" className="m-0 mt-1 border-2 border-ink bg-surface px-2 py-1 text-sm font-black text-accent-text">
+              {activeTitle} {Math.min(CONFIG.trial.attempts, trialResult(active.tally).attempts + 1)}/{CONFIG.trial.attempts} · {promptFor(active)}
+            </p>}
+          </div>}
         </section>
       </div>
       <section aria-label="Live measurements" className="mx-auto w-full max-w-6xl border-t-2 border-ink pt-3">

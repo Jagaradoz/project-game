@@ -11,6 +11,8 @@ import { ema } from '@/engine/util/smooth';
 import { measureBody } from '@/engine/util/landmarks';
 import type {
   BodyMeasurement,
+  LaneGuide,
+  LaneThreshold,
   LateralConfig,
   LateralLabel,
   LateralState,
@@ -29,10 +31,13 @@ export function createLateralState(): LateralState {
     calibrationStartMs: null,
     isCalibrated: false,
     hasBody: false,
+    reach: { left: null, right: null },
+    excursionPeak: 0,
+    shoulderWidth: null,
   };
 }
 
-/** Discards the learned center so the next second of standing still re-learns it. */
+/** Discards the learned center and reach so the player's next centre, left and right re-teach them. */
 export function recalibrateLateral(state: LateralState): LateralState {
   return {
     ...state,
@@ -42,7 +47,27 @@ export function recalibrateLateral(state: LateralState): LateralState {
     isCalibrated: false,
     label: LATERAL.CENTER,
     offset: 0,
+    reach: { left: null, right: null },
+    excursionPeak: 0,
   };
+}
+
+/**
+ * Enter/exit points per side, in shoulder-widths. A side with a learned reach
+ * switches at a fixed fraction of how far this player actually steps; an
+ * unlearned side uses the configured defaults.
+ */
+export function laneThresholds(
+  state: Pick<LateralState, 'reach'>,
+  config: LateralConfig = CONFIG.lateral,
+): { left: LaneThreshold; right: LaneThreshold } {
+  const exitRatio = config.exitOffset / config.enterOffset;
+  const side = (reach: number | null): LaneThreshold => {
+    if (reach === null) return { enter: config.enterOffset, exit: config.exitOffset };
+    const enter = Math.min(config.maxEnterOffset, Math.max(config.minEnterOffset, reach * config.learnedEnterFraction));
+    return { enter, exit: enter * exitRatio };
+  };
+  return { left: side(state.reach.left), right: side(state.reach.right) };
 }
 
 export function updateLateral(
@@ -58,15 +83,77 @@ export function updateLateral(
   if (!body) return { ...state, hasBody: false };
 
   const smoothedX = ema(state.smoothedX, lateralCenter(body, config), config.smoothing);
+  const { shoulderWidth } = body;
 
   if (!state.isCalibrated) {
-    return calibrate({ ...state, smoothedX, hasBody: true }, smoothedX, nowMs, config);
+    return calibrate({ ...state, smoothedX, shoulderWidth, hasBody: true }, smoothedX, nowMs, config);
   }
 
-  const rawOffset = (smoothedX - (state.baseline ?? smoothedX)) / body.shoulderWidth;
+  const rawOffset = (smoothedX - (state.baseline ?? smoothedX)) / shoulderWidth;
   const offset = config.invertSides ? -rawOffset : rawOffset;
 
-  return { ...state, smoothedX, hasBody: true, offset, label: nextLabel(state.label, offset, config) };
+  const label = nextLabel(state.label, offset, laneThresholds(state, config));
+  return { ...state, smoothedX, shoulderWidth, hasBody: true, offset, label, ...learnReach(state, label, offset) };
+}
+
+/**
+ * Projects the detector's thresholds back into the camera frame, so the overlay
+ * draws exactly the lines the label switches on: around the calibrated centre,
+ * scaled by the current shoulder width, using this player's learned points.
+ */
+export function laneGuide(
+  state: LateralState,
+  body: BodyMeasurement | null,
+  nowMs: number,
+  config: LateralConfig = CONFIG.lateral,
+): LaneGuide {
+  const isTracking = state.hasBody && body !== null;
+  const calibrationProgress = state.isCalibrated ? 1
+    : state.calibrationStartMs === null ? 0 : Math.min(1, Math.max(0, (nowMs - state.calibrationStartMs) / config.calibrationMs));
+  const marker = body !== null && state.hasBody && state.smoothedX !== null
+    ? { x: state.smoothedX, topY: body.shoulderMid.y, bottomY: body.hipMid.y } : null;
+  const { baseline, shoulderWidth } = state;
+  if (!state.isCalibrated || baseline === null || shoulderWidth === null) {
+    return { baselineX: null, lanes: null, label: state.label, isTracking, marker, calibrationProgress };
+  }
+  // Raw x grows toward the subject's own LEFT unless the sides are inverted.
+  const leftward = (config.invertSides ? -1 : 1) * shoulderWidth;
+  const { left, right } = laneThresholds(state, config);
+  return {
+    baselineX: baseline,
+    lanes: {
+      left: { enterX: baseline + left.enter * leftward, exitX: baseline + left.exit * leftward },
+      right: { enterX: baseline - right.enter * leftward, exitX: baseline - right.exit * leftward },
+    },
+    label: state.label,
+    isTracking,
+    marker,
+    calibrationProgress,
+  };
+}
+
+/**
+ * Tracks how far each LEFT/RIGHT excursion goes, and when the first excursion on
+ * a side ends, keeps its peak as that side's reach. Later excursions do not
+ * overwrite it, so one big lunge mid-session cannot move the lanes; recalibrating
+ * clears it.
+ */
+function learnReach(
+  state: LateralState,
+  label: LateralLabel,
+  offset: number,
+): Pick<LateralState, 'reach' | 'excursionPeak'> {
+  const outward = (side: LateralLabel) => (side === LATERAL.LEFT ? offset : -offset);
+  const previous = state.label;
+  if (previous === label) {
+    const excursionPeak = label === LATERAL.CENTER ? 0 : Math.max(state.excursionPeak, outward(label));
+    return { reach: state.reach, excursionPeak };
+  }
+  const excursionPeak = label === LATERAL.CENTER ? 0 : outward(label);
+  if (previous === LATERAL.CENTER) return { reach: state.reach, excursionPeak };
+  const key = previous === LATERAL.LEFT ? 'left' : 'right';
+  const reach = state.reach[key] === null ? { ...state.reach, [key]: state.excursionPeak } : state.reach;
+  return { reach, excursionPeak };
 }
 
 /**
@@ -108,8 +195,8 @@ function calibrate(
 }
 
 /**
- * Signed hysteresis: crossing `enterOffset` commits to a side, and the label is
- * held until the offset falls back inside `exitOffset` ON THAT SAME SIDE. A
+ * Signed hysteresis: crossing a side's enter point commits to it, and the label is
+ * held until the offset falls back inside that side's exit point. A
  * single threshold would chatter whenever the subject hovers on the boundary.
  *
  * The comparisons are signed on purpose. An unsigned `Math.abs(offset) <
@@ -117,10 +204,14 @@ function calibrate(
  * other side keeps |offset| large, so the old label never releases and the new
  * one never gets a chance to commit.
  */
-function nextLabel(currentLabel: LateralLabel, offset: number, config: LateralConfig): LateralLabel {
-  if (offset > config.enterOffset) return LATERAL.LEFT;
-  if (offset < -config.enterOffset) return LATERAL.RIGHT;
-  if (currentLabel === LATERAL.LEFT) return offset > config.exitOffset ? LATERAL.LEFT : LATERAL.CENTER;
-  if (currentLabel === LATERAL.RIGHT) return offset < -config.exitOffset ? LATERAL.RIGHT : LATERAL.CENTER;
+function nextLabel(
+  currentLabel: LateralLabel,
+  offset: number,
+  { left, right }: { left: LaneThreshold; right: LaneThreshold },
+): LateralLabel {
+  if (offset > left.enter) return LATERAL.LEFT;
+  if (offset < -right.enter) return LATERAL.RIGHT;
+  if (currentLabel === LATERAL.LEFT) return offset > left.exit ? LATERAL.LEFT : LATERAL.CENTER;
+  if (currentLabel === LATERAL.RIGHT) return offset < -right.exit ? LATERAL.RIGHT : LATERAL.CENTER;
   return LATERAL.CENTER;
 }

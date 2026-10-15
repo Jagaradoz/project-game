@@ -101,6 +101,31 @@ export interface LateralState {
   calibrationStartMs: number | null;
   isCalibrated: boolean;
   hasBody: boolean;
+  /** Furthest offset (shoulder-widths, unsigned) of the first step out to each side; null until learned. */
+  reach: { left: number | null; right: number | null };
+  /** Furthest offset reached so far in the current LEFT/RIGHT excursion. */
+  excursionPeak: number;
+  /** Last measured shoulder width (normalised), held while the body is lost so the lane guide can stay up. */
+  shoulderWidth: number | null;
+}
+
+export interface LaneThreshold { enter: number; exit: number }
+
+/**
+ * Where the lane boundaries sit in the camera frame, for the overlay. All x/y are
+ * normalised RAW landmark coordinates (the canvas carries the CSS mirror).
+ */
+export interface LaneGuide {
+  /** Calibrated centre; null while calibrating or before a shoulder width is known. */
+  baselineX: number | null;
+  /** x where the label commits to each side (enter) and where it releases back (exit). */
+  lanes: { left: { enterX: number; exitX: number }; right: { enterX: number; exitX: number } } | null;
+  label: LateralLabel;
+  isTracking: boolean;
+  /** The measured lateral centre, drawn from shoulder to hip height; null when the body is lost. */
+  marker: { x: number; topY: number; bottomY: number } | null;
+  /** 0..1 through centre calibration; 1 once calibrated. */
+  calibrationProgress: number;
 }
 
 export type UpKnee = 'LEFT' | 'RIGHT' | null;

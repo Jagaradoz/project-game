@@ -61,9 +61,19 @@ export const CONFIG = {
 
   lateral: {
     /** |offset| must exceed this (in shoulder-widths) to enter LEFT/RIGHT. */
-    enterOffset: 0.35,
+    enterOffset: 0.5,
     /** ...and fall below this to return to CENTER. Hysteresis kills boundary flicker. */
-    exitOffset: 0.2,
+    exitOffset: 0.3,
+    /**
+     * Per-player lanes: the first step out to each side after calibration records
+     * how far that player actually steps, and that side's enter point becomes this
+     * fraction of it (exit keeps the exitOffset/enterOffset ratio). Until then the
+     * defaults above apply, so the first step must still clear enterOffset.
+     */
+    learnedEnterFraction: 0.55,
+    /** Clamp for a learned enter point, in shoulder-widths. */
+    minEnterOffset: 0.3,
+    maxEnterOffset: 0.75,
     /** Milliseconds of standing still averaged into the center baseline. */
     calibrationMs: 1000,
     /** EMA weight for the new sample. Lower = smoother but laggier. */
@@ -177,6 +187,25 @@ export const CONFIG = {
     jointColor: '#ffffff',
     /** Joints below CONFIG.pose.minVisibility are drawn in this colour instead. */
     lowConfidenceColor: '#ff4d4d',
+    /** Lane guide: the active lane's fill and the measured-centre marker. */
+    laneActiveColor: '#fe6601',
+    laneActiveAlpha: 0.22,
+    /** Extra fill alpha on a lane change, fading out over laneFlashMs. */
+    laneFlashAlpha: 0.3,
+    laneFlashMs: 350,
+    laneIdleFill: 'rgba(255, 255, 255, 0.05)',
+    laneLineColor: 'rgba(255, 255, 255, 0.85)',
+    /** Bands and lines turn this grey while the body is lost; the last lane is held. */
+    laneLostColor: 'rgba(170, 170, 170, 0.45)',
+    laneTextColor: '#ffffff',
+    laneMutedTextColor: 'rgba(255, 255, 255, 0.55)',
+    /** Sizes below are in CSS pixels, converted per frame so they read the same at any display size. */
+    laneLineCssPx: 2,
+    laneLabelCssPx: 12,
+    /** Lane names are skipped when the feed is shown smaller than this (the in-game thumbnail). */
+    laneLabelMinCssHeight: 220,
+    /** Labels sit this far below the top so the stage's own title bar does not cover them. */
+    laneLabelTopCssPx: 52,
   },
 
   /**

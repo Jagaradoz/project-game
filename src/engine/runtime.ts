@@ -32,13 +32,14 @@ import { createHandsOnHipsState, updateHandsOnHips } from '@/engine/detectors/ha
 import {
   LATERAL,
   createLateralState,
+  laneGuide,
   recalibrateLateral,
   updateLateral,
 } from '@/engine/detectors/lateral';
 import { describeCameraError, startCamera, stopCamera } from '@/engine/pose/camera';
 import { closePose, detect, getDelegate, initPose } from '@/engine/pose/pose';
 import type { PoseDelegate } from '@/engine/pose/pose';
-import { clearOverlay, drawSkeleton, resizeOverlay } from '@/engine/pose/draw';
+import { clearOverlay, drawLaneGuide, drawSkeleton, overlayCssScale, resizeOverlay } from '@/engine/pose/draw';
 import { createExposureSampler } from '@/engine/pose/exposure';
 import { ema } from '@/engine/util/smooth';
 import { measureBody } from '@/engine/util/landmarks';
@@ -318,6 +319,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let smoothedProcessingMs: number | null = null;
   const metrics = createMetrics();
   let lateral: LateralState = createLateralState();
+  let laneChangedMs = -Infinity;
   let jog: JogState = createJogState();
   let clap = createClapState();
   let handsOnHips = createHandsOnHipsState();
@@ -684,6 +686,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     const previousSteps = jog.stepCount, previousClaps = clap.clapCount, previousHolds = handsOnHips.holdCount;
     const previousLane = lateral.label;
     lateral = updateLateral(lateral, landmarks, nowMs);
+    if (lateral.label !== previousLane) laneChangedMs = nowMs;
     jog = updateJog(jog, landmarks, nowMs);
     clap = updateClap(clap, landmarks, nowMs);
     handsOnHips = updateHandsOnHips(handsOnHips, landmarks, nowMs);
@@ -723,6 +726,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     if (ctx) {
       clearOverlay(ctx);
+      const flash = Math.max(0, 1 - (nowMs - laneChangedMs) / CONFIG.draw.laneFlashMs);
+      drawLaneGuide(ctx, laneGuide(lateral, measureBody(landmarks), nowMs), flash, overlayCssScale(els.overlay));
       drawSkeleton(ctx, landmarks as PoseLandmarks | null, connections);
     }
     smoothedProcessingMs = ema(smoothedProcessingMs, performance.now() - nowMs, CONFIG.fps.smoothing);

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { CONFIG, LANDMARK } from '@/engine/config';
 import { cadenceSpm, ema } from '@/engine/util/smooth';
 import { measureBody } from '@/engine/util/landmarks';
-import { createLateralState, updateLateral, recalibrateLateral, LATERAL } from '@/engine/detectors/lateral';
+import { createLateralState, updateLateral, recalibrateLateral, laneGuide, laneThresholds, LATERAL } from '@/engine/detectors/lateral';
 import { createJogState, updateJog } from '@/engine/detectors/jog';
 import { makePose, run, FRAME_MS } from './helpers';
 import type { LateralState, PoseLandmarks } from '@/engine/types';
@@ -65,14 +65,14 @@ test('lateral: calibrates to centre and reports CENTER while standing still', ()
 });
 
 test('lateral: stepping to the subject\'s own left reports LEFT', () => {
-  const { state } = calibrateThenOffset(0.5);
+  const { state } = calibrateThenOffset(0.7);
 
   assert.equal(state.label, LATERAL.LEFT);
   assert.ok(state.offset > CONFIG.lateral.enterOffset, `offset was ${state.offset}`);
 });
 
 test('lateral: stepping to the subject\'s own right reports RIGHT', () => {
-  const { state } = calibrateThenOffset(-0.5);
+  const { state } = calibrateThenOffset(-0.7);
 
   assert.equal(state.label, LATERAL.RIGHT);
   assert.ok(state.offset < -CONFIG.lateral.enterOffset, `offset was ${state.offset}`);
@@ -81,8 +81,8 @@ test('lateral: stepping to the subject\'s own right reports RIGHT', () => {
 test('lateral: thresholds are distance-invariant', () => {
   // Same pose at half size (subject twice as far away) must give the same label
   // and, critically, the same normalised offset.
-  const near = calibrateThenOffset(0.5, { scale: 1 });
-  const far = calibrateThenOffset(0.5, { scale: 0.5 });
+  const near = calibrateThenOffset(0.7, { scale: 1 });
+  const far = calibrateThenOffset(0.7, { scale: 0.5 });
 
   assert.equal(near.state.label, LATERAL.LEFT);
   assert.equal(far.state.label, LATERAL.LEFT);
@@ -90,16 +90,16 @@ test('lateral: thresholds are distance-invariant', () => {
 });
 
 test('lateral: hysteresis holds CENTER inside the dead band', () => {
-  // 0.28 sits above exitOffset (0.20) but below enterOffset (0.35).
-  const { state } = calibrateThenOffset(0.28);
+  // 0.4 sits above exitOffset (0.30) but below enterOffset (0.50).
+  const { state } = calibrateThenOffset(0.4);
   assert.equal(state.label, LATERAL.CENTER);
 });
 
 test('lateral: hysteresis holds a committed side inside the dead band', () => {
-  const committed = calibrateThenOffset(0.5);
+  const committed = calibrateThenOffset(0.7);
   assert.equal(committed.state.label, LATERAL.LEFT);
 
-  const shifted = 0.5 + 0.28 * shoulderWidthAt(1);
+  const shifted = 0.5 + 0.4 * shoulderWidthAt(1);
   const { state } = run(
     committed.state,
     updateLateral,
@@ -112,7 +112,7 @@ test('lateral: hysteresis holds a committed side inside the dead band', () => {
 });
 
 test('lateral: falling under exitOffset releases back to CENTER', () => {
-  const committed = calibrateThenOffset(0.5);
+  const committed = calibrateThenOffset(0.7);
   const { state } = run(committed.state, updateLateral, SETTLE_FRAMES, () => makePose({ centerX: 0.5 }), committed.endMs);
 
   assert.equal(state.label, LATERAL.CENTER);
@@ -121,21 +121,21 @@ test('lateral: falling under exitOffset releases back to CENTER', () => {
 test('lateral: stepping straight across from one side to the other flips the label', () => {
   // The regression that made the HUD read LEFT forever: unsigned hysteresis never
   // released the committed side, because |offset| stays large on the far side too.
-  const left = calibrateThenOffset(0.5);
+  const left = calibrateThenOffset(0.7);
   assert.equal(left.state.label, LATERAL.LEFT);
 
-  const acrossX = 0.5 - 0.5 * shoulderWidthAt(1);
+  const acrossX = 0.5 - 0.7 * shoulderWidthAt(1);
   const { state } = run(left.state, updateLateral, SETTLE_FRAMES, () => makePose({ centerX: acrossX }), left.endMs);
 
   assert.equal(state.label, LATERAL.RIGHT);
 });
 
 test('lateral: a committed side releases once the offset crosses the baseline', () => {
-  const left = calibrateThenOffset(0.5);
+  const left = calibrateThenOffset(0.7);
 
   // Just past centre toward the other side: too small to commit RIGHT, but well
   // past the point where LEFT should still be held.
-  const pastCentreX = 0.5 - 0.28 * shoulderWidthAt(1);
+  const pastCentreX = 0.5 - 0.4 * shoulderWidthAt(1);
   const { state } = run(left.state, updateLateral, SETTLE_FRAMES, () => makePose({ centerX: pastCentreX }), left.endMs);
 
   assert.equal(state.label, LATERAL.CENTER);
@@ -198,15 +198,112 @@ test('lateral: jogging in place does not drag the label off CENTER over time', (
 });
 
 test('lateral: an unusable frame holds the previous label instead of snapping to CENTER', () => {
-  const committed = calibrateThenOffset(0.5);
+  const committed = calibrateThenOffset(0.7);
   const held = updateLateral(committed.state, null, committed.endMs);
 
   assert.equal(held.label, LATERAL.LEFT);
   assert.equal(held.hasBody, false);
 });
 
+/** Calibrates, steps out to `reachSw` and back, so that side has learned its reach. */
+function learnReach(reachSw: number) {
+  const out = calibrateThenOffset(reachSw);
+  return run(out.state, updateLateral, SETTLE_FRAMES, () => makePose({ centerX: 0.5 }), out.endMs);
+}
+
+const holdAt = (from: { state: LateralState; endMs: number }, offsetSw: number) =>
+  run(from.state, updateLateral, SETTLE_FRAMES, () => makePose({ centerX: 0.5 + offsetSw * shoulderWidthAt(1) }), from.endMs);
+
+test('lateral: a wide first step raises that side\'s switch point', () => {
+  const learned = learnReach(1.3);
+  assert.ok(Math.abs(learned.state.reach.left! - 1.3) < 0.02, `reach was ${learned.state.reach.left}`);
+
+  // 0.6 commits LEFT on the default threshold, but is under 55% of a 1.3 step.
+  assert.equal(holdAt(learned, 0.6).state.label, LATERAL.CENTER);
+  assert.equal(holdAt(learned, 0.8).state.label, LATERAL.LEFT);
+});
+
+test('lateral: a small first step lowers that side\'s switch point', () => {
+  const learned = learnReach(0.55);
+
+  // 0.4 is under the default 0.5, but over 55% of a 0.55 step (clamped to the 0.3 floor).
+  assert.equal(holdAt(learned, 0.4).state.label, LATERAL.LEFT);
+});
+
+test('lateral: each side learns its own reach', () => {
+  const learned = learnReach(1.3);
+
+  assert.equal(learned.state.reach.right, null);
+  assert.equal(holdAt(learned, -0.6).state.label, LATERAL.RIGHT, 'right keeps the default threshold');
+});
+
+test('lateral: learned switch points are clamped and keep the hysteresis ratio', () => {
+  const state = { ...createLateralState(), reach: { left: 5, right: 0.1 } };
+  const { left, right } = laneThresholds(state);
+  const ratio = CONFIG.lateral.exitOffset / CONFIG.lateral.enterOffset;
+
+  assert.equal(left.enter, CONFIG.lateral.maxEnterOffset);
+  assert.equal(right.enter, CONFIG.lateral.minEnterOffset);
+  assert.ok(Math.abs(left.exit - left.enter * ratio) < 1e-9);
+  assert.deepEqual(laneThresholds(createLateralState()).left, { enter: CONFIG.lateral.enterOffset, exit: CONFIG.lateral.exitOffset });
+});
+
+test('lateral: only the first excursion per side is learned', () => {
+  const first = learnReach(0.7);
+  const second = run(holdAt(first, 1.2).state, updateLateral, SETTLE_FRAMES, () => makePose({ centerX: 0.5 }), holdAt(first, 1.2).endMs);
+
+  assert.ok(Math.abs(second.state.reach.left! - 0.7) < 0.02, `reach was ${second.state.reach.left}`);
+});
+
+test('lateral: recalibrate forgets the learned reach', () => {
+  const reset = recalibrateLateral(learnReach(1.0).state);
+  assert.deepEqual(reset.reach, { left: null, right: null });
+});
+
+test('laneGuide: shows calibration progress and no lanes before a baseline exists', () => {
+  const pose = makePose({ centerX: 0.5 });
+  const started = updateLateral(createLateralState(), pose, 0);
+  const guide = laneGuide(started, measureBody(pose), CONFIG.lateral.calibrationMs / 2);
+
+  assert.equal(guide.lanes, null);
+  assert.equal(guide.baselineX, null);
+  assert.ok(Math.abs(guide.calibrationProgress - 0.5) < 1e-9);
+  assert.equal(laneGuide(createLateralState(), null, 0).calibrationProgress, 0);
+});
+
+test('laneGuide: lines sit where the label actually switches, scaled by shoulder width', () => {
+  const { state } = calibrateThenOffset(0, { scale: 0.5 });
+  const guide = laneGuide(state, measureBody(makePose({ centerX: 0.5, scale: 0.5 })), 0);
+  const sw = shoulderWidthAt(0.5);
+
+  assert.equal(guide.calibrationProgress, 1);
+  assert.ok(Math.abs(guide.lanes!.left.enterX - (0.5 + CONFIG.lateral.enterOffset * sw)) < 1e-6);
+  assert.ok(Math.abs(guide.lanes!.right.exitX - (0.5 - CONFIG.lateral.exitOffset * sw)) < 1e-6);
+  assert.ok(guide.marker && Math.abs(guide.marker.x - 0.5) < 1e-6 && guide.marker.topY < guide.marker.bottomY);
+});
+
+test('laneGuide: a learned side moves only its own line', () => {
+  const learned = learnReach(1.3);
+  const guide = laneGuide(learned.state, measureBody(makePose({ centerX: 0.5 })), 0);
+  const sw = shoulderWidthAt(1);
+
+  assert.ok(guide.lanes!.left.enterX - 0.5 > CONFIG.lateral.enterOffset * sw + 1e-3);
+  assert.ok(Math.abs(0.5 - guide.lanes!.right.enterX - CONFIG.lateral.enterOffset * sw) < 1e-6);
+});
+
+test('laneGuide: inverted sides mirror the lines and a lost body keeps them without a marker', () => {
+  const config = { ...CONFIG.lateral, invertSides: true };
+  const calibrated = run(createLateralState(), (s, l, t) => updateLateral(s, l, t, config), CALIBRATION_FRAMES, () => makePose({ centerX: 0.5 }));
+  const lost = updateLateral(calibrated.state, null, calibrated.endMs, config);
+  const guide = laneGuide(lost, null, calibrated.endMs, config);
+
+  assert.ok(guide.lanes!.left.enterX < 0.5);
+  assert.equal(guide.isTracking, false);
+  assert.equal(guide.marker, null);
+});
+
 test('lateral: recalibrate clears the learned baseline', () => {
-  const { state } = calibrateThenOffset(0.5);
+  const { state } = calibrateThenOffset(0.7);
   const reset = recalibrateLateral(state);
 
   assert.equal(reset.isCalibrated, false);

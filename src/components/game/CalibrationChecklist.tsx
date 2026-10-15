@@ -86,8 +86,8 @@ export function buildChecks(
       id: 'lean',
       label: 'Sideways step tested',
       detail: rehearsal.hasLeaned
-        ? 'Sideways movement detected'
-        : 'Try stepping or leaning to the left and to the right',
+        ? 'Lanes set to your step size'
+        : 'Step to the left, back to the middle, then to the right. Your step size sets the lanes.',
       isPassing: rehearsal.hasLeaned,
     },
     {
