@@ -16,5 +16,5 @@ tsconfig.tsbuildinfo
 public/assets/**/*.blend*
 .agents/
 docs/
-test/
+/test/
 tools/
