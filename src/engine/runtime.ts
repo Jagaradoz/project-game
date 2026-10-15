@@ -198,8 +198,7 @@ export interface HudSnapshot {
   /**
    * What TOR 3 calls จำนวนการเคลื่อนไหว: jog steps, lane changes, jumps, arm
    * raises and hands-on-hips holds. The system
-   * detected these -- it is not a calibrated energy figure, and
-   * src/types/api.ts keeps that distinction too.
+   * detected these -- it is not a calibrated energy figure.
    */
   movementCount: number;
   /** Lane changes so far. Monotonic, so a view can latch on it without state. */
@@ -275,7 +274,7 @@ export interface GameRuntime {
   restart(): void;
   setCharacter(charId: string): Promise<void>;
   setGraphicsQuality(quality: ShadowQuality): void;
-  /** What /result submits. Read after the run ends. */
+  /** What /result shows. Read after the run ends. */
   getRunSummary(): RunSummary;
   /** Stable between changes, so it is safe for useSyncExternalStore. */
   getSnapshot(): HudSnapshot;
@@ -820,11 +819,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
    * stretch of trail, and to read renderer.info for the draw-call budget.
    *
    * Development only. `warpTo` and `simulate` drive the real reducer, so in a
-   * production build this would be a one-line path to an arbitrary score right
-   * before the run is submitted. The harness is documented to run against
-   * `npm run dev`, so gating it costs nothing. Note that this is defence in
-   * depth, not a control: a determined player can forge the request anyway,
-   * which is why src/types/api.ts tells the backend to re-derive the score.
+   * production build this would be a one-line path to an arbitrary score. The
+   * harness is documented to run against `npm run dev`, so gating it costs
+   * nothing.
    */
   function exposeTestHook(): void {
     if (process.env.NODE_ENV === 'production') return;

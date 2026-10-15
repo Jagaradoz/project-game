@@ -1,10 +1,9 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useGameRuntime } from '@/hooks/useGameRuntime';
 import type { RuntimeMode } from '@/engine/runtime';
 import { usePlayDebugTools } from '@/hooks/usePlayDebugTools';
-import { repository, getErrorMessage } from '@/lib/api';
 import { useRunStore } from '@/lib/store/run';
 import { useSettings } from '@/lib/store/settings';
 import { CameraStage } from '@/components/game/CameraStage';
@@ -27,8 +26,7 @@ export default function GameCanvas({ mode = 'game' }: { mode?: RuntimeMode }) {
   const { snapshot, actions } = useGameRuntime(refs, { mode, character, graphicsQuality });
   const showDebugTools = usePlayDebugTools();
   const setLastRun = useRunStore(s => s.setLastRun);
-  const [isSubmitting, setIsSubmitting] = useState(false), [submitError, setSubmitError] = useState<string | null>(null);
-  const clientRunId = useRef<string | null>(null), submitted = useRef(false);
+  const handedOff = useRef(false);
   useEffect(() => {
     if (mode !== 'test') return;
     let cancelled = false;
@@ -39,25 +37,19 @@ export default function GameCanvas({ mode = 'game' }: { mode?: RuntimeMode }) {
     });
     return () => { cancelled = true; };
   }, [mode, actions]);
-  const submitRun = useCallback(async () => {
+  /** Hands the finished run to /result. Held in memory for this page view only. */
+  const seeResult = () => {
     const summary = actions.getRunSummary();
-    if (!summary) return null;
-    clientRunId.current ??= crypto.randomUUID();
-    setIsSubmitting(true); setSubmitError(null);
-    try {
-      const saved = await repository.submitRun({ ...summary, clientRunId: clientRunId.current });
-      setLastRun(saved); return saved;
-    } catch (error) { setSubmitError(getErrorMessage(error)); return null; }
-    finally { setIsSubmitting(false); }
-  }, [actions, setLastRun]);
-  useEffect(() => {
-    if (mode !== 'game' || !snapshot.isOver || submitted.current) return;
-    submitted.current = true; void submitRun();
-  }, [mode, snapshot.isOver, submitRun]);
-  const restart = () => {
-    submitted.current = false; clientRunId.current = null; setSubmitError(null); actions.restart();
+    if (summary) setLastRun(summary);
+    router.push('/result');
   };
-  const seeResult = async () => { if (await submitRun()) router.push('/result'); };
+  useEffect(() => {
+    if (mode !== 'game' || !snapshot.isOver || handedOff.current) return;
+    handedOff.current = true;
+    const summary = actions.getRunSummary();
+    if (summary) setLastRun(summary);
+  }, [mode, snapshot.isOver, actions, setLastRun]);
+  const restart = () => { handedOff.current = false; actions.restart(); };
 
   if (mode === 'test') return <TestModePanel runtimeRefs={refs} snapshot={snapshot} actions={actions} />;
   if (mode === 'pose') return <PageShell title="Camera calibration" heading={false} width="wide">
@@ -84,7 +76,7 @@ export default function GameCanvas({ mode = 'game' }: { mode?: RuntimeMode }) {
       </section>}
       {!setup && !snapshot.isOver && <div className="absolute top-3 left-3 z-20 flex max-w-[calc(100%_-_120px)] flex-wrap gap-2">
         <Button size="sm" variant="secondary" onClick={actions.pause} disabled={snapshot.pauseReason !== null}>Pause</Button>
-        <Button size="sm" variant="secondary" onClick={() => { actions.finish(); void seeResult(); }}>Finish session</Button>
+        <Button size="sm" variant="secondary" onClick={() => { actions.finish(); seeResult(); }}>Finish session</Button>
         <Button size="sm" variant="secondary" onClick={() => setHideCamera(!hideCamera)}>{hideCamera ? 'Show camera' : 'Hide camera'}</Button>
       </div>}
       {snapshot.pauseReason !== null && !snapshot.isOver && <section className="absolute inset-0 z-30 grid place-content-center bg-black/70 p-6" aria-label="Game paused">
@@ -93,11 +85,10 @@ export default function GameCanvas({ mode = 'game' }: { mode?: RuntimeMode }) {
           {!snapshot.isCameraRunning && !snapshot.isCameraSkipped && <Button onClick={actions.startCamera}>Allow camera again</Button>}
           {snapshot.error && <p role="alert" className="m-0 text-danger-text">{snapshot.error}</p>}
           <Button onClick={actions.resume} disabled={!snapshot.isCameraSkipped && (!snapshot.isCameraRunning || !snapshot.hasBody || !snapshot.isCalibrated || !snapshot.kneesVisible)}>Resume</Button>
-          <Button variant="secondary" onClick={() => { actions.finish(); void seeResult(); }}>Finish session</Button>
+          <Button variant="secondary" onClick={() => { actions.finish(); seeResult(); }}>Finish session</Button>
         </div>
       </section>}
-      <GameOverOverlay snapshot={snapshot} onRestart={restart} onSeeResult={seeResult} isSubmitting={isSubmitting} />
-      {submitError && <p role="alert" className="absolute inset-x-4 bottom-24 z-40 bg-surface p-3 text-danger-text">{submitError}</p>}
+      <GameOverOverlay snapshot={snapshot} onRestart={restart} onSeeResult={seeResult} />
     </div>
   </main>;
 }

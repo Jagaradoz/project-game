@@ -30,9 +30,7 @@ export default defineConfig({
        */
       include: [
         'src/engine/**',
-        // The data layer is pure too: the repository is derivation over a
-        // storage map, and the schemas and formatters are plain functions.
-        'src/lib/api/**',
+        // The formatters and schemas are plain functions.
         'src/lib/validation/**',
         'src/lib/format.ts',
       ],
@@ -41,9 +39,6 @@ export default defineConfig({
         'src/engine/pose/**',
         'src/engine/runtime.ts',
         'src/engine/types.ts',
-        // The live adapter cannot be exercised until the backend exists; it is
-        // schema declarations plus one apiRequest call per endpoint.
-        'src/lib/api/live/**',
       ],
       thresholds: {
         lines: 80,

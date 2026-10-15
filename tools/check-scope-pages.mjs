@@ -35,8 +35,8 @@ try {
       return new Promise((resolve,reject)=>{window.__denyCamera=()=>reject(new DOMException('Synthetic permission rejection','NotAllowedError'))});
     };
   ` });
-  const retained = ['/', '/calibrate', '/test', '/play', '/result', '/profile'];
-  const removed = ['/login', '/register', '/profile/edit', '/leaderboard', '/consent', '/practice', '/characters', '/catalog.html'];
+  const retained = ['/', '/calibrate', '/test', '/play', '/result'];
+  const removed = ['/profile', '/login', '/register', '/profile/edit', '/leaderboard', '/consent', '/practice', '/characters', '/catalog.html'];
   for (const route of retained) assert.equal((await fetch(base + route)).status, 200, route);
   for (const route of removed) assert.equal((await fetch(base + route)).status, 404, route);
   await page.goto(base + '/');
@@ -108,16 +108,15 @@ try {
   await page.evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Finish session').click()`);
   await page.waitFor(`location.pathname==='/result' && document.body.innerText.toLowerCase().includes('detected knee steps')`);
   assert.ok(await page.evaluate(`document.body.innerText.toLowerCase().includes('detected knee steps')`));
-  await page.evaluate(`document.querySelector('a[href="/profile"]').click()`);
-  await page.waitFor(`location.pathname==='/profile' && document.querySelector('a[href^="/result?run="]')`);
+  assert.equal(await page.evaluate(`document.querySelector('a[href="/profile"]')`), null, 'no Profile link');
   assert.deepEqual(await page.evaluate('window.__playerStorageAccess'), []);
-  writeFileSync(output + '/visit-profile.png', await page.screenshot());
+  writeFileSync(output + '/result.png', await page.screenshot());
   await page.send('Page.reload');
-  await page.waitFor(`document.body.innerText.toLowerCase().includes('no runs yet') && !document.querySelector('a[href^="/result?run="]')`);
+  await page.waitFor(`document.body.innerText.toLowerCase().includes('no run to show')`);
   assert.deepEqual(await page.evaluate('window.__playerStorageAccess'), []);
   const errors = page.logs.filter(log => log.level === 'pageerror');
   assert.deepEqual(errors, []);
   writeFileSync(output + '/acceptance.json', JSON.stringify({ retained, removed, panels, storageAccess: [], physicalWebcam: 'not tested' }, null, 2));
-  console.log('Scope browser checks passed: six routes, eight removals, portrait/viewport fit, zero measurements, automatic camera entry, repeated denial stays in Test Mode, preview retry, synthetic camera acquisition/navigation cleanup, idle animation, pause/resume, finish/result and visit reset. Pose inference startup is network-dependent and excluded from this UI check.');
+  console.log('Scope browser checks passed: five routes, nine removals, portrait/viewport fit, zero measurements, automatic camera entry, repeated denial stays in Test Mode, preview retry, synthetic camera acquisition/navigation cleanup, idle animation, pause/resume, finish/result and empty result after reload. Pose inference startup is network-dependent and excluded from this UI check.');
 } finally { await page.close(); await browser.close(); }
 process.exit(0);

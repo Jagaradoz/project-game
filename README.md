@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. The public pages are Home (`/`), Calibration (`/calibrate`), Test Mode (`/test`), Game Mode (`/play`), Result (`/result`), and Profile (`/profile`).
+Open http://localhost:3000. The public pages are Home (`/`), Calibration (`/calibrate`), Test Mode (`/test`), Game Mode (`/play`), and Result (`/result`). There is no Profile page, history or saved data.
 
 Home leads directly to both modes. Game Mode requires camera permission, current body/centre calibration, suitable framing and light, and rehearsal of all four movements before every run. Stand with your head and knees visible, clear your space, and move at a comfortable pace.
 
@@ -32,9 +32,9 @@ Two 9:16 panels show the webcam/skeleton and a slightly rotated character facing
 
 Opening Test Mode requests browser camera permission automatically. Rejection or camera/model startup failure keeps the page open and shows an Allow camera retry button inside the camera preview. Calibration happens automatically, and the current game character is reused without a selector. Without a detected body or movement, the character plays its idle animation; hidden pages suspend rendering. The author's revised scope removes the built-in evaluation trial forms. The researcher must record observer scores, manual step counts and environment notes separately. Accuracy comes from observer ground truth, never model confidence.
 
-## Visit-only data and privacy
+## No stored data and privacy
 
-Player results, personal high scores, trial records, notes, and preferences live only in memory. Client navigation preserves them; reloading or closing the document clears them. There are no accounts, authentication, backend writes, browser player-storage reads/writes, or online rankings. Legacy browser data is left untouched and unused.
+The application keeps nothing. The only thing held in memory is the run that just ended, so Result can show it; reloading or leaving that page clears it. There is no history, profile, personal high score, account, backend write, browser storage or online ranking.
 
 Camera frames are processed locally using MediaPipe and are never uploaded or recorded. The initial pose model and WASM files are downloaded from the pinned CDN. The developer asset catalog uses existing assets and requires network access for its Three.js import map.
 
@@ -60,7 +60,7 @@ Local tests and software-rendered Chrome do not establish physical accuracy, dev
 - `test`: the same detection/control pipeline plus a lightweight character demonstration.
 - `pose`: calibration only, with no renderer.
 
-`GameCanvas` is the React runtime boundary. Snapshot subscriptions are throttled; setup and gameplay retain the same camera and DOM nodes. Pages use `repository` from `@/lib/api`, backed by one visit-scoped repository with idempotent run submission. Results are returned as defensive copies. Settings and evaluation state use plain in-memory zustand stores.
+`GameCanvas` is the React runtime boundary. Snapshot subscriptions are throttled; setup and gameplay retain the same camera and DOM nodes. The finished run is handed to `/result` through a small in-memory zustand store (`src/lib/store/run.ts`); there is no repository or data layer. Settings use plain in-memory zustand stores.
 
 Assets in `public/assets/` remain runtime-fetched files. Existing assets, character rigs and licenses are preserved. Legacy body-jump/arm-raise detector modules remain independently tested but are not production controls. Headless/developer input omitting cadence retains the old simulation path; production pose input always supplies cadence and consumable step events.
 
@@ -76,7 +76,7 @@ node tools/check-scope-pages.mjs http://localhost:3000
 node tools/check-long-play.mjs http://localhost:3000/play 1204
 ```
 
-The browser tools need a running development server and installed Chrome or Edge. They use an isolated software-rendered browser. The scope check covers six public routes, eight removed routes, two portrait panels, six Proposal measurement types, viewport fit without scrolling, removed controls, zero-valued empty measurements, automatic camera entry, preview retry after denial, synthetic camera acquisition/navigation cleanup, idle animation, developer pause/resume, finishing/results, visit history, and reset on reload. The long-play probe simulates 1,204 seconds across repeated runs and checks GPU-resource bounds; it is not a 20-minute physical-webcam acceptance trial.
+The browser tools need a running development server and installed Chrome or Edge. They use an isolated software-rendered browser. The scope check covers five public routes, nine removed routes, two portrait panels, six Proposal measurement types, viewport fit without scrolling, removed controls, zero-valued empty measurements, automatic camera entry, preview retry after denial, synthetic camera acquisition/navigation cleanup, idle animation, developer pause/resume, finishing/results and an empty result after reload. The long-play probe simulates 1,204 seconds across repeated runs and checks GPU-resource bounds; it is not a 20-minute physical-webcam acceptance trial.
 
 For local development only, game setup includes **Development: skip camera**, plus the existing keyboard/headless harness. These controls and `window.__lane` are absent in production.
 
@@ -84,4 +84,4 @@ For local development only, game setup includes **Development: skip camera**, pl
 
 For webcam use outside localhost, use HTTPS (for example the existing `npm run dev:mobile` tunnel helper). The documented product target remains desktop/laptop browsers.
 
-See [the document alignment report](docs/document-alignment.md) for source conflicts and recommended corrections, and [the execution record](docs/scope-modes-execution.md) for validation boundaries.
+See [the document alignment report](docs/document-alignment.md) (also exported as `docs/document-alignment.docx`) for source conflicts and recommended corrections.

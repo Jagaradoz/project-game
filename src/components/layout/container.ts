@@ -13,7 +13,7 @@
  * Landing heroes break out with BareShell `bleed`; inner copy still uses `wide`.
  */
 export const SHELL_WIDTH = {
-  /** Forms with a single column of fields: login, register, edit profile. */
+  /** A single column of fields. */
   narrow: 'max-w-md',
   /** Long-form reading, held near 70 characters. */
   prose: 'max-w-[40rem]',

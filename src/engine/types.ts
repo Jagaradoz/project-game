@@ -27,9 +27,8 @@ export type GameConfig = AppConfig['game'];
 export type RunConfig = GameConfig & { goalKills?: number; requireBoss?: boolean };
 
 /**
- * What one finished run reports. Deliberately NOT SubmitRunInput: the engine
- * knows nothing about the API contract, and src/types/api.ts already imports
- * from here. The React layer adds the idempotency key and submits it.
+ * What one finished run reports. The React layer holds the latest one in memory
+ * for /result and keeps nothing else.
  */
 export interface RunSummary {
   biomeId: string;

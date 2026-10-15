@@ -7,9 +7,8 @@ import { formatNumber } from '@/lib/format';
 interface GameOverOverlayProps {
   snapshot: HudSnapshot;
   onRestart: () => void;
-  /** Shown alongside Restart once the run has been recorded. */
+  /** Shown alongside Restart; opens the summary of this run. */
   onSeeResult?: () => void;
-  isSubmitting?: boolean;
 }
 
 /**
@@ -21,7 +20,6 @@ export function GameOverOverlay({
   snapshot,
   onRestart,
   onSeeResult,
-  isSubmitting,
 }: GameOverOverlayProps) {
   if (!snapshot.isOver || !snapshot.endPresentationComplete) return null;
 
@@ -67,11 +65,10 @@ export function GameOverOverlay({
             <Button
               variant="secondary"
               onClick={onSeeResult}
-              isLoading={isSubmitting}
               icon={<ChartColumn size={18} />}
               className="min-w-[160px]"
             >
-              {isSubmitting ? 'Preparing…' : 'See summary'}
+              See summary
             </Button>
           )}
         </div>

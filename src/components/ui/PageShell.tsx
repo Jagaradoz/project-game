@@ -14,8 +14,7 @@ interface PageShellProps {
   /** Controls that belong to the page, beside its heading. */
   actions?: React.ReactNode;
   /**
-   * Skip the eyebrow/title/subtitle header when the page supplies its own
-   * heading -- profile uses the display name as the <h1>.
+   * Skip the eyebrow/title/subtitle header when the page supplies its own heading.
    */
   heading?: boolean;
   children?: React.ReactNode;

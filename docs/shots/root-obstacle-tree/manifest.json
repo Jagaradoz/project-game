@@ -1,9 +1,0 @@
-{
-  "blend": "D:\\Engineering Works\\project-game\\public\\assets\\models\\blender\\environment\\root_obstacle_tree.blend",
-  "mesh_objects": 77,
-  "triangles": 10662,
-  "root_crest_m": 0.8,
-  "main_root_reach_m": 9.2,
-  "continuous_wood": "RootOak_Wood_Continuous",
-  "game_integration": false
-}

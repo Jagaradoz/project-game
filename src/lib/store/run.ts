@@ -3,19 +3,17 @@
 /**
  * The run that just finished, handed from /play to /result.
  *
- * Deliberately NOT persisted. It is a one-way handoff between two screens in
- * the same visit; keeping it in localStorage would mean /result showing a run
- * from days ago to someone who opened it directly. /result falls back to the
- * visit's most recent run when this is empty.
+ * In memory only, and only the latest run: there is no history, no totals and
+ * no comparison. Reloading or opening /result directly shows an empty state.
  */
 
 import { create } from 'zustand';
 
-import type { RunResult } from '@/types/api';
+import type { RunSummary } from '@/engine/types';
 
 interface RunState {
-  lastRun: RunResult | null;
-  setLastRun: (run: RunResult) => void;
+  lastRun: RunSummary | null;
+  setLastRun: (run: RunSummary) => void;
   clearLastRun: () => void;
 }
 

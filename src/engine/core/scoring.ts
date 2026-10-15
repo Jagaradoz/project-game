@@ -2,8 +2,8 @@
  * Score rules, as pure functions over one reducer step's events.
  *
  * Kept apart from the reducer so the formula lives in one place: the server is
- * told to re-derive a submitted score (src/types/api.ts), and it can only do
- * that if the rules are small enough to port. Every input here is something the
+ * re-derivable from a run's events alone, which only works if the rules stay
+ * small. Every input here is something the
  * reducer already knows; nothing reads the clock or the scene.
  *
  * The score is the sum of the score orbs the player picks up -- nothing else
