@@ -1,9 +1,8 @@
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SHELL_GUTTER, SHELL_WIDTH, type ShellWidth } from '@/components/layout/container';
-import type { NavVariant } from '@/components/layout/nav';
 
-export type { NavVariant, ShellWidth };
+export type { ShellWidth };
 
 interface PageShellProps {
   title: string;
@@ -11,8 +10,6 @@ interface PageShellProps {
   eyebrow?: string;
   /** One line under the heading, saying what this screen is for. */
   subtitle?: string;
-  /** Navigation variant; retained screens share visit-only destinations. */
-  nav?: NavVariant;
   width?: ShellWidth;
   /** Controls that belong to the page, beside its heading. */
   actions?: React.ReactNode;
@@ -28,7 +25,6 @@ export function PageShell({
   title,
   eyebrow,
   subtitle,
-  nav = 'game',
   width = 'prose',
   actions,
   heading = true,
@@ -36,7 +32,7 @@ export function PageShell({
 }: PageShellProps) {
   return (
     <div className="flex min-h-dvh flex-col">
-      <SiteHeader variant={nav} />
+      <SiteHeader />
 
       <main
         className={`mx-auto flex w-full flex-col gap-6 py-8 sm:py-10 ${SHELL_GUTTER} ${SHELL_WIDTH[width]}`}
