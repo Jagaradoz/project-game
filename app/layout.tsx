@@ -81,7 +81,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${plusJakarta.variable} ${luckiestGuy.variable}`}>
+    <html lang="en" className={`${plusJakarta.variable} ${luckiestGuy.variable}`} suppressHydrationWarning>
       <body className="m-0 min-h-dvh antialiased">{children}</body>
     </html>
   );

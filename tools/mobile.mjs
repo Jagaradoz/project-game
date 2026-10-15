@@ -111,7 +111,7 @@ async function main() {
     console.log('\x1b[32m%s\x1b[0m', '============================================================\n');
     console.log('\x1b[1m\x1b[32m%s\x1b[0m', `  📱 Mobile HTTPS URL (Webcam Enabled):`);
     console.log(`     ${httpsUrl}\n`);
-    console.log('\x1b[36m%s\x1b[0m', `  💻 Local Network URL:`);
+    console.log('\x1b[36m%s\x1b[0m', `  💻 Local Network URL (no camera -- plain HTTP):`);
     console.log(`     http://${lanIp}:${PORT}\n`);
     console.log('\x1b[37m%s\x1b[0m', `  🖥️  Local Machine URL:`);
     console.log(`     http://localhost:${PORT}\n`);

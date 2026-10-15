@@ -84,7 +84,7 @@ function assertSecureContext() {
   if (window.isSecureContext) return;
   throw new Error(
     'Camera access requires HTTPS (or localhost). ' +
-      `This page was loaded over ${window.location.protocol}//${window.location.host} -- use the ngrok https:// URL instead.`,
+      `This page was loaded over ${window.location.protocol}//${window.location.host} -- open the https:// tunnel link printed by 'npm run dev:mobile' instead.`,
   );
 }
 
