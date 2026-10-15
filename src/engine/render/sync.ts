@@ -157,7 +157,7 @@ function syncPlayer(
 /** Flight follows reducer time; landing completes before shots resume the run. */
 export function updatePlayerAnimation(
   player: PlayerRefs,
-  state: Pick<GameState, 'isOver' | 'isFiring' | 'justFired'> & Partial<Pick<GameState, 'isCleared' | 'justHit' | 'jumpStartedMs' | 'elapsedMs' | 'deathReason'>>,
+  state: Pick<GameState, 'isOver' | 'isFiring' | 'justFired'> & Partial<Pick<GameState, 'isCleared' | 'justHit' | 'jumpStartedMs' | 'elapsedMs' | 'deathReason' | 'speed'>>,
   dtSec: number,
   config: GameConfig = CONFIG.game,
 ): void {
@@ -171,7 +171,8 @@ export function updatePlayerAnimation(
   }
 
   if (state.isOver) {
-    player.playAnimation(state.isCleared || state.deathReason === 'drowned' ? 'idle' : 'death', 0.2, Boolean(state.isCleared || state.deathReason === 'drowned'));
+    const rested = state.isCleared || state.deathReason === 'drowned' || state.deathReason === null;
+    player.playAnimation(rested ? 'idle' : 'death', 0.2, Boolean(rested));
   } else if (airborne) {
     const restart = player.lastJumpStartedMs !== state.jumpStartedMs;
     player.playAnimation('jump', .06, false, restart);
@@ -194,7 +195,7 @@ export function updatePlayerAnimation(
   } else if (state.justFired) {
     player.playAnimation('shoot', 0.06, false, true);
   } else if (player.currentActionName !== 'shoot' || !player.currentAction?.isRunning()) {
-    player.playAnimation('run', 0.1, true);
+    player.playAnimation(state.speed === 0 ? 'idle' : 'run', 0.1, true);
   }
   player.mixer?.update(dtSec);
 }

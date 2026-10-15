@@ -25,10 +25,14 @@ import type { RunSummary, ShadowQuality } from '@/engine/types';
 
 /** Stable reference, so a render before the engine exists cannot loop. */
 const IDLE_SNAPSHOT: HudSnapshot = {
+  clapCount: 0, speed: 0, difficulty: 1, goalReached: false, hasStarted: false, canBegin: false, pauseReason: null,
+  rehearsal: { left: false, right: false, knees: false, hips: false, clap: false }, poseFps: null, renderFps: null, processingMs: null,
+  metrics: { latencyMeanMs: null, latencyP95Ms: null, latencyMinMs: null, latencyMaxMs: null, latencySamples: 0,
+    fpsMean: null, firstMinuteFps: null, lastMinuteFps: null, fpsDeclinePercent: null, bodyLossIncidents: 0 },
   jumpCount: 0, armRaiseCount: 0, hipsHoldCount: 0, isHandsOnHips: false, isShielding: false,
   sporeDistance: null, isInSpore: false,
   feetVisible: false, isJumpCalibrated: false, isAirborne: false,
-  obstacleDistance: null, bossHp: null, bossMaxHp: CONFIG.game.enemyTypes.boss.hp,
+  obstacleDistance: null, bossHp: null, enemyHp: null, enemyMaxHp: null, bossMaxHp: CONFIG.game.enemyTypes.boss.hp,
   obstacleKind: null, obstacleOpenLane: null, deathReason: null, endPresentationComplete: true,
   bossDefeated: false,
   score: 0,
@@ -85,8 +89,12 @@ export interface UseGameRuntimeOptions {
 
 /** Stable action surface, so components never depend on the runtime existing. */
 export interface GameActions {
+  beginRun: (difficulty?: number) => boolean;
+  pause: () => void;
+  resume: () => boolean;
+  finish: () => void;
   jump: () => void;
-  startCamera: () => Promise<void>;
+  startCamera: () => Promise<boolean>;
   stopCamera: () => void;
   skipCamera: () => void;
   recalibrate: () => void;
@@ -171,8 +179,12 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
 
   const actions = useMemo<GameActions>(
     () => ({
+      beginRun: (difficulty) => runtimeRef.current?.beginRun(difficulty) ?? false,
+      pause: () => runtimeRef.current?.pause(),
+      resume: () => runtimeRef.current?.resume() ?? false,
+      finish: () => runtimeRef.current?.finish(),
       jump: () => runtimeRef.current?.jump(),
-      startCamera: () => runtimeRef.current?.startCamera() ?? Promise.resolve(),
+      startCamera: () => runtimeRef.current?.startCamera() ?? Promise.resolve(false),
       stopCamera: () => runtimeRef.current?.stopCamera(),
       skipCamera: () => runtimeRef.current?.skipCamera(),
       recalibrate: () => runtimeRef.current?.recalibrate(),

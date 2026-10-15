@@ -2,12 +2,11 @@
  * The biome and stage catalogue.
  *
  * Derived from the engine's BIOMES rather than restated, so adding a biome to
- * the renderer also adds it to progress -- there is no second
+ * the renderer also makes its name available in results -- there is no second
  * list to remember. Importing it here is safe: biomes.ts and palette.ts import
  * `three` only as a type, so nothing pulls WebGL into a page or a test.
  *
- * The game is Training mode only: one forest biome with a single stage. The
- * biome/stage shape stays in the API contract so the backend need not change.
+ * Game Mode uses one forest biome with a single endless stage.
  */
 
 import { BIOMES } from '@/engine/render/world/biomes';
@@ -24,7 +23,7 @@ export const BIOME_CATALOG: readonly BiomeCatalogEntry[] = BIOMES.map((biome) =>
   name: biome.name,
 }));
 
-/** Position in the unlock order, or -1 for an id the catalogue does not know. */
+/** Position in the catalogue, or -1 for an unknown id. */
 export function biomeIndex(biomeId: string): number {
   return BIOME_CATALOG.findIndex((entry) => entry.biomeId === biomeId);
 }

@@ -9,6 +9,7 @@ interface CameraStageProps {
   isCameraRunning: boolean;
   isCameraSkipped: boolean;
   isCameraHidden?: boolean;
+  isSetup?: boolean;
 }
 
 /**
@@ -19,15 +20,15 @@ interface CameraStageProps {
  * the skeleton stays glued to the body without any flipping in the drawing code.
  * Changing one without the other detaches the skeleton -- see app/globals.css.
  */
-export function CameraStage({ videoRef, overlayRef, isCameraRunning, isCameraSkipped, isCameraHidden = false }: CameraStageProps) {
+export function CameraStage({ videoRef, overlayRef, isCameraRunning, isCameraSkipped, isCameraHidden = false, isSetup = false }: CameraStageProps) {
   const [isVideoReady, setIsVideoReady] = useState(false);
   const showFeed = isCameraRunning && isVideoReady;
 
   return (
     <div
-      className={`absolute right-3 bottom-3 z-[2] overflow-hidden border-2 border-white ${isCameraHidden ? 'bg-black' : 'bg-black/85'} shadow-[3px_3px_0_0_var(--color-primary)] transition-[width,height] duration-200 motion-reduce:transition-none ${isCameraSkipped ? 'invisible' : ''} ${
-        showFeed
-          ? 'aspect-9/16 w-[72px] rounded-none border-white/20 sm:w-[84px]'
+      className={`absolute right-3 bottom-3 ${isSetup ? 'z-40' : 'z-[2]'} overflow-hidden border-2 border-white ${isCameraHidden && !isSetup ? 'bg-black' : 'bg-black/85'} shadow-[3px_3px_0_0_var(--color-primary)] transition-[width,height] duration-200 motion-reduce:transition-none ${isCameraSkipped ? 'invisible' : ''} ${
+        isSetup ? 'aspect-4/3 w-[140px] sm:w-[240px] lg:w-[320px]' : showFeed
+          ? 'aspect-4/3 w-[120px] rounded-none border-white/20 sm:w-[180px]'
           : 'h-9 w-[116px] rounded-none border-white/15'
       }`}
       role="status"
@@ -43,11 +44,11 @@ export function CameraStage({ videoRef, overlayRef, isCameraRunning, isCameraSki
         onEmptied={() => setIsVideoReady(false)}
         onPause={() => setIsVideoReady(false)}
         onEnded={() => setIsVideoReady(false)}
-        className={`mirrored absolute inset-0 h-full w-full object-cover ${isCameraHidden ? 'opacity-0' : `transition-opacity duration-200 ${showFeed ? 'opacity-100' : 'opacity-0'}`}`}
+        className={`mirrored absolute inset-0 h-full w-full object-contain ${isCameraHidden && !isSetup ? 'opacity-0' : `transition-opacity duration-200 ${showFeed ? 'opacity-100' : 'opacity-0'}`}`}
       />
       <canvas
         ref={overlayRef}
-        className={`mirrored absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${showFeed ? 'opacity-100' : 'opacity-0'}`}
+        className={`mirrored absolute inset-0 h-full w-full object-contain transition-opacity duration-200 ${showFeed ? 'opacity-100' : 'opacity-0'}`}
       />
       {showFeed ? (
         <div className="absolute inset-x-1.5 top-1.5 flex items-center justify-center gap-1 rounded-none bg-black/65 px-1.5 py-1">

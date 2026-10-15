@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { launchBrowser, openPage } from './cdp.mjs';
 
-const BATCHES = 181;
+const BATCHES = Math.max(181, Math.ceil(Number(process.argv[3] ?? 1204) / 4));
 const STEPS = 40;
 const STEP_SEC = .1;
 const browser = await launchBrowser({ width: 850, height: 850, port: 9348 });

@@ -15,14 +15,17 @@
  */
 
 import { CONFIG } from '@/engine/config';
-import { createGameState, restartGame, updateGame } from '@/engine/core/state';
+import { createGameState, restartGame, updateGame, difficultyAt } from '@/engine/core/state';
+import { advanceDemo } from '@/engine/core/demo';
+import { createMetrics, type MetricsSnapshot } from '@/engine/core/metrics';
+import { createClapState, updateClap } from '@/engine/detectors/clap';
+import { classifyDistance, classifyLighting } from '@/engine/util/luma';
+import { createTestScene } from '@/engine/render/testScene';
 import { activeMultiplier } from '@/engine/core/scoring';
 import { createDrowningPresentation, updateDrowningPresentation } from '@/engine/core/drowning';
 import { TRAINING_STAGE_NUMBER, resolveTrainingRules } from '@/engine/core/stage';
 import { createInput } from '@/engine/core/input';
 import { createJogState, updateJog } from '@/engine/detectors/jog';
-import { createJumpState, updateJump } from '@/engine/detectors/jump';
-import { createArmsUpState, updateArmsUp } from '@/engine/detectors/armsUp';
 import { createHandsOnHipsState, updateHandsOnHips } from '@/engine/detectors/handsOnHips';
 import {
   LATERAL,
@@ -116,15 +119,11 @@ export function createCharacterPreviewRuntime(
 }
 
 /**
- * 'game' is the full runner. 'pose' runs the camera and the detectors and
- * nothing else -- no WebGL context, no reducer, no keyboard.
- *
- * /calibrate and /practice both need pose detection with no game around it, and
- * neither should pay for a renderer. The control-group mode in TOR 3
- * (การประเมินแรงจูงใจ) additionally REQUIRES the absence of game elements, so
- * this is a correctness boundary there, not only an optimisation.
+ * 'game' is the calibrated runner, 'test' demonstrates the same four controls
+ * with one character, and 'pose' runs calibration without a renderer or reducer.
  */
-export type RuntimeMode = 'game' | 'pose';
+export type RuntimeMode = 'game' | 'pose' | 'test';
+export type PauseReason = 'body' | 'camera' | 'hidden' | 'manual' | null;
 
 export interface RuntimeElements {
   gameCanvas: HTMLCanvasElement;
@@ -143,6 +142,18 @@ export interface RuntimeOptions {
 }
 
 export interface HudSnapshot {
+  clapCount: number;
+  speed: number;
+  difficulty: number;
+  goalReached: boolean;
+  hasStarted: boolean;
+  canBegin: boolean;
+  pauseReason: PauseReason;
+  rehearsal: { left: boolean; right: boolean; knees: boolean; hips: boolean; clap: boolean };
+  poseFps: number | null;
+  processingMs: number | null;
+  renderFps: number | null;
+  metrics: MetricsSnapshot;
   jumpCount: number;
   /** Both-arms-overhead raises, each one a jump. */
   armRaiseCount: number;
@@ -164,6 +175,8 @@ export interface HudSnapshot {
   deathReason: DeathReason | null;
   endPresentationComplete: boolean;
   bossHp: number | null;
+  enemyHp: number | null;
+  enemyMaxHp: number | null;
   bossMaxHp: number;
   bossDefeated: boolean;
   score: number;
@@ -228,6 +241,7 @@ export interface HudSnapshot {
  * an orb lands without publishing every frame.
  */
 const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
+  'hasStarted', 'pauseReason', 'canBegin', 'hasBody', 'goalReached',
   'score',
   'comboHits',
   'comboMultiplier',
@@ -247,9 +261,13 @@ const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
 ];
 
 export interface GameRuntime {
+  beginRun(startingDifficulty?: number): boolean;
+  pause(): void;
+  resume(): boolean;
+  finish(): void;
   jump(): void;
   start(): void;
-  startCamera(): Promise<void>;
+  startCamera(): Promise<boolean>;
   stopCamera(): void;
   skipCamera(): void;
   recalibrate(): void;
@@ -276,16 +294,29 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   const rules: RunConfig = rulesFor(mode);
 
   let game: GameState = createGameState(options.seed ?? 1, rules);
+  if (mode === 'test') game = { ...game, speed: 0 };
   let drowning = createDrowningPresentation();
   let previewPaused = false;
+  let hasStarted = false;
+  let pauseReason: PauseReason = null;
+  let startingDifficulty = 1;
+  let rehearsal = { left: false, right: false, knees: false, hips: false, clap: false };
+  let runSteps = 0, runMovements = 0;
+  let lastValidPoseMs: number | null = null;
+  let lastPoseReceivedMs: number | null = null;
+  let pendingResponseMs: number | null = null;
+  let lastRenderMs: number | null = null;
+  let smoothedRenderFps: number | null = null;
+  let smoothedProcessingMs: number | null = null;
+  const metrics = createMetrics();
   let lateral: LateralState = createLateralState();
   let jog: JogState = createJogState();
-  let jump = createJumpState();
-  let armsUp = createArmsUpState();
+  let clap = createClapState();
   let handsOnHips = createHandsOnHipsState();
   const input = createInput();
 
   let sceneRefs: SceneRefs | null = null;
+  let testScene: Awaited<ReturnType<typeof createTestScene>> | null = null;
   let renderedGame: GameState | null = null;
   let renderedActorsVisible = true;
   let renderedDrowningMs = -1;
@@ -360,19 +391,32 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   function buildSnapshot(): HudSnapshot {
     const nearest = game.obstacles.filter(o => o.status !== 'cleared').reduce<TrailHazard | null>(
       (near, o) => !near || o.z > near.z ? o : near, null);
+    const nearestEnemy = game.enemies.reduce<(typeof game.enemies)[number] | null>((near, e) => !near || e.z > near.z ? e : near, null);
     return {
+      clapCount: clap.clapCount,
+      speed: pauseReason !== null || !isPoseRunning && !isCameraSkipped ? 0 : game.speed,
+      difficulty: difficultyAt(game.elapsedMs, startingDifficulty),
+      goalReached: game.elapsedMs >= CONFIG.game.goalMs,
+      hasStarted,
+      canBegin: canBegin(),
+      pauseReason,
+      rehearsal,
+      poseFps: smoothedFps,
+      processingMs: smoothedProcessingMs,
+      renderFps: smoothedRenderFps,
+      metrics: metrics.snapshot(),
       score: game.score,
       comboHits: game.comboHits,
       comboMultiplier: activeMultiplier(game, game.elapsedMs, rules),
-      jumpCount: jump.jumpCount,
-      armRaiseCount: armsUp.raiseCount,
+      jumpCount: clap.clapCount,
+      armRaiseCount: clap.clapCount,
       hipsHoldCount: handsOnHips.holdCount,
       isHandsOnHips: handsOnHips.isActive,
       isShielding: game.isShielding,
       sporeDistance: sporeDistanceAhead(),
       isInSpore: game.isInSpore,
-      feetVisible: jump.feetVisible,
-      isJumpCalibrated: jump.isCalibrated,
+      feetVisible: false,
+      isJumpCalibrated: lateral.isCalibrated,
       isAirborne: game.jumpStartedMs !== null,
       obstacleDistance: nearest && !game.isOver ? Math.max(0, rules.playerZ - nearest.z) : null,
       obstacleKind: nearest?.kind ?? null,
@@ -380,6 +424,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       deathReason: game.deathReason,
       endPresentationComplete: drowning.complete,
       bossHp: game.enemies.find(e => e.kind === 'boss')?.hp ?? null,
+      enemyHp: nearestEnemy ? nearestEnemy.hp ?? 1 : null,
+      enemyMaxHp: nearestEnemy ? rules.enemyTypes[nearestEnemy.kind ?? 'normal'].hp : null,
       bossMaxHp: rules.enemyTypes.boss.hp,
       bossDefeated: game.bossDefeated,
       hp: game.hp,
@@ -393,15 +439,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       elapsedMs: game.elapsedMs,
       movementCount: movementTotal(),
       lateralChangeCount,
-      movementMs,
+      movementMs: hasStarted || mode === 'test' ? game.movementMs : movementMs,
 
       lateralLabel: lateral.label,
       lateralOffset: lateral.offset,
       isCalibrated: lateral.isCalibrated,
-      hasBody: lateral.hasBody,
+      hasBody: lateral.hasBody && lastPoseReceivedMs !== null && performance.now() - lastPoseReceivedMs <= 1000,
       isJogging: jog.isJogging,
       cadenceSpm: jog.cadenceSpm,
-      stepCount: jog.stepCount,
+      stepCount: hasStarted ? runSteps : jog.stepCount,
       kneeDelta: jog.kneeDelta,
 
       shoulderWidth,
@@ -413,11 +459,11 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       delegate,
       poseModel,
       cameraLabel,
-      quality: sceneRefs?.quality ?? null,
+      quality: sceneRefs?.quality ?? testScene?.quality ?? null,
 
       isCameraRunning: isPoseRunning,
       isCameraSkipped,
-      isSceneReady: sceneRefs !== null,
+      isSceneReady: sceneRefs !== null || testScene !== null,
       status,
       error: errorMessage,
     };
@@ -457,6 +503,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     lastGameMs = performance.now();
     lastQualityMs = lastGameMs;
     frameBudget.reset();
+    lastRenderMs = null;
+    if (document.hidden) pauseRun('hidden');
     if (!document.hidden) needsRender = true;
   }
 
@@ -464,6 +512,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     if (isDisposed) return;
 
     if (document.hidden) {
+      pauseRun('hidden');
       lastGameMs = lastQualityMs = nowMs;
       frameBudget.reset();
       qualityMonitor.reset();
@@ -473,7 +522,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     // The run waits for pose tracking or the explicit dev bypass. The scene
     // still paints behind the dialog and remains available to tools/shot.mjs.
-    const isPlaying = isPoseRunning || isCameraSkipped;
+    if (mode === 'game' && hasStarted && !isCameraSkipped && !game.isOver
+      && (lastValidPoseMs === null || nowMs - lastValidPoseMs > 1000)) pauseRun('body');
+    const isPlaying = mode === 'test' ? isPoseRunning : hasStarted && pauseReason === null && (isPoseRunning || isCameraSkipped);
+    const hasTestTracking = isPoseRunning && lateral.hasBody && lateral.isCalibrated && kneesVisible
+      && lastValidPoseMs !== null && nowMs - lastValidPoseMs <= 1000;
+    if (mode === 'test' && !hasTestTracking) input.clearPose();
     // Measure display callbacks, not the intentional 30/45fps cap. Otherwise
     // Medium would mistake its own budget for a slow device and downgrade.
     sampleQuality(nowMs - lastQualityMs, !isPlaying || previewPaused || game.isOver);
@@ -490,7 +544,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     lastGameMs = nowMs;
     const stepMs = isPlaying ? dtMs : 0;
     if (isPlaying && !previewPaused && dtMs > 0) {
-      game = updateGame(game, input.read(), dtMs, rules);
+      const controls = input.read();
+      game = mode === 'test' ? advanceDemo(game, controls, dtMs)
+        : updateGame(game, { ...controls, ...(isCameraSkipped ? {} : { startingDifficulty }) }, dtMs, rules);
+      if (mode === 'test' && !hasTestTracking) {
+        game = { ...game, speed: 0, justFired: false, isFiring: false, isShielding: false, jumpStartedMs: null, jumpHeight: 0 };
+      }
     }
 
     drowning = updateDrowningPresentation(drowning, game.deathReason, previewPaused ? 0 : dtMs, rules.obstacle.drowningMs);
@@ -504,10 +563,46 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       renderedActorsVisible = actorsVisible;
       renderedDrowningMs = drowning.elapsedMs;
       needsRender = false;
+      recordRender(nowMs, isPlaying && !previewPaused && !game.isOver);
+    }
+    if (testScene) {
+      // Test Mode keeps the idle clip moving even without a detected body.
+      testScene.render(game, dtMs, hasTestTracking);
+      needsRender = false;
+      recordRender(nowMs, isPlaying);
     }
 
     publish(nowMs);
     gameFrameId = requestAnimationFrame(gameFrame);
+  }
+
+  function recordRender(nowMs: number, active: boolean) {
+    if (!active) { lastRenderMs = null; return; }
+    if (lastRenderMs !== null && nowMs > lastRenderMs) {
+      const dt = nowMs - lastRenderMs;
+      smoothedRenderFps = ema(smoothedRenderFps, 1000 / dt, CONFIG.fps.smoothing);
+      metrics.render(game.elapsedMs, dt);
+    }
+    lastRenderMs = nowMs;
+    if (pendingResponseMs !== null) {
+      metrics.response(Math.max(0, performance.now() - pendingResponseMs));
+      pendingResponseMs = null;
+    }
+  }
+
+  function canBegin() {
+    return isPoseRunning && lateral.hasBody && lateral.isCalibrated && kneesVisible
+      && classifyDistance(shoulderWidth) === 'ok' && classifyLighting(luma) === 'ok'
+      && Object.values(rehearsal).every(Boolean) && lastValidPoseMs !== null
+      && performance.now() - lastValidPoseMs <= 1000 && !document.hidden;
+  }
+
+  function pauseRun(reason: Exclude<PauseReason, null>) {
+    if (mode !== 'game' || !hasStarted || game.isOver || pauseReason !== null) return;
+    pauseReason = reason;
+    if (reason === 'body') metrics.bodyLoss();
+    input.clearPose(); pendingResponseMs = null; lastRenderMs = null;
+    needsRender = true; publish();
   }
 
   function sampleQuality(dtMs: number, suspended: boolean): void {
@@ -556,6 +651,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       try {
         processFrame(nowMs);
       } catch (error) {
+        pauseRun('camera');
         releaseCamera();
         setError(describeCameraError(error));
         setStatus('Stopped.');
@@ -575,28 +671,47 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     const { landmarks, inferenceMs } = detect(els.video, nowMs);
     smoothedInferenceMs = ema(smoothedInferenceMs, inferenceMs, CONFIG.fps.smoothing);
 
+    const previousSteps = jog.stepCount, previousClaps = clap.clapCount, previousHolds = handsOnHips.holdCount;
+    const previousLane = lateral.label;
     lateral = updateLateral(lateral, landmarks, nowMs);
     jog = updateJog(jog, landmarks, nowMs);
-    jump = updateJump(jump, landmarks, nowMs);
-    armsUp = updateArmsUp(armsUp, landmarks, nowMs);
+    clap = updateClap(clap, landmarks, nowMs);
     handsOnHips = updateHandsOnHips(handsOnHips, landmarks, nowMs);
 
     trackCalibrationReadouts(landmarks as PoseLandmarks | null, nowMs);
     trackMovement(nowMs);
+    if (lateral.hasBody && kneesVisible) lastValidPoseMs = nowMs;
+    else pauseRun('body');
+    if (!hasStarted) {
+      const next = { left: rehearsal.left || lateral.isCalibrated && lateral.label === LATERAL.LEFT,
+        right: rehearsal.right || lateral.isCalibrated && lateral.label === LATERAL.RIGHT,
+        knees: rehearsal.knees || jog.stepCount > 0, hips: rehearsal.hips || handsOnHips.holdCount > 0,
+        clap: rehearsal.clap || clap.clapCount > 0 };
+      if (Object.keys(next).some(key => next[key as keyof typeof next] !== rehearsal[key as keyof typeof next])) rehearsal = next;
+    } else if (pauseReason === null && !game.isOver) {
+      runSteps += jog.stepCount - previousSteps;
+      runMovements += jog.stepCount - previousSteps + clap.clapCount - previousClaps + handsOnHips.holdCount - previousHolds
+        + Number(lateral.isCalibrated && lateral.label !== previousLane);
+    }
 
     // The game reads this snapshot from its own loop; it never runs inference.
-    if (!landmarks || !lateral.isCalibrated) {
+    if (!landmarks || !lateral.hasBody || !lateral.isCalibrated) {
       input.clearPose();
     } else {
-      input.setPose(lateral.label, jog.isJogging, handsOnHips.isActive);
-      // Raising both arms is the low-impact jump; the body hop still works.
-      if (jump.justJumped || armsUp.justRaised) input.requestJump();
+      input.setPose(lateral.label, jog.isJogging, handsOnHips.isActive, jog.cadenceSpm, jog.stepCount);
+      if (mode === 'game' && (!hasStarted || pauseReason !== null || game.isOver)) input.clearPose();
+      else {
+        if (clap.justClapped) input.requestJump();
+        pendingResponseMs ??= nowMs;
+      }
     }
 
     if (ctx) {
       clearOverlay(ctx);
       drawSkeleton(ctx, landmarks as PoseLandmarks | null, connections);
     }
+    smoothedProcessingMs = ema(smoothedProcessingMs, performance.now() - nowMs, CONFIG.fps.smoothing);
+    lastPoseReceivedMs = performance.now();
   }
 
   /** Framing and lighting, for /calibrate. Held across frames the body is lost. */
@@ -636,6 +751,15 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   async function bootScene(): Promise<void> {
     try {
+      if (mode === 'test') {
+        const demo = await createTestScene(els.gameCanvas, () => isDisposed);
+        if (isDisposed) { demo.dispose(); return; }
+        testScene = demo;
+        demo.setQuality(pendingQuality);
+        await applyCharacter(pendingCharacter);
+        if (isDisposed) return;
+        observeResize(); publish(); return;
+      }
       const refs = await createScene(els.gameCanvas, { ...CONFIG.game, quality: pendingQuality });
 
       // Disposed while the scene was loading: throw it away rather than
@@ -663,6 +787,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   function observeResize(): void {
     const resize = () => {
       sceneRefs?.resize();
+      testScene?.resize();
       needsRender = true;
     };
     if (typeof ResizeObserver === 'function') {
@@ -677,12 +802,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   /** Loads a character and re-skins the projectiles to match their weapon. */
   async function applyCharacter(charId: string): Promise<void> {
     pendingCharacter = Object.hasOwn(CONFIG.game.characters, charId) ? charId : CONFIG.game.defaultCharacter;
-    if (!sceneRefs) return;
-    const refs = sceneRefs;
+    if (!sceneRefs && !testScene) return;
+    const refs = sceneRefs ?? testScene!;
     const character = pendingCharacter;
     const requestId = ++characterRequestId;
     await refs.player.loadCharacter(character);
-    if (isDisposed || refs !== sceneRefs || requestId !== characterRequestId) return;
+    if (isDisposed || refs !== (sceneRefs ?? testScene) || requestId !== characterRequestId) return;
     refs.bulletPool.setCharacter(character);
     needsRender = true;
   }
@@ -848,15 +973,14 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     start() {
       if (isDisposed) return;
 
-      // Pose mode has no scene and no game: /calibrate and /practice want the
-      // detectors alone. startCamera() drives the pose loop from there.
+      // Calibration has no scene or game. startCamera() owns its pose loop.
       if (mode === 'pose') {
         setStatus('Ready to start the camera.');
         return;
       }
 
       if (gameFrameId !== null) return;
-      detachKeyboard = input.attachKeyboard();
+      if (process.env.NODE_ENV !== 'production' && mode === 'game') detachKeyboard = input.attachKeyboard();
       void bootScene();
       lastGameMs = performance.now();
       lastQualityMs = lastGameMs;
@@ -865,7 +989,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     async startCamera() {
-      if (isDisposed || isPoseRunning || isCameraStarting) return;
+      if (isDisposed || isCameraStarting) return false;
+      if (isPoseRunning) return true;
       isCameraStarting = true;
       const requestId = ++cameraRequestId;
       const abortController = new AbortController();
@@ -877,16 +1002,21 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         const camera = await startCamera(els.video, undefined, abortController.signal);
         if (isDisposed || requestId !== cameraRequestId) {
           stopCamera(camera.stream);
-          return;
+          return false;
         }
         stream = camera.stream;
+        const acquiredStream = stream;
+        for (const track of stream.getTracks()) track.addEventListener?.('ended', () => {
+          if (stream !== acquiredStream || isDisposed || !isPoseRunning) return;
+          pauseRun('camera'); releaseCamera(); setError('The camera disconnected. Start it again, then resume.');
+        }, { once: true });
         cameraLabel = `${camera.width}x${camera.height}`;
 
         setStatus(`Loading pose model (${CONFIG.pose.model})...`);
-        if (isDisposed || requestId !== cameraRequestId) return;
+        if (isDisposed || requestId !== cameraRequestId) return false;
         const pose = await initPose();
         if (isDisposed || requestId !== cameraRequestId) {
-          return;
+          return false;
         }
 
         connections = pose.connections;
@@ -895,14 +1025,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
         isPoseRunning = true;
         isCameraSkipped = false;
-        setStatus('Running. Stand still with both feet visible to calibrate centre and jumping.');
+        setStatus('Camera ready. Stand still to set your centre, then try all four movements.');
         schedulePoseFrame();
+        return true;
       } catch (error) {
-        if (isDisposed || requestId !== cameraRequestId) return;
+        if (isDisposed || requestId !== cameraRequestId) return false;
         releaseCamera();
         setError(describeCameraError(error));
         setStatus('Stopped.');
         console.error(error);
+        return false;
       } finally {
         if (requestId === cameraRequestId) {
           isCameraStarting = false;
@@ -912,6 +1044,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     stopCamera() {
+      pauseRun('camera');
       releaseCamera();
       setStatus('Camera stopped.');
     },
@@ -920,6 +1053,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       if (process.env.NODE_ENV === 'production' || isDisposed || mode !== 'game') return;
       releaseCamera();
       isCameraSkipped = true;
+      hasStarted = true; pauseReason = null;
       setError(null);
       setStatus('Development mode: keyboard controls, camera off.');
     },
@@ -927,7 +1061,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     recalibrate() {
       resetPoseHolds();
       lateral = recalibrateLateral(lateral);
-      setStatus('Recalibrating centre and jumping — stand still with both feet visible.');
+      pauseRun('manual');
+      setStatus('Recalibrating centre — stand still with your knees visible.');
     },
 
     setDevFire(active: boolean) {
@@ -941,8 +1076,41 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       game = restartGame(game, rules);
       input.reset();
       resetMovementTallies();
-      sceneRefs?.player?.playAnimation('run', 0.1, true);
+      hasStarted = false; pauseReason = null; isCameraSkipped = false;
+      rehearsal = { left: false, right: false, knees: false, hips: false, clap: false };
+      lateral = recalibrateLateral(lateral);
+      metrics.reset(); lastRenderMs = null; pendingResponseMs = null;
+      sceneRefs?.player?.playAnimation('idle', 0.1, true);
+      needsRender = true;
       publish();
+    },
+
+    beginRun(difficulty = 1) {
+      if (mode !== 'game' || hasStarted || !sceneRefs || !canBegin()) return false;
+      startingDifficulty = Number.isFinite(difficulty) ? Math.min(5, Math.max(1, Math.round(difficulty))) : 1;
+      game = restartGame(game, rules); resetMovementTallies(); input.reset();
+      hasStarted = true; pauseReason = null; runSteps = runMovements = 0;
+      metrics.reset(); lastRenderMs = null; pendingResponseMs = null;
+      lastGameMs = performance.now(); needsRender = true; setStatus('Playing. Move at a comfortable pace.'); publish();
+      return true;
+    },
+
+    pause() { pauseRun('manual'); },
+
+    resume() {
+      if (mode !== 'game' || !hasStarted || game.isOver || pauseReason === null || document.hidden) return false;
+      if (!isCameraSkipped && (!isPoseRunning || !lateral.hasBody || !lateral.isCalibrated || !kneesVisible
+        || lastValidPoseMs === null || performance.now() - lastValidPoseMs > 1000)) return false;
+      pauseReason = null; input.clearPose();
+      if (!isCameraSkipped) { input.setPose(lateral.label, jog.isJogging, handsOnHips.isActive, jog.cadenceSpm, jog.stepCount); input.read(); }
+      lastGameMs = performance.now(); lastRenderMs = null; needsRender = true; publish(); return true;
+    },
+
+    finish() {
+      if (mode !== 'game' || !hasStarted || game.isOver) return;
+      game = { ...game, isOver: true, isFiring: false, speed: 0, deathReason: null,
+        isCleared: game.elapsedMs >= CONFIG.game.goalMs };
+      pauseReason = null; input.clearPose(); pendingResponseMs = null; needsRender = true; publish();
     },
 
     setCharacter(charId: string) {
@@ -955,6 +1123,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       qualityMonitor.reset();
       frameBudget.reset();
       sceneRefs?.setQuality(quality);
+      testScene?.setQuality(quality);
       needsRender = true;
       publish();
     },
@@ -969,6 +1138,10 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         distanceM: Math.round(game.distance),
         movementCount: movementTotal(),
         isCleared: game.isCleared,
+        stepCount: runSteps,
+        movementMs: Math.round(game.movementMs),
+        goalReached: game.elapsedMs >= CONFIG.game.goalMs,
+        metrics: metrics.snapshot(),
       };
     },
 
@@ -1008,6 +1181,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
       sceneRefs?.dispose();
       sceneRefs = null;
+      testScene?.dispose(); testScene = null;
 
       exposure.dispose();
 
@@ -1018,12 +1192,11 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   /** จำนวนการเคลื่อนไหว: every move the detectors counted this session. */
   function movementTotal(): number {
-    return jog.stepCount + lateralChangeCount + jump.jumpCount + armsUp.raiseCount + handsOnHips.holdCount;
+    return hasStarted ? runMovements : jog.stepCount + lateralChangeCount + clap.clapCount + handsOnHips.holdCount;
   }
 
   function resetPoseHolds(): void {
-    jump = { ...createJumpState(), jumpCount: jump.jumpCount };
-    armsUp = { ...createArmsUpState(), raiseCount: armsUp.raiseCount };
+    clap = { ...createClapState(), clapCount: clap.clapCount };
     handsOnHips = { ...createHandsOnHipsState(), holdCount: handsOnHips.holdCount };
   }
 
@@ -1033,6 +1206,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     cameraAbortController = null;
     isCameraStarting = false;
     isPoseRunning = false;
+    lastValidPoseMs = null;
+    lastPoseReceivedMs = null;
+    if (mode === 'test') {
+      game = { ...game, speed: 0, isFiring: false, isShielding: false, jumpStartedMs: null, jumpHeight: 0, bullets: [] };
+      needsRender = true;
+    }
+    lateral = createLateralState(); jog = { ...createJogState(), stepCount: jog.stepCount };
     cancelPoseFrame();
     stopCamera(stream);
     if (stream && els.video.srcObject === stream) {
@@ -1064,8 +1244,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     sceneRefs?.enemyPool.reset();
     sceneRefs?.bulletPool.reset();
     if (sceneRefs) sceneRefs.lastEventsMs = -1;
-    jump = { ...jump, jumpCount: 0, justJumped: false };
-    armsUp = { ...armsUp, raiseCount: 0, justRaised: false };
+    clap = createClapState(); jog = createJogState();
+    runSteps = runMovements = 0;
     handsOnHips = { ...handsOnHips, holdCount: 0 };
     lateralChangeCount = 0;
     lastCountedLateral = LATERAL.CENTER;

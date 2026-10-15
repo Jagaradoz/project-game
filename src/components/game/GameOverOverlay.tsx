@@ -28,10 +28,10 @@ export function GameOverOverlay({
   return (
     <div className="absolute inset-0 z-[3] grid content-end justify-items-stretch bg-black/75 p-4 pb-8 text-left sm:content-center sm:justify-items-center sm:text-center">
       <div className="flex max-w-sm flex-col gap-3 border-2 border-ink bg-surface p-6 shadow-[7px_7px_0_0_var(--color-primary)] sm:items-center">
-        <span className="eyebrow">{snapshot.isCleared ? 'Cleared' : 'Complete'}</span>
+        <span className="eyebrow">{snapshot.goalReached ? '20-minute goal reached' : 'Complete'}</span>
 
         <h2 className="m-0 text-3xl font-black tracking-tight sm:text-4xl">
-          {snapshot.isCleared ? 'Training cleared' : snapshot.deathReason === 'drowned' ? 'River crossing missed' : snapshot.deathReason === 'poisoned' ? 'Overcome by spores' : 'Run complete'}
+          Session complete
         </h2>
 
         <p className="m-0 text-sm tabular-nums text-muted">
@@ -71,7 +71,7 @@ export function GameOverOverlay({
               icon={<ChartColumn size={18} />}
               className="min-w-[160px]"
             >
-              {isSubmitting ? 'Saving…' : 'See summary'}
+              {isSubmitting ? 'Preparing…' : 'See summary'}
             </Button>
           )}
         </div>

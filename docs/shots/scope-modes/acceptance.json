@@ -1,0 +1,40 @@
+{
+  "retained": [
+    "/",
+    "/calibrate",
+    "/test",
+    "/play",
+    "/result",
+    "/profile"
+  ],
+  "removed": [
+    "/login",
+    "/register",
+    "/profile/edit",
+    "/leaderboard",
+    "/consent",
+    "/practice",
+    "/characters",
+    "/catalog.html"
+  ],
+  "panels": [
+    {
+      "label": "Camera and skeleton",
+      "x": 371.5,
+      "y": 16,
+      "bottom": 536,
+      "width": 292.5,
+      "height": 520
+    },
+    {
+      "label": "Character response",
+      "x": 680,
+      "y": 16,
+      "bottom": 536,
+      "width": 292.5,
+      "height": 520
+    }
+  ],
+  "storageAccess": [],
+  "physicalWebcam": "not tested"
+}

@@ -12,9 +12,9 @@
  *      partial offsets, so the rendered x can never drift from the logical lane.
  *   2. An enemy is born in one lane and dies in that lane. It only ever moves in
  *      +z, towards the player.
- *   3. The march never stops. Jogging decides whether the player SHOOTS, so the
- *      answer to an enemy is bullets, not dodging -- though a lane change is
- *      still the way out of a column you cannot clear in time.
+ *   3. Pose input supplies cadence and consumable steps. Cadence controls motion;
+ *      each step emits a projectile. Input omitting these fields retains the
+ *      legacy continuous walk/fire path for headless development tools.
  */
 
 import { CONFIG } from '@/engine/config';
@@ -67,6 +67,7 @@ export function createGameState(seed = 1, config: RunConfig = CONFIG.game): Game
     isFiring: false,
     fireCooldownMs: 0,
     elapsedMs: 0,
+    movementMs: 0,
     nextSpawnMs: config.spawnIntervalMs,
     invulnUntilMs: -Infinity,
     /** Set on the frame a hit lands, so the view can flash without polling HP. */
@@ -119,11 +120,16 @@ export function updateGame(
 
   const stepMs = Math.min(Math.max(dtMs, 0), config.maxFrameMs);
   const stepSec = stepMs / 1000;
-  const elapsedMs = state.elapsedMs + stepMs;
+  const elapsedDelta = input.cadenceSpm === undefined ? stepMs : Number.isFinite(dtMs) ? Math.max(0, dtMs) : 0;
+  const elapsedMs = state.elapsedMs + elapsedDelta;
 
-  const progress = spawnProgress(elapsedMs, config);
+  const progress = input.startingDifficulty === undefined ? spawnProgress(elapsedMs, config)
+    : (difficultyAt(elapsedMs, input.startingDifficulty, config) - 1) / 4;
   // The walk is constant for the whole run; only the start eases up from a standstill.
-  const speed = rampTo(state.speed, config.walkSpeed, stepMs, config.speedLerpMs);
+  const speed = input.cadenceSpm === undefined
+    ? rampTo(state.speed, config.walkSpeed, stepMs, config.speedLerpMs)
+    : Math.min(config.maxCadenceSpeed, Math.max(0, Number.isFinite(input.cadenceSpm) ? input.cadenceSpm : 0)
+      / config.cadenceForMaxSpeed * config.maxCadenceSpeed);
   const distance = state.distance + speed * stepSec;
   const lane = clampLane(input.lane, config);
   const isShielding = Boolean(input.isShielding);
@@ -138,7 +144,9 @@ export function updateGame(
   const jumpHeight = jumpStartedMs === null ? 0 : Math.sin(Math.PI * jumpPhase) * config.jump.height;
   // Hands on hips is not a jog: the shield and the gun never run together. Nor
   // does a jump: arms up to jump must not spray bullets on the way over.
-  const isFiring = Boolean(input.isFiring) && !isShielding && jumpStartedMs === null;
+  const isFiring = input.stepEvents === undefined
+    ? Boolean(input.isFiring) && !isShielding && jumpStartedMs === null
+    : input.stepEvents > 0;
   const crossed = advanceHazards(state.obstacles, lane, speed * stepSec, state.elapsedMs, elapsedMs, lastTakeoffMs, config);
   // The boss is just a big enemy: it walks in, and contact costs one HP.
   const movedEnemies = state.enemies.map((enemy) => {
@@ -178,7 +186,7 @@ export function updateGame(
       config,
     );
 
-  const fired = fireDue(
+  const fired = input.stepEvents !== undefined ? fireSteps(shots.bullets.filter(bullet => bullet.z >= config.spawnZ), lane, input.stepEvents, config) : fireDue(
     { bullets: shots.bullets.filter((bullet) => bullet.z >= config.spawnZ), cooldownMs: state.fireCooldownMs },
     { lane, isFiring, stepMs },
     config,
@@ -227,9 +235,11 @@ export function updateGame(
     nextObstacleMs = elapsedMs + config.obstacle.intervalMs;
   }
   spawned.enemies = spawned.enemies.filter(enemy => hasSafeHazardArrival(enemy, retainedHazards, speed, config));
-  const spawnsSpore = hp > 0 && !isCleared && canSpawnSpore(state, retainedHazards, elapsedMs, isBossPhase, config) && spores.length === 0;
+  const sporeConfig = input.startingDifficulty === undefined ? config : { ...config,
+    spore: { ...config.spore, intervalMs: config.spore.intervalMs * (1.4 - progress * .8) } };
+  const spawnsSpore = hp > 0 && !isCleared && canSpawnSpore(state, retainedHazards, elapsedMs, isBossPhase, sporeConfig) && spores.length === 0;
   const nextSpores = spawnsSpore ? [...spores, createSporeCloud(nextId++, config)] : spores;
-  const nextSporeMs = spawnsSpore ? elapsedMs + config.spore.intervalMs : state.nextSporeMs;
+  const nextSporeMs = spawnsSpore ? elapsedMs + sporeConfig.spore.intervalMs : state.nextSporeMs;
   // Existing orbs roll in first; this step's kills drop theirs behind them.
   const chained = chainKills(state, shots.killed, tookDamage, elapsedMs, config);
   const rolled = advanceOrbs(state.orbs, speed * stepSec, config);
@@ -237,7 +247,11 @@ export function updateGame(
   nextId = dropped.nextId;
   const swept = isCleared ? collectAll(dropped.orbs) : { collected: 0, collectedIds: [] };
   // Orbs, plus braving a spore cloud behind the shield; see core/scoring.ts.
-  const score = state.score + rolled.collected + dropped.banked + swept.collected + braved.points;
+  const movementMs = state.movementMs + (speed > 0 ? elapsedDelta : 0);
+  const activityPoints = input.cadenceSpm === undefined ? 0
+    : (Math.floor(movementMs / 1000) - Math.floor(state.movementMs / 1000)) * config.movementPointsPerSecond
+      + crossed.cleared * config.obstaclePoints;
+  const score = state.score + rolled.collected + dropped.banked + swept.collected + braved.points + activityPoints;
 
   return {
     ...state,
@@ -254,7 +268,7 @@ export function updateGame(
     orbs: isCleared ? [] : dropped.orbs,
     justCollected: [...rolled.collectedIds, ...swept.collectedIds],
     nextShieldPointMs: braved.nextPointMs,
-    justBonus: braved.points,
+    justBonus: braved.points + activityPoints,
     distance,
     speed,
     enemies: spawned.enemies,
@@ -262,6 +276,7 @@ export function updateGame(
     isFiring,
     fireCooldownMs: fired.cooldownMs,
     elapsedMs,
+    movementMs,
     nextSpawnMs: spawned.nextSpawnMs,
     invulnUntilMs: hitCount > 0 ? elapsedMs + config.invulnMs : state.invulnUntilMs,
     justHit: tookDamage,
@@ -305,6 +320,18 @@ function spawnProgress(elapsedMs: number, config: RunConfig): number {
   let stageIndex = 0;
   while (stageIndex < 4 && elapsedMs >= (stageIndex + 1) * stageDurationMs) stageIndex += 1;
   return stageIndex / 4;
+}
+
+export function difficultyAt(elapsedMs: number, startingDifficulty = 1, config: RunConfig = CONFIG.game): number {
+  const start = Number.isFinite(startingDifficulty) ? Math.min(5, Math.max(1, Math.round(startingDifficulty))) : 1;
+  return Math.min(5, start + Math.floor(Math.max(0, elapsedMs) / config.difficultyIntervalMs));
+}
+
+function fireSteps(bullets: GameBody[], lane: number, count: number, config: RunConfig) {
+  const steps = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  const muzzleZ = config.playerZ - config.playerRadius;
+  return { bullets: [...bullets, ...Array.from({ length: Math.min(steps, config.bulletPoolSize) }, () =>
+    ({ lane, z: muzzleZ, previousZ: muzzleZ }))], cooldownMs: 0, didFire: steps > 0 };
 }
 
 function spawnIntervalAt(progress: number, config: RunConfig): number {

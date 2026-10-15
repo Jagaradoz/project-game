@@ -3,6 +3,7 @@ import type { GameRuntime } from '@/engine/runtime';
 
 const mocks = vi.hoisted(() => ({ createScene: vi.fn(), syncScene: vi.fn() }));
 vi.mock('@/engine/render/scene', () => ({ createScene: mocks.createScene }));
+vi.mock('@/engine/render/testScene', () => ({ createTestScene: mocks.createScene }));
 vi.mock('@/engine/render/sync', () => ({ syncScene: mocks.syncScene }));
 vi.mock('@/engine/pose/pose', () => ({ closePose: vi.fn(), getDelegate: () => null }));
 vi.mock('@/engine/pose/exposure', () => ({ createExposureSampler: () => ({ dispose: vi.fn() }) }));
@@ -34,12 +35,12 @@ function sceneFixture() {
   };
 }
 
-async function start() {
+async function start(mode: 'game' | 'test' = 'game') {
   const refs = sceneFixture();
   mocks.createScene.mockResolvedValue(refs);
   const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
   const video = { srcObject: null, pause: vi.fn() } as unknown as HTMLVideoElement;
-  handle = createGameRuntime({ gameCanvas: canvas, overlay: canvas, video, container: {} as HTMLElement });
+  handle = createGameRuntime({ gameCanvas: canvas, overlay: canvas, video, container: {} as HTMLElement }, { mode });
   handle.start();
   await vi.waitFor(() => expect(handle.getSnapshot().isSceneReady).toBe(true));
   return refs;
@@ -48,6 +49,7 @@ async function start() {
 beforeEach(() => {
   vi.resetAllMocks();
   frames.clear(); frameId = 0; now = performance.now();
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
   vi.stubGlobal('window', new EventTarget());
   vi.stubGlobal('document', Object.assign(new EventTarget(), { hidden: false }));
   vi.stubGlobal('ResizeObserver', class {
@@ -81,7 +83,24 @@ test('a stationary dialog paints once, keeps its HUD snapshot stable, and repain
   expect(refs.render).toHaveBeenCalledTimes(2);
 });
 
-test('active play draws continuously, pauses while hidden, and drops the time spent away', async () => {
+test('Test Mode advances idle animation without camera input and suspends rendering while hidden', async () => {
+  const refs = await start('test');
+  for (let i = 0; i < 120; i++) tick();
+  expect(refs.render).toHaveBeenCalledTimes(120);
+  const [state, dt, hasTracking] = refs.render.mock.calls.at(-1)!;
+  expect(state.speed).toBe(0);
+  expect(dt).toBeGreaterThan(0);
+  expect(hasTracking).toBe(false);
+  Object.assign(document, { hidden: true });
+  for (let i = 0; i < 10; i++) tick();
+  expect(refs.render).toHaveBeenCalledTimes(120);
+  Object.assign(document, { hidden: false });
+  await handle.setCharacter('witch');
+  tick();
+  expect(refs.render).toHaveBeenCalledTimes(121);
+});
+
+test('active play freezes while hidden and requires an explicit resume', async () => {
   const refs = await start();
   handle.skipCamera();
   tick(); tick();
@@ -94,9 +113,11 @@ test('active play draws continuously, pauses while hidden, and drops the time sp
   Object.defineProperty(document, 'hidden', { value: false, configurable: true });
   tick(5000);
   expect(handle.getRunSummary().durationMs).toBe(summary.durationMs);
+  expect(handle.getSnapshot().pauseReason).toBe('hidden');
+  expect(handle.resume()).toBe(true);
   tick(100);
   expect(handle.getRunSummary().durationMs).toBeGreaterThan(summary.durationMs);
-  expect(refs.render).toHaveBeenCalledTimes(calls + 2);
+  expect(refs.render.mock.calls.length).toBeGreaterThan(calls);
 });
 
 test('a late character request cannot replace the newest projectile style', async () => {

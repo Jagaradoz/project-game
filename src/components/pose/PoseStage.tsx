@@ -7,11 +7,12 @@ interface PoseStageProps {
   isCameraRunning: boolean;
   /** Shown over the video when the camera is off. */
   idleLabel?: string;
+  aspect?: 'landscape' | 'portrait';
 }
 
 /**
  * The camera at full size, with the skeleton drawn over it. /calibrate and
- * /practice both need the player to actually SEE their tracking, which is the
+ * /test both need the player to actually SEE their tracking, which is the
  * opposite of the corner thumbnail /play uses (see CameraStage.tsx).
  *
  * The mirror lives in `.mirrored` and is applied to BOTH the video and the
@@ -23,9 +24,10 @@ export function PoseStage({
   overlayRef,
   isCameraRunning,
   idleLabel = 'The camera is not on',
+  aspect = 'landscape',
 }: PoseStageProps) {
   return (
-    <div className="relative aspect-4/3 w-full overflow-hidden rounded-none border-2 border-ink bg-black">
+    <div className={`relative ${aspect === 'portrait' ? 'aspect-9/16 h-full' : 'aspect-4/3'} w-full overflow-hidden rounded-none bg-black`}>
       <video
         ref={videoRef}
         playsInline
@@ -33,7 +35,7 @@ export function PoseStage({
         autoPlay
         className="mirrored absolute inset-0 h-full w-full object-cover"
       />
-      <canvas ref={overlayRef} className="mirrored absolute inset-0 h-full w-full" />
+      <canvas ref={overlayRef} className="mirrored absolute inset-0 h-full w-full object-cover" />
 
       {!isCameraRunning && (
         <div className="absolute inset-0 grid place-content-center justify-items-center gap-3 p-4 text-center">

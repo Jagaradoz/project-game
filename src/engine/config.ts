@@ -113,8 +113,8 @@ export const CONFIG = {
   },
 
   /**
-   * Both arms raised overhead = jump. A low-impact stand-in for the body jump,
-   * so older players can clear obstacles without leaving the floor.
+   * Legacy arm-raise detector settings, retained for standalone detector tests.
+   * Production jump control uses the overhead clap detector below.
    */
   armsUp: {
     /** Each wrist must sit this far above the shoulder line, in torso-lengths. */
@@ -123,6 +123,15 @@ export const CONFIG = {
     confirmMs: 120,
     /** Both wrists must be back below the shoulders this long to rearm. */
     rearmMs: 200,
+  },
+
+  /** Overhead clap: open hands must come together above the head, then separate. */
+  clap: {
+    minRise: 0.4,
+    closeDistanceSw: 0.45,
+    openDistanceSw: 0.8,
+    confirmMs: 40,
+    rearmMs: 120,
   },
 
   /**
@@ -189,15 +198,21 @@ export const CONFIG = {
   },
 
   /**
-   * Training mode: the one run the game offers. Endless -- it ends only when
-   * the player runs out of health. A boss walks in every `boss.triggerKills`.
+   * One continuous game scene, with a 20-minute milestone and optional continued
+   * play. Health loss or manual finish ends the run. Bosses recur by kill count.
    */
 
   game: {
+    goalMs: 20 * 60 * 1000,
+    difficultyIntervalMs: 4 * 60 * 1000,
+    cadenceForMaxSpeed: 180,
+    maxCadenceSpeed: 11,
+    movementPointsPerSecond: 1,
+    obstaclePoints: 10,
     laneCount: 3,
     laneWidth: 2.4,
 
-    /** Default graphics budget; the player's saved preset overrides this. */
+    /** Default graphics budget; the player's in-memory preset overrides this. */
     quality: 'medium' as 'high' | 'medium' | 'low',
 
     /**
@@ -222,14 +237,14 @@ export const CONFIG = {
     despawnZ: 8,
 
     /**
-     * The march is constant -- the player is always walking forward. Jogging
-     * decides whether they SHOOT, not whether they move.
+     * Legacy keyboard/headless walking speed. Production pose control uses
+     * cadenceForMaxSpeed/maxCadenceSpeed and sets speed to zero when idle.
      */
     walkSpeed: 11,
     /** The walk eases up from a standstill over this long at the start of a run, then holds. */
     speedLerpMs: 400,
 
-    /** Bullets only leave the barrel while the body is jogging. */
+    /** Production knee steps emit one projectile each; dev input may hold fire. */
     bulletSpeed: 46,
     bulletRadius: 0.18,
     fireIntervalMs: 190,

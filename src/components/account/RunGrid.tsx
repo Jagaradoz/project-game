@@ -17,8 +17,8 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
         title="No runs yet"
         icon={<Map size={22} />}
         action={
-          <LinkButton href="/characters" variant="primary" icon={<Map size={18} />}>
-            Start training
+          <LinkButton href="/play" variant="primary" icon={<Map size={18} />}>
+            Start Game Mode
           </LinkButton>
         }
       >
@@ -34,10 +34,10 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
       {runs.map((run) => {
         const isBest = run.score === bestScore && bestScore > 0;
         const name = biomeName(run.biomeId);
-        const outcome = run.isCleared ? 'cleared' : 'not cleared';
+        const outcome = run.goalReached ? '20-minute goal achieved' : 'session finished';
         const label = [
           name,
-          'training',
+          'Game Mode',
           `${formatNumber(run.score)} points`,
           formatDuration(run.durationMs),
           outcome,
@@ -49,7 +49,7 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
         return (
           <li key={run.id}>
             <Link
-              href="/characters"
+              href={`/result?run=${encodeURIComponent(run.id)}`}
               aria-label={label}
               className="relative block aspect-3/4 overflow-hidden rounded-none border-2 border-ink text-white no-underline shadow-[4px_4px_0_0_var(--color-ink)]"
             >
@@ -64,15 +64,15 @@ export function RunGrid({ runs }: { runs: RunResult[] }) {
                 aria-hidden
                 className="absolute inset-0 bg-linear-to-t from-black/80 via-black/25 to-black/10"
               />
-              {(isBest || run.isCleared) && (
+              {(isBest || run.goalReached) && (
                 <span className="absolute top-1.5 left-1.5">
-                  <Badge tone={isBest ? 'primary' : 'ok'}>{isBest ? 'Best' : 'Cleared'}</Badge>
+                  <Badge tone={isBest ? 'primary' : 'ok'}>{isBest ? 'Best' : 'Goal'}</Badge>
                 </span>
               )}
               <span className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 p-1.5 sm:p-2">
                 <span className="text-xs font-semibold leading-tight sm:text-sm">{name}</span>
                 <span className="text-[10px] tabular-nums text-white/85 sm:text-xs">
-                  Training · {formatNumber(run.score)} pts
+                  Game Mode · {formatNumber(run.score)} pts
                 </span>
               </span>
             </Link>

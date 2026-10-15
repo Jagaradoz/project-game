@@ -1,6 +1,6 @@
 {
   "name": "webcam-exercise-game",
-  "version": "2.30.4-alpha.0",
+  "version": "2.31.7-alpha.0",
   "private": true,
   "description": "Webcam-based exercise game website - pose-driven exergame (Next.js frontend)",
   "scripts": {
@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "shot": "node tools/shot.mjs"
+    "shot": "node tools/shot.mjs",
+    "assets:catalog": "node tools/serve-asset-catalog.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.0.1",

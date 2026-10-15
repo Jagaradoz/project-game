@@ -23,12 +23,12 @@ This version is an internal **development and testing version** (not an official
 Next.js 16 (App Router) + TypeScript + Tailwind v4. Routes live in `app/`, following the TOR screen list.
 
 - `src/engine/` is **framework-free** and must stay that way — no React imports, no JSX, and **no imports from `src/lib/`** (the dependency runs the other way: `src/lib/api/catalog.ts` derives from the engine's `BIOMES`). It owns the game reducer, the stage rules, the pose detectors, and the Three.js scene.
-- `src/engine/runtime.ts` is the only lifecycle owner. Anything that starts a loop, a camera or a WebGL context goes through it, and `dispose()` must release it. It has two modes: `game` (full runner) and `pose` (detectors only — no WebGL, no reducer), which is what `/calibrate` and `/practice` use.
+- `src/engine/runtime.ts` is the only lifecycle owner. Anything that starts a loop, a camera or a WebGL context goes through it, and `dispose()` must release it. Modes are `game` (calibrated runner), `test` (the same detectors and a character-only demonstration), and `pose` (calibration detectors only — no WebGL or reducer). Game setup and gameplay retain one runtime and camera.
 - `src/components/game/GameCanvas.tsx` is the **only** React component that touches the engine.
-- **No page may import from `src/lib/api/mock/` or `live/`.** Everything goes through `repository` from `@/lib/api`, so swapping to the real backend is one env var.
+- Pages use `repository` from `@/lib/api`. Proposal-first scope uses only visit-scoped memory: no accounts, backend requests, localStorage, sessionStorage, or persisted player settings. Preserve original DOCX files; document recommendations separately. Public pages are Home, Calibration, Test Mode, Game Mode, Result, and Profile.
 - A zustand selector that builds a **new object** must be wrapped in `useShallow`, or React kills the page with "getSnapshot should be cached" → infinite update loop. See `useStageSelection` in `src/lib/store/settings.ts`.
 - The 3D assets in `public/assets/` are fetched at runtime by path string; never import or bundle them.
-- Run `npm test` (Vitest, 149 tests), `npm run typecheck` and `npm run lint` before considering a change done. `npx vitest run --coverage` enforces an 80% floor over the engine and the data layer.
+- Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` before considering a change done. `npx vitest run --coverage` enforces an 80% floor over the engine and the data layer. Local/software-browser checks do not establish real-webcam accuracy or target-device FPS acceptance.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

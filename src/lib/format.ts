@@ -2,7 +2,7 @@
  * Display formatting.
  *
  * One module so a duration reads the same on /result, /profile and
- * /leaderboard. Every function tolerates junk input -- these render values that
+ * the visit history. Every function tolerates junk input -- these render values that
  * came from storage, and a NaN on screen is worse than a dash.
  */
 

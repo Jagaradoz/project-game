@@ -1,7 +1,6 @@
 /**
- * Turns body signals (and a keyboard fallback) into the two values the game
- * reducer wants: which lane, and whether the player is shooting. The march is
- * constant, so jogging controls the gun, not the legs.
+ * Converts body signals into lanes, cadence, consumable knee steps, clap jumps
+ * and held shielding. Legacy keyboard/headless input remains a development aid.
  *
  * The lateral detector already emits exactly three states, so the mapping is
  * ABSOLUTE -- LEFT is lane 0, CENTRE is lane 1, RIGHT is lane 2. Nothing here
@@ -33,14 +32,22 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   let devFire = false;
   let pendingJump = false;
   let isShielding = false;
+  let cadenceSpm: number | undefined;
+  let countedSteps = 0;
+  let pendingSteps = 0;
   let devShield = false;
   let detachKeyboard: () => void = () => {};
 
   /** `label` is null when no body is tracked. */
-  function setPose(label: LateralLabel | null, isJogging: boolean, shielding = false): void {
+  function setPose(label: LateralLabel | null, isJogging: boolean, shielding = false, cadence?: number, stepCount?: number): void {
     hasPose = true;
     isFiring = Boolean(isJogging);
     isShielding = shielding;
+    cadenceSpm = cadence === undefined ? undefined : isJogging ? Math.max(0, cadence) : 0;
+    if (stepCount !== undefined) {
+      pendingSteps += Math.max(0, stepCount - countedSteps);
+      countedSteps = stepCount;
+    }
 
     // Only a CHANGE of label takes the lane back from the keyboard, so tapping a
     // key while standing centred does not fight the detector every frame.
@@ -51,9 +58,11 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
     lastPoseLabel = label;
   }
 
-  /** No body tracked: hold the last lane and hold fire. The march continues. */
+  /** No body tracked: hold the last lane, discard pending events, stop movement/fire. */
   function clearPose(): void {
     pendingJump = false;
+    pendingSteps = 0;
+    if (cadenceSpm !== undefined) cadenceSpm = 0;
     hasPose = true;
     isFiring = false;
     isShielding = false;
@@ -124,11 +133,16 @@ export function createInput(config: GameConfig = CONFIG.game): InputHandle {
   function read(): GameInput {
     const jump = pendingJump;
     pendingJump = false;
-    return { lane, isFiring: isFiring || devFire, isShielding: isShielding || devShield, ...(jump ? { jump: true } : {}) };
+    const stepEvents = pendingSteps;
+    pendingSteps = 0;
+    return { lane, isFiring: isFiring || devFire, isShielding: isShielding || devShield,
+      ...(cadenceSpm !== undefined && !devFire ? { cadenceSpm, stepEvents } : {}), ...(jump ? { jump: true } : {}) };
   }
 
   function reset(): void {
     pendingJump = false;
+    pendingSteps = countedSteps = 0;
+    if (cadenceSpm !== undefined) cadenceSpm = 0;
     lane = clampLane((config.laneCount - 1) / 2, config);
     lastPoseLabel = null;
     devFire = false;

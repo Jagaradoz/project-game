@@ -176,7 +176,7 @@ test('airborne damage preserves the jump pose and landing completes before runni
   expect(player.actions.jump.paused).toBe(false);
   updatePlayerAnimation(player, { ...state, justHit: false, jumpStartedMs: null, elapsedMs: 1200 }, .4);
   updatePlayerAnimation(player, { ...state, justHit: false, jumpStartedMs: null, elapsedMs: 1250 }, .05);
-  expect(player.currentActionName).toBe('run');
+  expect(player.currentActionName).toBe('idle');
 });
 
 test('a fresh jump interrupts landing recovery and a paused jump holds its pose', async () => {

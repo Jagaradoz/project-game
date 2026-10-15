@@ -1,8 +1,8 @@
 /**
  * Training rules: the config the one Training run steps under.
  *
- * Training is endless -- no kill goal, no clear -- so the run lasts until the
- * player runs out of health. Pure and headless, like the rest of
+ * The 20-minute milestone does not end play. A run ends on health loss or an
+ * explicit finish. Pure and headless, like the rest of
  * src/engine/core, and it returns a NEW object: CONFIG.game is shared by every
  * run in the session, and one in-place edit would retune them all.
  */

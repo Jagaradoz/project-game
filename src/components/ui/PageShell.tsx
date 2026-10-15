@@ -11,7 +11,7 @@ interface PageShellProps {
   eyebrow?: string;
   /** One line under the heading, saying what this screen is for. */
   subtitle?: string;
-  /** 'study' strips every game affordance from the chrome. See nav.ts. */
+  /** Navigation variant; retained screens share visit-only destinations. */
   nav?: NavVariant;
   width?: ShellWidth;
   /** Controls that belong to the page, beside its heading. */

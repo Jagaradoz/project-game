@@ -4,7 +4,6 @@ import {
   Map,
   MonitorSmartphone,
   MoveHorizontal,
-  Pause,
   Play,
   Shield,
   TriangleAlert,
@@ -32,9 +31,9 @@ const FEATURES: {
   },
   {
     icon: Map,
-    title: 'Training mode',
-    body: 'One forest trail, five gentle moves. Paced for every age — no difficulty to pick.',
-    mark: '5',
+    title: 'Test and play',
+    body: 'Rehearse and measure four gentle controls in Test Mode. Play toward a 20-minute goal in Game Mode.',
+    mark: '4',
     markLabel: 'moves to learn',
   },
   {
@@ -46,10 +45,9 @@ const FEATURES: {
 
 const CONTROLS = [
   { icon: MoveHorizontal, action: 'Step or lean sideways', effect: 'Switch lane — left, centre, or right' },
-  { icon: Footprints, action: 'Jog in place', effect: 'Attack for as long as you keep moving' },
-  { icon: ArrowBigUp, action: 'Raise both arms', effect: 'Jump over logs, stones and rivers' },
+  { icon: Footprints, action: 'Lift your knees gently', effect: 'One knee step fires one projectile. Running speed follows your cadence' },
+  { icon: ArrowBigUp, action: 'Clap above your head', effect: 'Jump over logs, stones and rivers. Separate your hands before the next clap' },
   { icon: Shield, action: 'Hands on hips', effect: 'Hold a shield through poison spore clouds' },
-  { icon: Pause, action: 'Stand still', effect: 'Attacking stops. The runner still goes forward' },
 ];
 
 const CAUTIONS = [
@@ -72,15 +70,15 @@ export default function HomePage() {
             </span>
           </h1>
           <p className="m-0 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
-            Jog in place to attack. Step sideways to dodge. Your webcam reads your movement right
+            Lift your knees to run and attack. Lean sideways to dodge. Your webcam reads your movement right
             here in your browser — no controller needed.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <LinkButton href="/characters" variant="primary" size="lg" icon={<Play size={20} />}>
-              Play now
+            <LinkButton href="/play" variant="primary" size="lg" icon={<Play size={20} />}>
+              Game Mode
             </LinkButton>
-            <LinkButton href="#how-to-play" variant="secondary" size="lg">
-              How to play
+            <LinkButton href="/test" variant="secondary" size="lg">
+              Test Mode
             </LinkButton>
           </div>
           <ul className="m-0 mt-2 flex list-none flex-wrap justify-center gap-2 p-0">
@@ -147,7 +145,8 @@ export default function HomePage() {
               How to Play
             </h2>
             <p className="m-0 mx-auto mt-2 max-w-lg text-center text-sm leading-relaxed text-muted">
-              The whole game is these five. Nothing to memorise, nothing in your hands.
+              Four controls, with nothing to hold. Stopping knee lifts stops running and attacks.
+              Aim for 20 minutes at a comfortable pace; you can continue after the goal or finish sooner.
             </p>
 
             <ul className="m-0 mt-8 flex list-none flex-col gap-2 p-0">
@@ -179,6 +178,7 @@ export default function HomePage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Notice tone="ok" title="Camera feed stays on this device">
                 Pose detection runs in your browser. Frames are never uploaded or stored.
+                Your results and preferences exist only for this visit and clear on reload.
               </Notice>
               <Notice tone="warn" title="This is not a medical device">
                 Stop if you feel dizzy, short of breath, or unusually tired.

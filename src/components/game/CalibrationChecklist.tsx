@@ -100,10 +100,10 @@ export function buildChecks(
     },
     {
       id: 'armsUp',
-      label: 'Raise both arms tested',
+      label: 'Overhead clap tested',
       detail: rehearsal.hasRaisedArms
-        ? 'Both arms raised overhead — that is your jump'
-        : 'Raise both arms above your head, then lower them',
+        ? 'Clap detected — that is your jump'
+        : 'Separate your hands, clap above your head, then separate again',
       isPassing: rehearsal.hasRaisedArms,
     },
     {

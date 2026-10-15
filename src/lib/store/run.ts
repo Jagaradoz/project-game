@@ -6,7 +6,7 @@
  * Deliberately NOT persisted. It is a one-way handoff between two screens in
  * the same visit; keeping it in localStorage would mean /result showing a run
  * from days ago to someone who opened it directly. /result falls back to the
- * profile's most recent run when this is empty, which is the honest answer.
+ * visit's most recent run when this is empty.
  */
 
 import { create } from 'zustand';

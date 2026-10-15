@@ -2,7 +2,8 @@ import { Heart, Shield } from 'lucide-react';
 import { useState, type CSSProperties } from 'react';
 import type { HudSnapshot } from '@/engine/runtime';
 import { useCountUp } from '@/hooks/useCountUp';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatDuration } from '@/lib/format';
+import { CONFIG } from '@/engine/config';
 import pkg from '../../../package.json';
 
 interface GameHudProps {
@@ -35,7 +36,7 @@ export function GameHud({ snapshot }: GameHudProps) {
       >
         v{pkg.version}
       </p>
-      <div className="pointer-events-none absolute inset-x-3 top-10 z-[1] flex flex-col items-center gap-2">
+      <div className="pointer-events-none absolute inset-x-3 top-24 z-[1] flex flex-col items-center gap-2">
         <GoalBar snapshot={snapshot} />
         <div
           key={snapshot.hp}
@@ -80,6 +81,8 @@ export function GameHud({ snapshot }: GameHudProps) {
               </span>
             )}
             <Stat label="Distance" value={`${Math.round(snapshot.distance)} m`} />
+            <Stat label="Speed" value={`${snapshot.speed.toFixed(1)} m/s`} />
+            <Stat label="Difficulty" value={`${snapshot.difficulty} / 5`} />
           </div>
         </div>
       </div>
@@ -120,11 +123,14 @@ function ComboHit({ hits }: { hits: number }) {
 
 /** The Elder Treant's health, under the player's own while the boss is up. */
 function BossBar({ snapshot }: { snapshot: HudSnapshot }) {
-  if (snapshot.bossHp === null) return null;
+  const hp = snapshot.bossHp ?? snapshot.enemyHp;
+  const maxHp = snapshot.bossHp !== null ? snapshot.bossMaxHp : snapshot.enemyMaxHp;
+  if (hp === null || maxHp === null) return null;
+  const title = snapshot.bossHp !== null ? 'Elder Treant' : 'Nearest enemy';
   return (
     <div className="w-full max-w-[320px] border-2 border-surface bg-ink px-3 py-2 text-white">
-      <div className="flex justify-between text-xs font-black uppercase"><span>Elder Treant</span><span>{snapshot.bossHp}/{snapshot.bossMaxHp}</span></div>
-      <progress className="mt-1 h-2 w-full accent-orange-500" max={snapshot.bossMaxHp} value={snapshot.bossHp} aria-label="Elder Treant health" />
+      <div className="flex justify-between text-xs font-black uppercase"><span>{title}</span><span>{hp}/{maxHp}</span></div>
+      <progress className="mt-1 h-2 w-full accent-orange-500" max={maxHp} value={hp} aria-label={`${title} health`} />
     </div>
   );
 }
@@ -133,72 +139,17 @@ function BossBar({ snapshot }: { snapshot: HudSnapshot }) {
  * Training goal progress. Absent in an endless run, which has no goal.
  */
 function GoalBar({ snapshot }: { snapshot: HudSnapshot }) {
-  if (snapshot.goalKills === null) return null;
-
-  const completed = Math.min(snapshot.killCount, snapshot.goalKills);
-  const completedShare = (completed / snapshot.goalKills) * 100;
-  const remaining = Math.max(0, snapshot.goalKills - completed);
-
-  return (
-    <div className="mx-auto flex w-full max-w-[320px] flex-col gap-1.5 border-2 border-surface bg-ink px-3 py-2 shadow-[4px_4px_0_0_var(--color-primary)]">
-      <div className="flex items-end justify-between gap-3 text-white">
-        <div className="min-w-0">
-          <p className="m-0 text-[10px] font-black tracking-[0.12em] text-white/80 uppercase">
-            Training goal
-          </p>
-          <p className="m-0 truncate text-sm font-black tracking-wide uppercase">
-            Defeat {snapshot.goalKills} enemies
-          </p>
-        </div>
-        <span className="shrink-0 text-base font-black tabular-nums">
-          {completed}<span className="text-white/55">/{snapshot.goalKills}</span>
-        </span>
-      </div>
-      <div
-        className="h-3 overflow-hidden border border-white/50 bg-white/15"
-        role="progressbar"
-        aria-label="Enemies defeated"
-        aria-valuemin={0}
-        aria-valuemax={snapshot.goalKills}
-        aria-valuenow={completed}
-      >
-        <div
-          className="h-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none"
-          style={{ width: `${completedShare}%` }}
-        />
-      </div>
-      <span className="text-[10px] font-bold tracking-wide text-white/80 uppercase">
-        {snapshot.isCleared ? 'Objective complete' : remaining === 0 ? 'Defeat the Elder Treant to finish' : `${remaining} remaining · includes the boss`}
-      </span>
-    </div>
-  );
+  return <div className="mx-auto flex w-full max-w-[320px] flex-col gap-2 border-2 border-surface bg-ink px-3 py-2 text-white shadow-[4px_4px_0_0_var(--color-primary)]">
+    <div className="flex justify-between text-sm font-bold"><span>{snapshot.goalReached ? '20-minute goal reached' : '20-minute goal'}</span><span className="tabular-nums">{formatDuration(snapshot.elapsedMs)}</span></div>
+    <progress className="h-3 w-full accent-orange-500" value={Math.min(snapshot.elapsedMs, CONFIG.game.goalMs)} max={CONFIG.game.goalMs} aria-label="Progress toward 20 minutes of gameplay" />
+    {snapshot.goalReached && <p className="m-0 text-xs">Keep playing or finish whenever you are ready.</p>}
+  </div>;
 }
 
-/**
- * The score only moves when orbs land, so every change is a pickup: the number
- * swells. The "+N" for each orb floats up in the world, beside the character.
- */
 function ScoreStat({ score, shownScore }: { score: number; shownScore: number }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <span className="text-[11px] font-bold tracking-[0.08em] text-white/80 uppercase">Score</span>
-      <span
-        key={score}
-        className="inline-block origin-left text-base leading-tight tracking-tight text-primary animate-[score-bump_260ms_ease-out_1] motion-reduce:animate-none"
-      >
-        {formatNumber(shownScore)}
-      </span>
-    </div>
-  );
+  return <div className="flex items-baseline gap-2"><span className="text-[11px] font-bold tracking-wide text-white/80 uppercase">Score</span>
+    <span key={score} className="text-base font-black tabular-nums text-primary">{formatNumber(shownScore)}</span></div>;
 }
-
 function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <span className="text-[11px] font-bold tracking-[0.08em] text-white/80 uppercase">
-        {label}
-      </span>
-      <span className="text-base leading-tight tracking-tight">{value}</span>
-    </div>
-  );
+  return <div className="flex items-baseline gap-2"><span className="text-[11px] font-bold tracking-wide text-white/80 uppercase">{label}</span><span className="text-base tabular-nums">{value}</span></div>;
 }

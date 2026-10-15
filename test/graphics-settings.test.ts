@@ -1,40 +1,33 @@
-import { afterAll, beforeEach, expect, test, vi } from 'vitest';
-import { createJSONStorage } from 'zustand/middleware';
-
-const saved = new Map<string, string>();
-const storage = {
-  getItem: (key: string) => saved.get(key) ?? null,
-  setItem: (key: string, value: string) => { saved.set(key, value); },
-  removeItem: (key: string) => { saved.delete(key); },
-};
-const key = 'trail_runner_settings_v3';
-vi.stubGlobal('window', { localStorage: storage });
-const { useSettings } = await import('@/lib/store/settings');
-afterAll(() => vi.unstubAllGlobals());
-
-beforeEach(() => {
-  saved.clear();
-  useSettings.persist.setOptions({ storage: createJSONStorage(() => storage) });
-  useSettings.setState({ graphicsQuality: 'medium', character: 'mage', hideCamera: false });
-});
-
-test('graphics persist across hydration with the existing character and camera preferences', async () => {
+import { afterEach, expect, test, vi } from 'vitest';
+afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
+test('settings ignore legacy storage and reset with a fresh visit', async () => {
+  const storage = { getItem: vi.fn(() => { throw new Error('must not read'); }), setItem: vi.fn(), removeItem: vi.fn() };
+  vi.stubGlobal('localStorage', storage);
+  vi.resetModules();
+  const { useSettings } = await import('@/lib/store/settings');
   useSettings.getState().setGraphicsQuality('low');
   useSettings.getState().setCharacter('witch');
   useSettings.getState().setHideCamera(true);
-  const persisted = saved.get(key)!;
-  useSettings.setState({ graphicsQuality: 'high', character: 'mage', hideCamera: false });
-  saved.set(key, persisted);
-  await useSettings.persist.rehydrate();
+  useSettings.getState().setStartingDifficulty(3);
   expect(useSettings.getState().graphicsQuality).toBe('low');
   expect(useSettings.getState().character).toBe('witch');
-  expect(useSettings.getState().hideCamera).toBe(true);
+  expect(useSettings.getState().startingDifficulty).toBe(3);
+  expect(storage.getItem).not.toHaveBeenCalled();
+  expect(storage.setItem).not.toHaveBeenCalled();
+  expect(storage.removeItem).not.toHaveBeenCalled();
+  vi.resetModules();
+  const fresh = (await import('@/lib/store/settings')).useSettings.getState();
+  expect(fresh.graphicsQuality).toBe('medium');
+  expect(fresh.character).toBe('mage');
+  expect(fresh.hideCamera).toBe(false);
+  expect(fresh.startingDifficulty).toBe(1);
 });
-
-test.each([undefined, 'ultra', null, 0])('old or invalid graphics preferences fall back to Medium (%s)', async graphicsQuality => {
-  saved.set(key, JSON.stringify({ state: { graphicsQuality, character: 'druid', hideCamera: true }, version: 0 }));
-  await useSettings.persist.rehydrate();
-  expect(useSettings.getState().graphicsQuality).toBe('medium');
-  expect(useSettings.getState().character).toBe('druid');
-  expect(useSettings.getState().hideCamera).toBe(true);
+test('invalid settings stay within supported graphics, character and difficulty choices', async () => {
+  const { useSettings } = await import('@/lib/store/settings');
+  useSettings.getState().setStartingDifficulty(NaN);
+  expect(useSettings.getState().startingDifficulty).toBe(1);
+  useSettings.getState().setStartingDifficulty(9);
+  expect(useSettings.getState().startingDifficulty).toBe(5);
+  useSettings.getState().setCharacter('missing');
+  expect(useSettings.getState().character).toBe('mage');
 });

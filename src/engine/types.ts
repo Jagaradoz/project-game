@@ -40,6 +40,10 @@ export interface RunSummary {
   distanceM: number;
   movementCount: number;
   isCleared: boolean;
+  stepCount: number;
+  movementMs: number;
+  goalReached: boolean;
+  metrics?: import('@/engine/core/metrics').MetricsSnapshot;
 }
 
 export type CharacterId = keyof GameConfig['characters'];
@@ -139,6 +143,15 @@ export interface ArmsUpState {
   candidateMs: number | null;
   loweredMs: number | null;
   hasArms: boolean;
+}
+
+export interface ClapState {
+  justClapped: boolean;
+  clapCount: number;
+  armed: boolean;
+  candidateMs: number | null;
+  separatedMs: number | null;
+  hasHands: boolean;
 }
 
 export interface HandsOnHipsState {
@@ -254,6 +267,7 @@ export interface GameState {
   isFiring: boolean;
   fireCooldownMs: number;
   elapsedMs: number;
+  movementMs: number;
   nextSpawnMs: number;
   invulnUntilMs: number;
   justHit: boolean;
@@ -275,6 +289,11 @@ export interface GameInput {
   isFiring: boolean;
   /** Level signal: the shield is up for as long as this is true. Never consumed. */
   isShielding?: boolean;
+  /** Present for pose control; omitted only by legacy headless/dev input. */
+  cadenceSpm?: number;
+  /** Number of new knee steps since the last read. Consumed exactly once. */
+  stepEvents?: number;
+  startingDifficulty?: number;
 }
 
 /**
@@ -283,7 +302,7 @@ export interface GameInput {
  */
 export interface InputHandle {
   requestJump(): void;
-  setPose(label: LateralLabel | null, isJogging: boolean, isShielding?: boolean): void;
+  setPose(label: LateralLabel | null, isJogging: boolean, isShielding?: boolean, cadenceSpm?: number, stepCount?: number): void;
   clearPose(): void;
   attachKeyboard(target?: EventTarget): () => void;
   detach(): void;
