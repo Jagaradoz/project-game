@@ -18,6 +18,8 @@ import { CONFIG } from '@/engine/config';
 import { createGameState, restartGame, updateGame, difficultyAt } from '@/engine/core/state';
 import { advanceDemo } from '@/engine/core/demo';
 import { createMetrics, type MetricsSnapshot } from '@/engine/core/metrics';
+import { createTrialState, startTrial, stopTrial, updateTrial } from '@/engine/core/trial';
+import type { PoseEvent, PoseId, TrialState } from '@/engine/core/trial';
 import { createClapState, updateClap } from '@/engine/detectors/clap';
 import { classifyDistance, classifyLighting } from '@/engine/util/luma';
 import { createTestScene } from '@/engine/render/testScene';
@@ -154,6 +156,8 @@ export interface HudSnapshot {
   processingMs: number | null;
   renderFps: number | null;
   metrics: MetricsSnapshot;
+  /** Test Mode's guided error-rate trial. */
+  trial: TrialState;
   jumpCount: number;
   /** Both-arms-overhead raises, each one a jump. */
   armRaiseCount: number;
@@ -240,7 +244,7 @@ export interface HudSnapshot {
  * an orb lands without publishing every frame.
  */
 const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
-  'hasStarted', 'pauseReason', 'canBegin', 'hasBody', 'goalReached',
+  'hasStarted', 'pauseReason', 'canBegin', 'hasBody', 'goalReached', 'trial',
   'score',
   'comboHits',
   'comboMultiplier',
@@ -272,6 +276,9 @@ export interface GameRuntime {
   recalibrate(): void;
   setDevFire(active: boolean): void;
   restart(): void;
+  /** Test Mode only: prompt one pose `CONFIG.trial.attempts` times and score each prompt. */
+  startTrial(pose: PoseId): void;
+  stopTrial(): void;
   setCharacter(charId: string): Promise<void>;
   setGraphicsQuality(quality: ShadowQuality): void;
   /** What /result shows. Read after the run ends. */
@@ -303,7 +310,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let runSteps = 0, runMovements = 0;
   let lastValidPoseMs: number | null = null;
   let lastPoseReceivedMs: number | null = null;
-  let pendingResponseMs: number | null = null;
+  /** Pose-frame time of each pose's first unrendered detection. */
+  let pendingResponse: Partial<Record<PoseId, number>> = {};
+  let trial = createTrialState();
   let lastRenderMs: number | null = null;
   let smoothedRenderFps: number | null = null;
   let smoothedProcessingMs: number | null = null;
@@ -404,6 +413,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       processingMs: smoothedProcessingMs,
       renderFps: smoothedRenderFps,
       metrics: metrics.snapshot(),
+      trial,
       score: game.score,
       comboHits: game.comboHits,
       comboMultiplier: activeMultiplier(game, game.elapsedMs, rules),
@@ -583,10 +593,11 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       metrics.render(game.elapsedMs, dt);
     }
     lastRenderMs = nowMs;
-    if (pendingResponseMs !== null) {
-      metrics.response(Math.max(0, performance.now() - pendingResponseMs));
-      pendingResponseMs = null;
+    const renderedMs = performance.now();
+    for (const [pose, startMs] of Object.entries(pendingResponse) as [PoseId, number][]) {
+      metrics.response(pose, Math.max(0, renderedMs - startMs));
     }
+    pendingResponse = {};
   }
 
   function canBegin() {
@@ -600,7 +611,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     if (mode !== 'game' || !hasStarted || game.isOver || pauseReason !== null) return;
     pauseReason = reason;
     if (reason === 'body') metrics.bodyLoss();
-    input.clearPose(); pendingResponseMs = null; lastRenderMs = null;
+    input.clearPose(); pendingResponse = {}; lastRenderMs = null;
     needsRender = true; publish();
   }
 
@@ -694,6 +705,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     }
 
     // The game reads this snapshot from its own loop; it never runs inference.
+    let events: PoseEvent[] = [];
     if (!landmarks || !lateral.hasBody || !lateral.isCalibrated) {
       input.clearPose();
     } else {
@@ -701,8 +713,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       if (mode === 'game' && (!hasStarted || pauseReason !== null || game.isOver)) input.clearPose();
       else {
         if (clap.justClapped) input.requestJump();
-        pendingResponseMs ??= nowMs;
+        events = poseEvents(previousLane, previousSteps, previousHolds, previousClaps);
+        for (const event of events) pendingResponse[event.pose] ??= nowMs;
       }
+    }
+    if (mode === 'test') {
+      trial = updateTrial(trial, kneesVisible ? events : [], { lane: lateral.label, upKnee: jog.upKnee, isHandsOnHips: handsOnHips.isActive }, nowMs);
     }
 
     if (ctx) {
@@ -711,6 +727,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     }
     smoothedProcessingMs = ema(smoothedProcessingMs, performance.now() - nowMs, CONFIG.fps.smoothing);
     lastPoseReceivedMs = performance.now();
+  }
+
+  /** This frame's detections, in a fixed order. */
+  function poseEvents(previousLane: LateralLabel, previousSteps: number, previousHolds: number, previousClaps: number): PoseEvent[] {
+    const events: PoseEvent[] = [];
+    if (lateral.label !== previousLane) events.push({ pose: 'lateral', lane: lateral.label });
+    if (jog.stepCount > previousSteps) events.push({ pose: 'knees' });
+    if (handsOnHips.holdCount > previousHolds) events.push({ pose: 'hips' });
+    if (clap.clapCount > previousClaps) events.push({ pose: 'clap' });
+    return events;
   }
 
   /** Framing and lighting, for /calibrate. Held across frames the body is lost. */
@@ -1068,6 +1094,17 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     jump() { if (!isDisposed && mode === 'game') input.requestJump(); },
 
+    startTrial(pose: PoseId) {
+      if (isDisposed || mode !== 'test') return;
+      trial = startTrial(trial, pose, performance.now());
+      publish();
+    },
+
+    stopTrial() {
+      trial = stopTrial(trial);
+      publish();
+    },
+
     restart() {
       previewPaused = false;
       game = restartGame(game, rules);
@@ -1076,7 +1113,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       hasStarted = false; pauseReason = null; isCameraSkipped = false;
       rehearsal = { left: false, right: false, knees: false, hips: false, clap: false };
       lateral = recalibrateLateral(lateral);
-      metrics.reset(); lastRenderMs = null; pendingResponseMs = null;
+      metrics.reset(); lastRenderMs = null; pendingResponse = {};
       sceneRefs?.player?.playAnimation('idle', 0.1, true);
       needsRender = true;
       publish();
@@ -1087,7 +1124,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       startingDifficulty = Number.isFinite(difficulty) ? Math.min(5, Math.max(1, Math.round(difficulty))) : 1;
       game = restartGame(game, rules); resetMovementTallies(); input.reset();
       hasStarted = true; pauseReason = null; runSteps = runMovements = 0;
-      metrics.reset(); lastRenderMs = null; pendingResponseMs = null;
+      metrics.reset(); lastRenderMs = null; pendingResponse = {};
       lastGameMs = performance.now(); needsRender = true; setStatus('Playing. Move at a comfortable pace.'); publish();
       return true;
     },
@@ -1107,7 +1144,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       if (mode !== 'game' || !hasStarted || game.isOver) return;
       game = { ...game, isOver: true, isFiring: false, speed: 0, deathReason: null,
         isCleared: game.elapsedMs >= CONFIG.game.goalMs };
-      pauseReason = null; input.clearPose(); pendingResponseMs = null; needsRender = true; publish();
+      pauseReason = null; input.clearPose(); pendingResponse = {}; needsRender = true; publish();
     },
 
     setCharacter(charId: string) {

@@ -21,6 +21,9 @@ import { CONFIG } from '@/engine/config';
 import { createGameRuntime } from '@/engine/runtime';
 import type { GameRuntime, HudSnapshot, RuntimeMode } from '@/engine/runtime';
 import { LATERAL } from '@/engine/detectors/lateral';
+import { EMPTY_LATENCY } from '@/engine/core/metrics';
+import { createTrialState } from '@/engine/core/trial';
+import type { PoseId } from '@/engine/core/trial';
 import type { RunSummary, ShadowQuality } from '@/engine/types';
 
 /** Stable reference, so a render before the engine exists cannot loop. */
@@ -28,7 +31,9 @@ const IDLE_SNAPSHOT: HudSnapshot = {
   clapCount: 0, speed: 0, difficulty: 1, goalReached: false, hasStarted: false, canBegin: false, pauseReason: null,
   rehearsal: { left: false, right: false, knees: false, hips: false, clap: false }, poseFps: null, renderFps: null, processingMs: null,
   metrics: { latencyMeanMs: null, latencyP95Ms: null, latencyMinMs: null, latencyMaxMs: null, latencySamples: 0,
+    latencyByPose: { lateral: EMPTY_LATENCY, knees: EMPTY_LATENCY, hips: EMPTY_LATENCY, clap: EMPTY_LATENCY },
     fpsMean: null, firstMinuteFps: null, lastMinuteFps: null, fpsDeclinePercent: null, bodyLossIncidents: 0 },
+  trial: createTrialState(),
   jumpCount: 0, armRaiseCount: 0, hipsHoldCount: 0, isHandsOnHips: false, isShielding: false,
   sporeDistance: null, isInSpore: false,
   feetVisible: false, isJumpCalibrated: false, isAirborne: false,
@@ -100,6 +105,8 @@ export interface GameActions {
   recalibrate: () => void;
   setDevFire: (active: boolean) => void;
   restart: () => void;
+  startTrial: (pose: PoseId) => void;
+  stopTrial: () => void;
   /** Null when the engine is not mounted, so callers must handle its absence. */
   getRunSummary: () => RunSummary | null;
 }
@@ -190,6 +197,8 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
       recalibrate: () => runtimeRef.current?.recalibrate(),
       setDevFire: (active) => runtimeRef.current?.setDevFire(active),
       restart: () => runtimeRef.current?.restart(),
+      startTrial: (pose) => runtimeRef.current?.startTrial(pose),
+      stopTrial: () => runtimeRef.current?.stopTrial(),
       getRunSummary: () => runtimeRef.current?.getRunSummary() ?? null,
     }),
     [],

@@ -16,6 +16,7 @@ export type JogConfig = AppConfig['jog'];
 export type JumpConfig = AppConfig['jump'];
 export type ArmsUpConfig = AppConfig['armsUp'];
 export type HandsOnHipsConfig = AppConfig['handsOnHips'];
+export type TrialConfig = AppConfig['trial'];
 export type DrawConfig = AppConfig['draw'];
 export type GameConfig = AppConfig['game'];
 

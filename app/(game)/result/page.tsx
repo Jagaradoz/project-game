@@ -26,7 +26,7 @@ export default function ResultPage() {
         <StatTile label="Distance" value={formatMetres(run.distanceM)} />
       </StatGrid></Card>
       {metrics && <Card title="Technical measurements"><StatGrid>
-        <StatTile label="Response mean / P95" value={number(metrics.latencyMeanMs) + ' / ' + number(metrics.latencyP95Ms) + ' ms'} detail={metrics.latencySamples + ' frame-to-render samples · P95 target ≤200 ms'} />
+        <StatTile label="Response mean / P95" value={number(metrics.latencyMeanMs) + ' / ' + number(metrics.latencyP95Ms) + ' ms'} detail={metrics.latencySamples + ' detected moves · P95 target ≤200 ms'} />
         <StatTile label="Response min / max" value={number(metrics.latencyMinMs) + ' / ' + number(metrics.latencyMaxMs) + ' ms'} />
         <StatTile label="Average render FPS" value={number(metrics.fpsMean)} detail="Target ≥24; this browser and current graphics settings" />
         <StatTile label="First / last minute FPS" value={number(metrics.firstMinuteFps) + ' / ' + number(metrics.lastMinuteFps)} />

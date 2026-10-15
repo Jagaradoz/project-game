@@ -3,6 +3,7 @@ import type { GameRuntime } from '@/engine/runtime';
 const mocks = vi.hoisted(() => ({ scene: vi.fn(), camera: vi.fn(), stop: vi.fn(), detect: vi.fn(),
   pose: null as import('@/engine/types').PoseLandmarks | null }));
 vi.mock('@/engine/render/scene', () => ({ createScene: mocks.scene }));
+vi.mock('@/engine/render/testScene', () => ({ createTestScene: mocks.scene }));
 vi.mock('@/engine/render/sync', () => ({ syncScene: vi.fn(), updatePlayerAnimation: vi.fn() }));
 vi.mock('@/engine/pose/camera', () => ({ startCamera: mocks.camera, stopCamera: mocks.stop, describeCameraError: (e: Error) => e.message }));
 vi.mock('@/engine/pose/pose', () => ({ initPose: vi.fn().mockResolvedValue({ connections: [], delegate: 'CPU', model: 'lite' }),
@@ -53,10 +54,13 @@ beforeEach(async () => {
     drowningSplash: { update: vi.fn() }, setQuality: vi.fn(), quality: 'high', resize: vi.fn(), render: vi.fn(), dispose: vi.fn() });
   mocks.camera.mockImplementation(async () => ({ stream, width: 640, height: 480 }));
   mocks.detect.mockImplementation(() => ({ landmarks: mocks.pose, inferenceMs: 2 }));
-  const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
-  runtime = createGameRuntime({ gameCanvas: canvas, overlay: canvas, video: video as unknown as HTMLVideoElement, container: {} as HTMLElement });
-  runtime.start(); await vi.waitFor(() => expect(runtime.getSnapshot().isSceneReady).toBe(true));
+  await mount('game');
 });
+async function mount(mode: 'game' | 'test') {
+  const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
+  runtime = createGameRuntime({ gameCanvas: canvas, overlay: canvas, video: video as unknown as HTMLVideoElement, container: {} as HTMLElement }, { mode });
+  runtime.start(); await vi.waitFor(() => expect(runtime.getSnapshot().isSceneReady).toBe(true));
+}
 afterEach(() => { runtime.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it('camera entry reports failure on rejection and success only after pose startup', async () => {
@@ -82,7 +86,11 @@ it('requires current calibration and all four controls; setup movements do not e
   expect(runtime.getSnapshot().difficulty).toBe(3);
   expect(runtime.getRunSummary().durationMs).toBeCloseTo(500, -1);
   expect(runtime.getRunSummary().movementMs).toBe(0);
-  expect(runtime.getSnapshot().metrics.latencySamples).toBeGreaterThan(0);
+  // Latency is timed from a detected movement, so standing still records none.
+  expect(runtime.getSnapshot().metrics.latencySamples).toBe(0);
+  frames(makePose({ centerX: .35 }), 20);
+  expect(runtime.getSnapshot().metrics.latencyByPose.lateral.samples).toBeGreaterThan(0);
+  expect(runtime.getSnapshot().metrics.latencyByPose.clap.samples).toBe(0);
   runtime.restart();
   expect(runtime.getSnapshot().hasStarted).toBe(false);
   expect(runtime.beginRun()).toBe(false);
@@ -119,4 +127,24 @@ it('camera stop and hidden tabs require valid tracking and explicit resume', asy
   expect(runtime.getSnapshot().pauseReason).toBe('camera');
   expect(runtime.resume()).toBe(false);
   expect(mocks.stop).toHaveBeenCalledWith(stream);
+});
+
+it('Test Mode scores a guided trial from live detections; Game Mode ignores trials', async () => {
+  runtime.startTrial('clap');
+  expect(runtime.getSnapshot().trial.active).toBeNull();
+  runtime.dispose(); callbacks.clear();
+  await mount('test');
+  await runtime.startCamera();
+  frames(makePose(), 40);
+  runtime.startTrial('clap');
+  frames(makePose(), 50);
+  expect(runtime.getSnapshot().trial.active).toMatchObject({ pose: 'clap', phase: 'attempt' });
+  frames(makePose({ arms: 'up' }), 10);
+  const clap = makePose({ arms: 'up' }); clap[LANDMARK.LEFT_WRIST]!.x = .51; clap[LANDMARK.RIGHT_WRIST]!.x = .49;
+  frames(clap, 5);
+  expect(runtime.getSnapshot().trial.results.clap).toEqual({ correct: 1, missed: 0, incorrect: 0 });
+  frames(makePose(), 5);
+  expect(runtime.getSnapshot().metrics.latencyByPose.clap.samples).toBe(1);
+  runtime.stopTrial();
+  expect(runtime.getSnapshot().trial.results.clap).toBeNull();
 });

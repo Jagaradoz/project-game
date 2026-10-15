@@ -159,6 +159,17 @@ export const CONFIG = {
     smoothing: 0.1,
   },
 
+  /** Test Mode's guided error-rate trial, run once per pose. */
+  trial: {
+    attempts: 10,
+    /** A prompt with no matching detection inside this window counts as missed. */
+    attemptMs: 5000,
+    /** Pause between prompts; detections here are not scored. */
+    restMs: 1500,
+    /** Pass when at most this share of attempts is missed or wrong. */
+    maxErrorPercent: 10,
+  },
+
   draw: {
     boneWidth: 4,
     jointRadius: 5,
