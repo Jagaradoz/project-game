@@ -148,3 +148,101 @@ it('Test Mode scores a guided trial from live detections; Game Mode ignores tria
   runtime.stopTrial();
   expect(runtime.getSnapshot().trial.results.clap).toBeNull();
 });
+
+async function testMode() {
+  runtime.dispose(); callbacks.clear(); await mount('test');
+  runtime.practiceCommand({ type: 'start' });
+  expect(runtime.getSnapshot().practice.phase).toBe('idle');
+  await runtime.startCamera(); frames(makePose(), 40);
+  expect(runtime.getSnapshot().canPractice).toBe(true);
+}
+
+it('counts real detector events once and pauses practice on lost tracking until explicit resume', async () => {
+  await testMode();
+  runtime.practiceCommand({ type: 'select', pose: 'hips' });
+  runtime.practiceCommand({ type: 'start' }); frames(makePose(), 5);
+  frames(makePose({ arms: 'hips' }), 20);
+  expect(runtime.getSnapshot().practice.count).toBe(1);
+  frames(makePose({ arms: 'hips' }), 30);
+  expect(runtime.getSnapshot().practice.count).toBe(1);
+  frames(null, 1);
+  expect(runtime.getSnapshot().practice).toMatchObject({ phase: 'paused', count: 1 });
+  frames(makePose(), 40);
+  expect(runtime.getSnapshot().practice.phase).toBe('paused');
+  runtime.practiceCommand({ type: 'resume' }); frames(makePose(), 5);
+  frames(makePose({ arms: 'hips' }), 20);
+  expect(runtime.getSnapshot().practice.count).toBe(2);
+  expect(runtime.getDiagnosticReport('test').events.filter(e => e.event === 'counted')).toHaveLength(2);
+});
+
+it('forwards knee sides and keeps detections driving the character during free practice', async () => {
+  await testMode();
+  runtime.practiceCommand({ type: 'select', pose: 'knees' });
+  runtime.practiceCommand({ type: 'start' });
+  frames(makePose({ leftKneeLift: .1 }), 10);
+  expect(runtime.getSnapshot().practice.count).toBe(0);
+  frames(makePose({ rightKneeLift: .1 }), 10);
+  expect(runtime.getSnapshot().practice.count).toBe(1);
+  const event = runtime.getDiagnosticReport('test').events.find(e => e.category === 'detection' && e.data.pose === 'knees');
+  expect(event?.data.knee).toBe('RIGHT');
+  runtime.practiceCommand({ type: 'mode', mode: 'free' });
+  frames(makePose({ leftKneeLift: .1 }), 10);
+  expect(runtime.getSnapshot().practice).toMatchObject({ mode: 'free', count: 0, phase: 'idle' });
+  expect(runtime.getSnapshot().stepCount).toBeGreaterThan(1);
+  expect(mocks.camera).toHaveBeenCalledTimes(1);
+});
+
+it('isolates timed evaluation and practice, logs outcomes and preserves camera ownership', async () => {
+  await testMode();
+  runtime.practiceCommand({ type: 'select', pose: 'clap' });
+  runtime.practiceCommand({ type: 'start' }); frames(makePose(), 5);
+  runtime.startTrial('clap');
+  expect(runtime.getSnapshot().practice.phase).toBe('paused');
+  frames(makePose(), 50);
+  frames(makePose({ arms: 'up' }), 10);
+  const clap = makePose({ arms: 'up' }); clap[LANDMARK.LEFT_WRIST]!.x = .51; clap[LANDMARK.RIGHT_WRIST]!.x = .49;
+  frames(clap, 5);
+  expect(runtime.getSnapshot().practice.count).toBe(0);
+  expect(runtime.getSnapshot().trial.results.clap?.correct).toBe(1);
+  runtime.practiceCommand({ type: 'resume' });
+  expect(runtime.getSnapshot().trial.active).toBeNull();
+  frames(makePose({ arms: 'up' }), 10); frames(clap, 5);
+  expect(runtime.getSnapshot().practice.count).toBe(1);
+  const report = runtime.getDiagnosticReport('test');
+  expect(report.events.some(e => e.category === 'trial' && e.data.tally)).toBe(true);
+  expect(report.events.some(e => e.event === 'model-ready')).toBe(true);
+  expect(mocks.camera).toHaveBeenCalledTimes(1);
+});
+
+it('freezes practice for hidden tabs and camera stop, and samples diagnostics at five seconds', async () => {
+  await testMode();
+  runtime.practiceCommand({ type: 'start' }); frames(makePose(), 3);
+  Object.assign(document, { hidden: true }); document.dispatchEvent(new Event('visibilitychange'));
+  expect(runtime.getSnapshot().practice.phase).toBe('paused');
+  Object.assign(document, { hidden: false }); document.dispatchEvent(new Event('visibilitychange'));
+  frames(makePose(), 150);
+  expect(runtime.getSnapshot().practice.phase).toBe('paused');
+  runtime.practiceCommand({ type: 'resume' }); frames(makePose(), 3);
+  runtime.stopCamera();
+  expect(runtime.getSnapshot().practice.phase).toBe('paused');
+  const samples = runtime.getDiagnosticReport('test').events.filter(e => e.category === 'performance');
+  expect(samples.length).toBeGreaterThan(0);
+  expect(samples.length).toBeLessThanOrEqual(2);
+  runtime.clearDiagnostics();
+  expect(runtime.getSnapshot().diagnostics.events).toHaveLength(0);
+});
+
+it('requires a fresh knee starting side after Start and Resume', async () => {
+  await testMode();
+  frames(makePose({ leftKneeLift: .1 }), 10);
+  runtime.practiceCommand({ type: 'select', pose: 'knees' });
+  runtime.practiceCommand({ type: 'start' });
+  frames(makePose({ rightKneeLift: .1 }), 10);
+  expect(runtime.getSnapshot().practice).toMatchObject({ count: 0, targetKnee: 'LEFT' });
+  frames(makePose({ leftKneeLift: .1 }), 10);
+  expect(runtime.getSnapshot().practice.count).toBe(1);
+  runtime.practiceCommand({ type: 'pause' });
+  runtime.practiceCommand({ type: 'resume' });
+  frames(makePose({ rightKneeLift: .1 }), 10);
+  expect(runtime.getSnapshot().practice).toMatchObject({ count: 1, targetKnee: 'LEFT' });
+});

@@ -19,6 +19,10 @@ import { createGameState, restartGame, updateGame, difficultyAt } from '@/engine
 import { advanceDemo } from '@/engine/core/demo';
 import { createMetrics, type MetricsSnapshot } from '@/engine/core/metrics';
 import { createTrialState, startTrial, stopTrial, updateTrial } from '@/engine/core/trial';
+import { createPracticeState, practiceCommand, updatePractice } from '@/engine/core/practice';
+import type { PracticeCommand, PracticeState } from '@/engine/core/practice';
+import { createDiagnosticLog } from '@/engine/core/diagnostics';
+import type { DiagnosticSnapshot, DiagnosticReport } from '@/engine/core/diagnostics';
 import type { PoseEvent, PoseId, TrialState } from '@/engine/core/trial';
 import { createClapState, updateClap } from '@/engine/detectors/clap';
 import { classifyDistance, classifyLighting } from '@/engine/util/luma';
@@ -159,6 +163,9 @@ export interface HudSnapshot {
   metrics: MetricsSnapshot;
   /** Test Mode's guided error-rate trial. */
   trial: TrialState;
+  practice: PracticeState;
+  diagnostics: DiagnosticSnapshot;
+  canPractice: boolean;
   jumpCount: number;
   /** Both-arms-overhead raises, each one a jump. */
   armRaiseCount: number;
@@ -245,7 +252,7 @@ export interface HudSnapshot {
  * an orb lands without publishing every frame.
  */
 const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
-  'hasStarted', 'pauseReason', 'canBegin', 'hasBody', 'goalReached', 'trial',
+  'hasStarted', 'pauseReason', 'canBegin', 'hasBody', 'goalReached', 'trial', 'practice', 'canPractice',
   'score',
   'comboHits',
   'comboMultiplier',
@@ -280,6 +287,9 @@ export interface GameRuntime {
   /** Test Mode only: prompt one pose `CONFIG.trial.attempts` times and score each prompt. */
   startTrial(pose: PoseId): void;
   stopTrial(): void;
+  practiceCommand(command: PracticeCommand): void;
+  clearDiagnostics(): void;
+  getDiagnosticReport(appVersion: string): DiagnosticReport;
   setCharacter(charId: string): Promise<void>;
   setGraphicsQuality(quality: ShadowQuality): void;
   /** What /result shows. Read after the run ends. */
@@ -314,6 +324,10 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   /** Pose-frame time of each pose's first unrendered detection. */
   let pendingResponse: Partial<Record<PoseId, number>> = {};
   let trial = createTrialState();
+  let practice = createPracticeState();
+  const diagnostics = createDiagnosticLog();
+  let lastPerformanceLogMs = performance.now();
+  let lastTrackingStatus = 'waiting';
   let lastRenderMs: number | null = null;
   let smoothedRenderFps: number | null = null;
   let smoothedProcessingMs: number | null = null;
@@ -416,6 +430,9 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       renderFps: smoothedRenderFps,
       metrics: metrics.snapshot(),
       trial,
+      practice,
+      diagnostics: diagnostics.snapshot(),
+      canPractice: hasPracticeTracking(),
       score: game.score,
       comboHits: game.comboHits,
       comboMultiplier: activeMultiplier(game, game.elapsedMs, rules),
@@ -499,11 +516,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   function setStatus(text: string): void {
     status = text;
+    if (mode === 'test') diagnostics.append('lifecycle', 'status', { message: text });
     publish();
   }
 
   function setError(message: string | null): void {
     errorMessage = message;
+    if (mode === 'test' && message) diagnostics.append('error', 'runtime-error', { message });
     if (message) options.onError?.(message);
     publish();
   }
@@ -516,11 +535,25 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     frameBudget.reset();
     lastRenderMs = null;
     if (document.hidden) pauseRun('hidden');
+    if (mode === 'test' && document.hidden) pausePractice('Tab hidden');
     if (!document.hidden) needsRender = true;
+    publish();
   }
 
   function gameFrame(nowMs: number): void {
     if (isDisposed) return;
+    if (mode === 'test') {
+      const tracking = hasPracticeTracking() ? 'ready' : document.hidden ? 'hidden' : !isPoseRunning ? 'camera' : !lateral.hasBody || !kneesVisible ? 'body' : !lateral.isCalibrated ? 'calibrating' : 'stale';
+      if (tracking !== lastTrackingStatus) {
+        diagnostics.append('tracking', tracking, { previous: lastTrackingStatus });
+        lastTrackingStatus = tracking;
+      }
+      if (tracking !== 'ready') pausePractice(tracking === 'hidden' ? 'Tab hidden' : tracking === 'camera' ? 'Camera stopped' : 'Tracking unavailable');
+      if (nowMs - lastPerformanceLogMs >= 5000) {
+        diagnostics.append('performance', 'sample', { poseFps: smoothedFps, renderFps: smoothedRenderFps, processingMs: smoothedProcessingMs, inferenceMs: smoothedInferenceMs, latency: metrics.snapshot().latencyByPose, model: poseModel, delegate });
+        lastPerformanceLogMs = nowMs;
+      }
+    }
 
     if (document.hidden) {
       pauseRun('hidden');
@@ -609,6 +642,24 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       && performance.now() - lastValidPoseMs <= 1000 && !document.hidden;
   }
 
+  function hasPracticeTracking() {
+    return isPoseRunning && lateral.hasBody && lateral.isCalibrated && kneesVisible
+      && lastValidPoseMs !== null && performance.now() - lastValidPoseMs <= 1000 && !document.hidden;
+  }
+
+  function setPractice(next: PracticeState, event: string) {
+    if (next === practice) return;
+    const previous = practice;
+    practice = next;
+    diagnostics.append('practice', event, { pose: next.pose, phase: next.phase, expected: next.prompt, count: next.count, goal: next.goal, reason: next.pauseReason });
+    if (next.count > previous.count) diagnostics.append('practice', 'counted', { pose: next.pose, count: next.count, goal: next.goal, expected: previous.prompt, detected: next.pose });
+    if (next.phase === 'complete' && previous.phase !== 'complete') diagnostics.append('practice', 'completed', { pose: next.pose, count: next.count });
+  }
+
+  function pausePractice(reason: string) {
+    if (mode === 'test') setPractice(practiceCommand(practice, { type: 'pause', reason }), 'paused');
+  }
+
   function pauseRun(reason: Exclude<PauseReason, null>) {
     if (mode !== 'game' || !hasStarted || game.isOver || pauseReason !== null) return;
     pauseReason = reason;
@@ -684,6 +735,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     smoothedInferenceMs = ema(smoothedInferenceMs, inferenceMs, CONFIG.fps.smoothing);
 
     const previousSteps = jog.stepCount, previousClaps = clap.clapCount, previousHolds = handsOnHips.holdCount;
+    const previousClapArmed = clap.armed;
     const previousLane = lateral.label;
     lateral = updateLateral(lateral, landmarks, nowMs);
     if (lateral.label !== previousLane) laneChangedMs = nowMs;
@@ -721,7 +773,16 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       }
     }
     if (mode === 'test') {
-      trial = updateTrial(trial, kneesVisible ? events : [], { lane: lateral.label, upKnee: jog.upKnee, isHandsOnHips: handsOnHips.isActive }, nowMs);
+      const readout = { lane: lateral.label, upKnee: jog.upKnee, isHandsOnHips: handsOnHips.isActive, clapArmed: previousClapArmed || clap.armed };
+      for (const event of events) diagnostics.append('detection', 'movement', { ...event, expected: practice.mode === 'guided' ? practice.prompt : null, trialTarget: trial.active?.target ?? trial.active?.pose ?? null });
+      if (hasPracticeTracking()) setPractice(updatePractice(practice, events, readout), 'prompt');
+      else pausePractice('Tracking unavailable');
+      const previousTrial = trial;
+      trial = updateTrial(trial, kneesVisible ? events : [], readout, nowMs);
+      if (trial !== previousTrial) {
+        const pose = previousTrial.active?.pose;
+        diagnostics.append('trial', trial.active ? 'updated' : 'completed', { pose, expected: previousTrial.active?.target ?? pose, detected: events, phase: trial.active?.phase ?? 'complete', tally: pose ? trial.results[pose] : null });
+      }
     }
 
     if (ctx) {
@@ -738,7 +799,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   function poseEvents(previousLane: LateralLabel, previousSteps: number, previousHolds: number, previousClaps: number): PoseEvent[] {
     const events: PoseEvent[] = [];
     if (lateral.label !== previousLane) events.push({ pose: 'lateral', lane: lateral.label });
-    if (jog.stepCount > previousSteps) events.push({ pose: 'knees' });
+    if (jog.stepCount > previousSteps) events.push({ pose: 'knees', knee: jog.upKnee });
     if (handsOnHips.holdCount > previousHolds) events.push({ pose: 'hips' });
     if (clap.clapCount > previousClaps) events.push({ pose: 'clap' });
     return events;
@@ -788,6 +849,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         demo.setQuality(pendingQuality);
         await applyCharacter(pendingCharacter);
         if (isDisposed) return;
+        diagnostics.append('lifecycle', 'character-ready', { character: pendingCharacter });
         observeResize(); publish(); return;
       }
       const refs = await createScene(els.gameCanvas, { ...CONFIG.game, quality: pendingQuality });
@@ -1039,6 +1101,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
           pauseRun('camera'); releaseCamera(); setError('The camera disconnected. Start it again, then resume.');
         }, { once: true });
         cameraLabel = `${camera.width}x${camera.height}`;
+        if (mode === 'test') diagnostics.append('lifecycle', 'camera-acquired', { dimensions: cameraLabel });
 
         setStatus(`Loading pose model (${CONFIG.pose.model})...`);
         if (isDisposed || requestId !== cameraRequestId) return false;
@@ -1050,6 +1113,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         connections = pose.connections;
         delegate = pose.delegate;
         poseModel = pose.model;
+        if (mode === 'test') diagnostics.append('lifecycle', 'model-ready', { model: poseModel, delegate });
 
         isPoseRunning = true;
         isCameraSkipped = false;
@@ -1100,15 +1164,39 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     jump() { if (!isDisposed && mode === 'game') input.requestJump(); },
 
     startTrial(pose: PoseId) {
-      if (isDisposed || mode !== 'test') return;
+      if (isDisposed || mode !== 'test' || !hasPracticeTracking()) return;
+      pausePractice('Timed evaluation running');
       trial = startTrial(trial, pose, performance.now());
+      diagnostics.append('trial', 'started', { pose, attempts: CONFIG.trial.attempts });
       publish();
     },
 
     stopTrial() {
+      if (mode === 'test' && trial.active) diagnostics.append('trial', 'stopped', { pose: trial.active.pose });
       trial = stopTrial(trial);
       publish();
     },
+
+    practiceCommand(command: PracticeCommand) {
+      if (isDisposed || mode !== 'test') return;
+      if ((command.type === 'start' || command.type === 'resume') && !hasPracticeTracking()) return;
+      if (trial.active) {
+        diagnostics.append('trial', 'stopped', { pose: trial.active.pose, reason: 'Practice control' });
+        trial = stopTrial(trial);
+      }
+      const next = practiceCommand(practice, command);
+      if (next !== practice && (command.type === 'start' || command.type === 'resume')) {
+        // Starting positions must be observed after Start/Resume, not inherited
+        // from movements made while the guide was idle or paused.
+        if (next.pose === 'clap') clap = { ...createClapState(), clapCount: clap.clapCount };
+        if (next.pose === 'knees') jog = { ...createJogState(), stepCount: jog.stepCount };
+      }
+      setPractice(next, command.type);
+      publish();
+    },
+
+    clearDiagnostics() { diagnostics.clear(); lastEmitMs = -Infinity; publish(); },
+    getDiagnosticReport(appVersion: string) { return diagnostics.report(appVersion, practice, trial, metrics.snapshot()); },
 
     restart() {
       previewPaused = false;
@@ -1240,6 +1328,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   }
 
   function releaseCamera(): void {
+    pausePractice('Camera stopped');
+    if (mode === 'test') diagnostics.append('lifecycle', 'camera-released');
     cameraRequestId += 1;
     cameraAbortController?.abort();
     cameraAbortController = null;

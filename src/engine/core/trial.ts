@@ -19,7 +19,7 @@ export type PoseId = 'lateral' | 'knees' | 'hips' | 'clap';
 export const POSE_IDS: readonly PoseId[] = ['lateral', 'knees', 'hips', 'clap'];
 
 /** One detection from a pose frame. Lane changes carry the lane reached. */
-export interface PoseEvent { pose: PoseId; lane?: LateralLabel }
+export interface PoseEvent { pose: PoseId; lane?: LateralLabel; knee?: UpKnee }
 
 /** Detector state the prompts depend on. */
 export interface PoseReadout { lane: LateralLabel; upKnee: UpKnee; isHandsOnHips: boolean }
@@ -108,6 +108,7 @@ function scoreAttempt(active: ActiveTrial, events: readonly PoseEvent[], nowMs: 
 
 function matches(active: ActiveTrial, event: PoseEvent): boolean {
   if (event.pose !== active.pose) return false;
+  if (active.pose === 'knees') return event.knee === (active.target === 'LEFT_KNEE' ? 'LEFT' : 'RIGHT');
   return active.pose !== 'lateral' || event.lane === active.target;
 }
 

@@ -55,6 +55,13 @@ describe('guided trial', () => {
     expect(opened('hips', { ...still, isHandsOnHips: true }).active?.phase).toBe('ready');
   });
 
+  it('requires the prompted knee side during timed evaluation', () => {
+    const open = opened('knees', { ...still, upKnee: 'LEFT' });
+    expect(open.active?.target).toBe('RIGHT_KNEE');
+    expect(updateTrial(open, [{ pose: 'knees', knee: 'LEFT' }], still, 200, config).results.knees?.incorrect).toBe(1);
+    expect(updateTrial(open, [{ pose: 'knees', knee: 'RIGHT' }], still, 200, config).results.knees?.correct).toBe(1);
+  });
+
   it('finishes after the configured attempts and clears a stopped trial', () => {
     let state = opened('clap');
     for (let i = 0; i < 3; i++) {

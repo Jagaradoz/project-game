@@ -1,0 +1,12 @@
+.figure { transform-origin: 100px 120px; }
+.first { animation: first 3s steps(1, end) infinite; }
+.second { animation: second 3s steps(1, end) infinite; opacity: 0; }
+.lateral { animation: lateral 6s ease-in-out infinite; }
+@keyframes first { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes second { 0%, 49% { opacity: 0; } 50%, 100% { opacity: 1; } }
+@keyframes lateral { 0%, 100% { transform: translateX(0); } 20%, 30% { transform: translateX(-40px); } 45%, 55% { transform: translateX(0); } 75%, 85% { transform: translateX(40px); } }
+@media (prefers-reduced-motion: reduce) {
+  .first, .second, .lateral { animation: none; }
+  .first { opacity: 1; }
+  .second { opacity: 0; }
+}

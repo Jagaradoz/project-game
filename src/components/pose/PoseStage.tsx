@@ -33,9 +33,9 @@ export function PoseStage({
         playsInline
         muted
         autoPlay
-        className="mirrored absolute inset-0 h-full w-full object-cover"
+        className="mirrored absolute inset-0 h-full w-full object-contain"
       />
-      <canvas ref={overlayRef} className="mirrored absolute inset-0 h-full w-full object-cover" />
+      <canvas ref={overlayRef} className="mirrored absolute inset-0 h-full w-full object-contain" />
 
       {!isCameraRunning && (
         <div className="absolute inset-0 grid place-content-center justify-items-center gap-3 p-4 text-center">

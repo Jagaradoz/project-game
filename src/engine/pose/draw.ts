@@ -72,7 +72,7 @@ function unmirroredText(ctx: CanvasRenderingContext2D, text: string, x: number, 
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(-1, 1);
-  ctx.fillText(text, 0, 0);
+  ctx.fillText(text, 0, 0, ctx.canvas.width * 0.94);
   ctx.restore();
 }
 
@@ -104,10 +104,11 @@ export function drawLaneGuide(
 ): void {
   const { width, height } = ctx.canvas;
   const px = 1 / Math.max(cssScale, 1e-3);
-  const showText = height * cssScale >= style.laneLabelMinCssHeight;
-  const labelY = style.laneLabelTopCssPx * px;
+  const compact = height * cssScale < style.laneLabelMinCssHeight;
+  const showText = true;
+  const labelY = (compact ? 38 : style.laneLabelTopCssPx) * px;
   ctx.save();
-  ctx.font = `700 ${style.laneLabelCssPx * px}px ui-monospace, "JetBrains Mono", Consolas, monospace`;
+  ctx.font = `700 ${(compact ? 9 : style.laneLabelCssPx) * px}px ui-monospace, "JetBrains Mono", Consolas, monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineWidth = style.laneLineCssPx * px;
@@ -153,7 +154,9 @@ export function drawLaneGuide(
     };
     for (const label of ['LEFT', 'CENTER', 'RIGHT'] as const) {
       ctx.fillStyle = guide.isTracking && label === guide.label ? style.laneTextColor : style.laneMutedTextColor;
-      unmirroredText(ctx, LANE_NAMES[label], labelAt[label], labelY);
+      const margin = ctx.measureText(LANE_NAMES[label]).width / 2 + 2 * px;
+      const x = Math.max(margin, Math.min(width - margin, labelAt[label]));
+      unmirroredText(ctx, LANE_NAMES[label], x, labelY);
     }
   }
 

@@ -202,7 +202,7 @@ export const CONFIG = {
     /** Sizes below are in CSS pixels, converted per frame so they read the same at any display size. */
     laneLineCssPx: 2,
     laneLabelCssPx: 12,
-    /** Lane names are skipped when the feed is shown smaller than this (the in-game thumbnail). */
+    /** Use compact lane labels below this feed height; guides remain visible on mobile. */
     laneLabelMinCssHeight: 220,
     /** Labels sit this far below the top so the stage's own title bar does not cover them. */
     laneLabelTopCssPx: 52,

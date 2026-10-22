@@ -23,6 +23,9 @@ import type { GameRuntime, HudSnapshot, RuntimeMode } from '@/engine/runtime';
 import { LATERAL } from '@/engine/detectors/lateral';
 import { EMPTY_LATENCY } from '@/engine/core/metrics';
 import { createTrialState } from '@/engine/core/trial';
+import { createPracticeState } from '@/engine/core/practice';
+import type { PracticeCommand } from '@/engine/core/practice';
+import type { DiagnosticReport } from '@/engine/core/diagnostics';
 import type { PoseId } from '@/engine/core/trial';
 import type { RunSummary, ShadowQuality } from '@/engine/types';
 
@@ -34,6 +37,8 @@ const IDLE_SNAPSHOT: HudSnapshot = {
     latencyByPose: { lateral: EMPTY_LATENCY, knees: EMPTY_LATENCY, hips: EMPTY_LATENCY, clap: EMPTY_LATENCY },
     fpsMean: null, firstMinuteFps: null, lastMinuteFps: null, fpsDeclinePercent: null, bodyLossIncidents: 0 },
   trial: createTrialState(),
+  practice: createPracticeState(),
+  diagnostics: { startedAt: '', events: [], dropped: 0 }, canPractice: false,
   jumpCount: 0, armRaiseCount: 0, hipsHoldCount: 0, isHandsOnHips: false, isShielding: false,
   sporeDistance: null, isInSpore: false,
   feetVisible: false, isJumpCalibrated: false, isAirborne: false,
@@ -107,6 +112,9 @@ export interface GameActions {
   restart: () => void;
   startTrial: (pose: PoseId) => void;
   stopTrial: () => void;
+  practiceCommand: (command: PracticeCommand) => void;
+  clearDiagnostics: () => void;
+  getDiagnosticReport: (appVersion: string) => DiagnosticReport | null;
   /** Null when the engine is not mounted, so callers must handle its absence. */
   getRunSummary: () => RunSummary | null;
 }
@@ -199,6 +207,9 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
       restart: () => runtimeRef.current?.restart(),
       startTrial: (pose) => runtimeRef.current?.startTrial(pose),
       stopTrial: () => runtimeRef.current?.stopTrial(),
+      practiceCommand: (command) => runtimeRef.current?.practiceCommand(command),
+      clearDiagnostics: () => runtimeRef.current?.clearDiagnostics(),
+      getDiagnosticReport: (appVersion) => runtimeRef.current?.getDiagnosticReport(appVersion) ?? null,
       getRunSummary: () => runtimeRef.current?.getRunSummary() ?? null,
     }),
     [],
