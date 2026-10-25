@@ -18,7 +18,7 @@ export interface DiagnosticSnapshot {
   dropped: number;
 }
 export interface DiagnosticReport extends DiagnosticSnapshot {
-  schemaVersion: 1;
+  schemaVersion: 2;
   appVersion: string;
   exportedAt: string;
   practice: PracticeState;
@@ -42,7 +42,7 @@ export function createDiagnosticLog(startedAtMs = Date.now(), startClockMs = per
     snapshot: () => snapshot,
     clear() { snapshot = { ...snapshot, events: [], dropped: 0 }; },
     report(appVersion: string, practice: PracticeState, trial: TrialState, metrics: MetricsSnapshot): DiagnosticReport {
-      return { ...snapshot, schemaVersion: 1, appVersion, exportedAt: new Date().toISOString(), practice, trial, metrics };
+      return { ...snapshot, schemaVersion: 2, appVersion, exportedAt: new Date().toISOString(), practice, trial, metrics };
     },
   };
 }

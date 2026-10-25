@@ -33,7 +33,7 @@ export default function ResultPage() {
         <StatTile label="FPS decline" value={number(metrics.fpsDeclinePercent) + '%'} detail="Target ≤15%; first and final minute" />
         <StatTile label="Body-loss pauses" value={String(metrics.bodyLossIncidents)} detail="Target ≤1 per 20-minute evaluation session" />
       </StatGrid><p className="m-0 text-sm text-muted">Latency ends at render submission, not screen presentation. Full evaluation requires a 20-minute real-webcam trial, observer-scored accuracy, manually counted steps, and observed stability incidents.</p></Card>}
-      <div className="flex flex-wrap gap-3"><LinkButton href="/play" variant="primary">Play again</LinkButton><LinkButton href="/test">Test Mode</LinkButton><LinkButton href="/">Home</LinkButton></div>
+      <div className="flex flex-wrap gap-3"><LinkButton href="/play" variant="primary">Play again</LinkButton><LinkButton href="/test">Guide Mode</LinkButton><LinkButton href="/">Home</LinkButton></div>
     </>}
   </PageShell>;
 }

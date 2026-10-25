@@ -25,7 +25,7 @@ export default function CalibrationPanel({ snapshot, actions, forGame = false }:
     <div className="flex flex-wrap gap-2">
       <Button onClick={snapshot.isCameraRunning ? actions.stopCamera : actions.startCamera} size="sm">{snapshot.isCameraRunning ? 'Stop camera' : 'Allow camera'}</Button>
       <Button variant="secondary" size="sm" onClick={actions.recalibrate} disabled={!snapshot.isCameraRunning}>Reset centre</Button>
-      <LinkButton href="/test" variant="secondary" size="sm">Test Mode</LinkButton>
+      <LinkButton href="/test" variant="secondary" size="sm">Guide Mode</LinkButton>
     </div>
     <p role="status" className="m-0 text-sm text-muted">{snapshot.status}</p>
     <CalibrationChecklist checks={checks} />

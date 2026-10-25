@@ -187,7 +187,7 @@ it('forwards knee sides and keeps detections driving the character during free p
   expect(event?.data.knee).toBe('RIGHT');
   runtime.practiceCommand({ type: 'mode', mode: 'free' });
   frames(makePose({ leftKneeLift: .1 }), 10);
-  expect(runtime.getSnapshot().practice).toMatchObject({ mode: 'free', count: 0, phase: 'idle' });
+  expect(runtime.getSnapshot().practice).toMatchObject({ mode: 'free', count: 1, phase: 'paused' });
   expect(runtime.getSnapshot().stepCount).toBeGreaterThan(1);
   expect(mocks.camera).toHaveBeenCalledTimes(1);
 });
@@ -245,4 +245,51 @@ it('requires a fresh knee starting side after Start and Resume', async () => {
   runtime.practiceCommand({ type: 'resume' });
   frames(makePose({ rightKneeLift: .1 }), 10);
   expect(runtime.getSnapshot().practice).toMatchObject({ count: 1, targetKnee: 'LEFT' });
+});
+
+it('advances completed poses and rests on the runtime clock without logging each frame', async () => {
+  await testMode();
+  runtime.practiceCommand({ type: 'start' });
+  for (let i = 0; i < 3; i++) runtime.practiceCommand({ type: 'skip' });
+  const clap = makePose({ arms: 'up' });
+  clap[LANDMARK.LEFT_WRIST]!.x = .51; clap[LANDMARK.RIGHT_WRIST]!.x = .49;
+  for (let i = 0; i < 5; i++) { frames(makePose({ arms: 'up' }), 10); frames(clap, 5); frames(makePose(), 5); }
+  expect(runtime.getSnapshot().practice).toMatchObject({ pose: 'clap', phase: 'complete', count: 5 });
+  const before = runtime.getSnapshot().practice.elapsedMs;
+  frames(makePose(), 110);
+  expect(runtime.getSnapshot().practice).toMatchObject({ phase: 'rest', skips: 3, completedRounds: 0 });
+  expect(runtime.getSnapshot().practice.elapsedMs).toBeGreaterThan(before + 3000);
+  runtime.practiceCommand({ type: 'pause' });
+  const paused = runtime.getSnapshot().practice;
+  frames(makePose(), 60);
+  expect(runtime.getSnapshot().practice).toBe(paused);
+  runtime.practiceCommand({ type: 'resume' });
+  expect(runtime.getSnapshot().practice.remainingPhaseMs).toBe(paused.remainingPhaseMs);
+  runtime.practiceCommand({ type: 'continue' }); frames(makePose(), 5);
+  expect(runtime.getSnapshot().practice).toMatchObject({ pose: 'lateral', round: 2, count: 0 });
+  const log = runtime.getDiagnosticReport('test').events;
+  expect(log.some(e => e.event === 'rest-started')).toBe(true);
+  expect(log.filter(e => e.category === 'practice').length).toBeLessThan(35);
+  expect(mocks.camera).toHaveBeenCalledTimes(1);
+});
+
+it('freezes session time across free practice, developer tests and finish', async () => {
+  await testMode(); runtime.practiceCommand({ type: 'start' }); frames(makePose(), 10);
+  expect(runtime.getSnapshot().practice.elapsedMs).toBeGreaterThan(0);
+  runtime.practiceCommand({ type: 'mode', mode: 'free' });
+  const checkpoint = runtime.getSnapshot().practice.elapsedMs;
+  frames(makePose(), 90);
+  expect(runtime.getSnapshot().practice.elapsedMs).toBe(checkpoint);
+  runtime.practiceCommand({ type: 'mode', mode: 'guided' });
+  frames(makePose(), 10);
+  expect(runtime.getSnapshot().practice.elapsedMs).toBe(checkpoint);
+  runtime.practiceCommand({ type: 'resume' }); frames(makePose(), 10);
+  runtime.startTrial('hips'); const trialTime = runtime.getSnapshot().practice.elapsedMs;
+  frames(makePose(), 90); runtime.stopTrial(); frames(makePose(), 10);
+  expect(runtime.getSnapshot().practice).toMatchObject({ phase: 'paused', elapsedMs: trialTime });
+  runtime.practiceCommand({ type: 'resume' }); frames(makePose(), 10);
+  runtime.practiceCommand({ type: 'finish' }); const ended = runtime.getSnapshot().practice;
+  frames(makePose(), 60);
+  expect(runtime.getSnapshot().practice).toBe(ended);
+  expect(ended).toMatchObject({ phase: 'summary', unfinishedPose: 'lateral', finishReason: 'manual' });
 });

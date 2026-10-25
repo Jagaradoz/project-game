@@ -32,7 +32,7 @@ const FEATURES: {
   {
     icon: Map,
     title: 'Test and play',
-    body: 'Rehearse and measure four gentle controls in Test Mode. Play toward a 20-minute goal in Game Mode.',
+    body: 'Follow four guided movements in a 20-minute Guide Mode session, or play toward a 20-minute goal in Game Mode.',
     mark: '4',
     markLabel: 'moves to learn',
   },
@@ -78,7 +78,7 @@ export default function HomePage() {
               Game Mode
             </LinkButton>
             <LinkButton href="/test" variant="secondary" size="lg">
-              Test Mode
+              Guide Mode
             </LinkButton>
           </div>
           <ul className="m-0 mt-2 flex list-none flex-wrap justify-center gap-2 p-0">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPracticeState, practiceCommand, updatePractice } from '@/engine/core/practice';
+import { createPracticeState, practiceCommand, updatePractice, tickPractice, PRACTICE_DURATION_MS } from '@/engine/core/practice';
 import type { PracticeReadout, PracticeState } from '@/engine/core/practice';
 import type { PoseId } from '@/engine/core/trial';
 
@@ -68,14 +68,15 @@ describe('guided practice', () => {
     expect(frame(state, [{ pose: 'clap' }], { ...still, clapArmed: true }).count).toBe(2);
   });
 
-  it.each([5, 10] as const)('completes exactly %i repetitions and waits for manual Next', goal => {
+  it.each([5, 10] as const)('completes exactly %i repetitions before an automatic transition', goal => {
     let state = practiceCommand(createPracticeState(), { type: 'goal', goal });
     state = practiceCommand(state, { type: 'select', pose: 'clap' });
     state = practiceCommand(state, { type: 'start' });
     for (let i = 0; i < goal; i++) state = frame(state, [{ pose: 'clap' }], { ...still, clapArmed: true });
     expect(state).toMatchObject({ count: goal, phase: 'complete', results: { clap: 'completed' } });
     expect(frame(state, [{ pose: 'clap' }], still)).toBe(state);
-    expect(practiceCommand(state, { type: 'next' }).phase).toBe('summary');
+    expect(tickPractice(state, 2999).phase).toBe('complete');
+    expect(tickPractice(state, 3000).phase).toBe('rest');
   });
 
   it('pauses without counting and resume discards a partial lane repetition', () => {
@@ -109,38 +110,121 @@ describe('guided practice', () => {
     expect(practiceCommand(state, { type: 'goal', goal: 10 })).toBe(state);
   });
 
-  it('resets the selected counter when changing a completed pose goal', () => {
-    let state = start('clap');
-    for (let i = 0; i < 5; i++) state = frame(state, [{ pose: 'clap' }], { ...still, clapArmed: true });
-    state = practiceCommand(state, { type: 'goal', goal: 10 });
-    expect(state).toMatchObject({ goal: 10, count: 0, phase: 'idle' });
-    state = practiceCommand(state, { type: 'start' });
-    expect(state.results.clap).toBe('pending');
-  });
 
-  it('switches modes and selection without counting in free practice', () => {
-    let state = practiceCommand(start('clap'), { type: 'mode', mode: 'free' });
-    expect(state).toMatchObject({ mode: 'free', phase: 'idle' });
-    expect(frame(state, [{ pose: 'clap' }], still)).toBe(state);
-    expect(practiceCommand(state, { type: 'start' })).toBe(state);
-    state = practiceCommand(state, { type: 'select', pose: 'knees' });
-    expect(state).toMatchObject({ mode: 'free', pose: 'knees', count: 0 });
-    state = practiceCommand(state, { type: 'mode', mode: 'guided' });
-    expect(state).toMatchObject({ mode: 'guided', phase: 'idle' });
-  });
-
-  it('supports restart, skips, and a four-pose summary', () => {
-    let state = practiceCommand(start('lateral'), { type: 'skip' });
-    expect(state).toMatchObject({ pose: 'knees', results: { lateral: 'skipped' } });
-    expect(practiceCommand(state, { type: 'next' })).toBe(state);
-    state = practiceCommand(state, { type: 'skip' });
-    state = practiceCommand(state, { type: 'skip' });
-    state = practiceCommand(state, { type: 'start' });
-    for (let i = 0; i < 5; i++) state = frame(state, [{ pose: 'clap' }], { ...still, clapArmed: true });
+  it('locks the goal after completion until the whole session is restarted', () => {
+    let state = completePose(start('clap'));
+    expect(practiceCommand(state, { type: 'goal', goal: 10 })).toBe(state);
     state = practiceCommand(state, { type: 'restart' });
-    expect(state).toMatchObject({ phase: 'idle', count: 0, results: { clap: 'pending', hips: 'skipped' } });
-    state = practiceCommand(state, { type: 'skip' });
-    expect(state).toMatchObject({ phase: 'summary', results: { lateral: 'skipped', knees: 'skipped', hips: 'skipped', clap: 'skipped' } });
+    state = practiceCommand(state, { type: 'goal', goal: 10 });
+    expect(state).toMatchObject({ goal: 10, count: 0, phase: 'idle', sessionStarted: false, pose: 'lateral' });
+  });
+
+  it('preserves the checkpoint through free practice and requires explicit guided resume', () => {
+    let state = tickPractice(start('knees'), 1000);
+    state = frame(state, [], { ...still, upKnee: 'LEFT' });
+    state = frame(state, [{ pose: 'knees', knee: 'RIGHT' }], still);
+    state = practiceCommand(state, { type: 'mode', mode: 'free' });
+    expect(state).toMatchObject({ mode: 'free', phase: 'paused', count: 1, elapsedMs: 1000 });
+    expect(frame(state, [{ pose: 'clap' }], still)).toBe(state);
+    expect(tickPractice(state, 10000)).toBe(state);
+    expect(practiceCommand(state, { type: 'resume' })).toBe(state);
+    expect(practiceCommand(state, { type: 'select', pose: 'clap' })).toBe(state);
+    state = practiceCommand(state, { type: 'mode', mode: 'guided' });
+    expect(state.phase).toBe('paused');
+    state = practiceCommand(state, { type: 'resume' });
+    expect(state).toMatchObject({ phase: 'ready', pose: 'knees', count: 1, targetKnee: null });
+  });
+
+  it('completes four poses, rests and repeats while accumulating totals', () => {
+    let state = practiceCommand(createPracticeState(), { type: 'start' });
+    for (let i = 0; i < 4; i++) state = tickPractice(completePose(state), 3000);
+    expect(state).toMatchObject({ phase: 'rest', round: 1, completedRounds: 1, remainingPhaseMs: 20000,
+      totals: { lateral: 5, knees: 5, hips: 5, clap: 5 } });
+    expect(frame(state, [{ pose: 'clap' }], still)).toBe(state);
+    expect(tickPractice(state, 19999).phase).toBe('rest');
+    state = tickPractice(state, 20000);
+    expect(state).toMatchObject({ phase: 'ready', pose: 'lateral', count: 0, round: 2, elapsedMs: 32000 });
+    state = completePose(state);
+    expect(state.totals.lateral).toBe(10);
+    for (let i = 0; i < 3; i++) state = completePose(tickPractice(state, 3000));
+    expect(state).toMatchObject({ phase: 'complete', pose: 'clap', completedRounds: 2 });
+    expect(practiceCommand(state, { type: 'finish' }).completedRounds).toBe(2);
+  });
+
+  it('skips a pose once, cancels its transition and records incomplete rounds', () => {
+    let state = practiceCommand(createPracticeState(), { type: 'start' });
+    for (let i = 0; i < 4; i++) state = practiceCommand(state, { type: 'skip' });
+    expect(state).toMatchObject({ phase: 'rest', skips: 4, completedRounds: 0 });
     expect(practiceCommand(state, { type: 'skip' })).toBe(state);
+    state = practiceCommand(state, { type: 'continue' });
+    expect(state).toMatchObject({ pose: 'lateral', phase: 'ready', round: 2 });
+    state = completePose(state);
+    state = practiceCommand(state, { type: 'skip' });
+    expect(state).toMatchObject({ pose: 'knees', phase: 'ready', skips: 4, remainingPhaseMs: 0 });
+    expect(tickPractice(state, 4000).pose).toBe('knees');
+  });
+
+  it.each(['complete', 'rest'] as const)('preserves %s countdown through pause and resume', phase => {
+    let state = completePose(start('clap'));
+    if (phase === 'rest') state = tickPractice(state, 3000);
+    state = tickPractice(state, 1000);
+    const remaining = state.remainingPhaseMs, elapsed = state.elapsedMs;
+    state = practiceCommand(state, { type: 'pause', reason: 'Tracking unavailable' });
+    expect(tickPractice(state, 9000)).toBe(state);
+    state = practiceCommand(state, { type: 'resume' });
+    expect(state).toMatchObject({ phase, remainingPhaseMs: remaining, elapsedMs: elapsed, pauseReason: null });
+  });
+
+  it('ends immediately at 20 minutes before counting further reps', () => {
+    let state = tickPractice(start('hips'), PRACTICE_DURATION_MS - 1);
+    state = tickPractice(state, 10);
+    expect(state).toMatchObject({ phase: 'summary', elapsedMs: PRACTICE_DURATION_MS, finishReason: 'time', unfinishedPose: 'hips' });
+    expect(frame(state, [{ pose: 'hips' }], still)).toBe(state);
+    expect(tickPractice(state, 1000)).toBe(state);
+  });
+
+  it('expires during transition/rest without advancing or inventing unfinished poses', () => {
+    let state = completePose(start('clap'));
+    state = { ...state, elapsedMs: PRACTICE_DURATION_MS - 1 };
+    expect(tickPractice(state, 3000)).toMatchObject({ phase: 'summary', pose: 'clap', round: 1, unfinishedPose: null });
+    state = tickPractice({ ...state, elapsedMs: 0 }, 3000);
+    expect(tickPractice({ ...state, elapsedMs: PRACTICE_DURATION_MS - 1 }, 20000)).toMatchObject({ phase: 'summary', round: 1, unfinishedPose: null });
+  });
+
+  it('finishes manually and reset cancels every pending transition', () => {
+    let state = tickPractice(start('knees'), 500);
+    state = practiceCommand(state, { type: 'pause' });
+    state = practiceCommand(state, { type: 'finish' });
+    expect(state).toMatchObject({ phase: 'summary', unfinishedPose: 'knees', finishReason: 'manual', elapsedMs: 500 });
+    expect(practiceCommand(state, { type: 'finish' })).toBe(state);
+    state = practiceCommand(completePose(start('clap')), { type: 'restart' });
+    expect(state).toEqual(createPracticeState());
+    expect(tickPractice(state, 10000)).toBe(state);
+  });
+
+  it('carries elapsed time across a long transition/rest tick and ignores invalid deltas', () => {
+    const state = completePose(start('clap'));
+    expect(tickPractice(state, 24000)).toMatchObject({ phase: 'ready', round: 2, elapsedMs: 24000 });
+    for (const delta of [0, -1, NaN, Infinity]) expect(tickPractice(state, delta)).toBe(state);
+    expect(practiceCommand(createPracticeState(), { type: 'finish' }).phase).toBe('idle');
+    expect(practiceCommand(createPracticeState(), { type: 'continue' }).phase).toBe('idle');
   });
 });
+
+function completePose(initial: PracticeState): PracticeState {
+  let state = initial;
+  if (state.pose === 'knees') state = frame(state, [], { ...still, upKnee: 'LEFT' });
+  while (state.count < state.goal) {
+    if (state.pose === 'lateral') {
+      state = frame(state, [], still);
+      state = frame(state, [{ pose: 'lateral', lane: state.nextSide }], { ...still, lane: state.nextSide });
+      state = frame(state, [{ pose: 'lateral', lane: 'CENTER' }], still);
+    } else if (state.pose === 'knees') {
+      state = frame(state, [{ pose: 'knees', knee: state.targetKnee! }], still);
+    } else {
+      state = frame(state, [], { ...still, clapArmed: true });
+      state = frame(state, [{ pose: state.pose }], { ...still, isHandsOnHips: state.pose === 'hips', clapArmed: true });
+    }
+  }
+  return state;
+}

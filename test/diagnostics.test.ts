@@ -33,7 +33,7 @@ describe('Test Mode diagnostic log', () => {
     log.append('practice', 'counted', { expected: 'clap', detected: 'clap', count: 1 }, 20);
     const practice = createPracticeState(), trial = createTrialState(), metrics = createMetrics().snapshot();
     const report = JSON.parse(JSON.stringify(log.report('2.35.0-alpha.0', practice, trial, metrics)));
-    expect(report).toMatchObject({ schemaVersion: 1, appVersion: '2.35.0-alpha.0', practice, trial, metrics });
+    expect(report).toMatchObject({ schemaVersion: 2, appVersion: '2.35.0-alpha.0', practice, trial, metrics });
     expect(report.events[0]).toMatchObject({ elapsedMs: 20, category: 'practice' });
     expect(report.exportedAt).toBeTruthy();
     expect(report).not.toHaveProperty('landmarks');

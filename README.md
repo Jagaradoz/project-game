@@ -1,6 +1,6 @@
 # Webcam Exercise Game
 
-A browser game controlled by four gentle movements, with a separate Test Mode for learning and technical evaluation. The implementation follows Proposal first, compatible TOR requirements, Research movement guidance, and the author's confirmed layout decisions.
+A browser game controlled by four gentle movements, with a separate Guide Mode for learning and technical evaluation. The implementation follows Proposal first, compatible TOR requirements, Research movement guidance, and the author's confirmed layout decisions.
 
 ## Run
 
@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. The public pages are Home (`/`), Calibration (`/calibrate`), Test Mode (`/test`), Game Mode (`/play`), and Result (`/result`). There is no Profile page, history or saved data.
+Open http://localhost:3000. The public pages are Home (`/`), Calibration (`/calibrate`), Guide Mode (`/test`), Game Mode (`/play`), and Result (`/result`). There is no Profile page, history or saved data.
 
 Home leads directly to both modes. Game Mode requires camera permission, current body/centre calibration, suitable framing and light, and rehearsal of all four movements before every run. Stand with your head and knees visible, clear your space, and move at a comfortable pace.
 
@@ -26,15 +26,19 @@ Select one of the five existing characters and a starting difficulty in Game Mod
 
 Body loss, camera failure, and hiding the page pause the simulation and gameplay clock. Resume is explicit and requires valid tracking. Manual Pause is available too. Results show score, enemies defeated, gameplay duration, detected knee-lift time, knee steps, movement counts, distance, and technical measurements.
 
-## Test Mode
+## Guide Mode
 
-Two 9:16 panels show the webcam/skeleton and a slightly rotated character facing the camera and responding automatically to detected movements. Movement status and instructions accompany the character. A plain text measurements section below shows the Proposal's latency, pose/render FPS, processing time per frame, knee cadence, character speed and per-movement detection counts. Empty measurements show zero. Test Mode has no site header/footer or setup controls; a camera retry button appears only after a camera error and fits the desktop viewport without page scrolling. Its demonstration has no enemies, damage, scoring, or game progression.
+Guide Mode keeps the existing `/test` URL and internal `test` runtime mode. Option A shows equal camera/skeleton, character response and visual-guidance columns on desktop and landscape; mobile portrait puts camera and character above the guide. The screen fits the device height without page scrolling. Measurements, logs, session options and developer evaluation use accessible overlays with independently scrollable contents.
 
-Opening Test Mode requests browser camera permission automatically. Rejection or camera/model startup failure keeps the page open and shows an Allow camera retry button inside the camera preview. Calibration happens automatically, and the current game character is reused without a selector. Without a detected body or movement, the character plays its idle animation; hidden pages suspend rendering. The author's revised scope removes the built-in evaluation trial forms. The researcher must record observer scores, manual step counts and environment notes separately. Accuracy comes from observer ground truth, never model confidence.
+Camera permission is requested once on entry, with an in-panel retry after camera/model failure. After calibration, framing and character readiness, the guide starts automatically. The toolbar contains only **Measurements** and **Event log**; **Resume** appears in the guide only when paused. The guide repeats lateral movement, alternate knee lifts, hands on hips and overhead clap: five successful repetitions per pose, a three-second transition, then a twenty-second rest after all four poses. Rests and pose changes advance automatically. The guide names one current action at a time, with arrows and short instructions for left/right movement, returning to centre and the next knee to lift.
+
+The twenty-minute clock includes movements, transitions and rests. Manual pauses, tracking loss, hidden tabs, free practice and timed developer tests freeze it. Resume is explicit and requires valid tracking; successful reps and countdowns are retained, while detector starting positions must be observed again. At twenty minutes the session ends immediately and shows totals, completed rounds, skips and any unfinished pose. The summary offers Restart, Game Mode and Home. The engine retains visit-scoped free-practice and evaluation support, but the standard guide no longer exposes their session controls. The demonstration has no enemies, damage or scoring.
+
+Measurements use actual runtime samples, with a dash for unavailable values. The centered event-log overlay shows short messages and elapsed timestamps, hides empty performance samples, and retains at most 500 raw events, supports category filters and clearing, and exports schema-version-2 JSON including guided session state, measurements and trial results. The diagnostic engine retains timed evaluation support and pauses guided practice if a developer trial is started. The two-button guide interface does not expose timed-test controls. These are technical observations; pose accuracy still requires observer ground truth.
 
 ## No stored data and privacy
 
-The application keeps nothing. The only thing held in memory is the run that just ended, so Result can show it; reloading or leaving that page clears it. There is no history, profile, personal high score, account, backend write, browser storage or online ranking.
+The application keeps session state, bounded diagnostic events and the last run only in visit-scoped memory. Guide Mode reloads start a fresh session; Result reloads clear the last run. Diagnostic JSON is downloaded only when requested. There is no history, profile, personal high score, account, backend write, browser storage or online ranking.
 
 Camera frames are processed locally using MediaPipe and are never uploaded or recorded. The initial pose model and WASM files are downloaded from the pinned CDN. The developer asset catalog uses existing assets and requires network access for its Three.js import map.
 
@@ -82,6 +86,6 @@ For local development only, game setup includes **Development: skip camera**, pl
 
 `npm run assets:catalog` opens the separate developer asset viewer at http://127.0.0.1:3101. It is served by a localhost-only tool; `/catalog.html` is absent from the public app.
 
-For webcam use outside localhost, use HTTPS (for example the existing `npm run dev:mobile` tunnel helper). The documented product target remains desktop/laptop browsers.
+For webcam use outside localhost, use HTTPS (for example the existing `npm run dev:mobile` tunnel helper). Guide Mode supports responsive phone, tablet and PC layouts; physical-webcam accuracy and target-device FPS still require testing on those devices.
 
 See [the document alignment report](docs/document-alignment.md) (also exported as `docs/document-alignment.docx`) for source conflicts and recommended corrections.
