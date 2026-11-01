@@ -1,34 +1,94 @@
 import { describe, expect, it } from 'vitest';
-import { createPracticeState, practiceCommand, updatePractice, tickPractice, PRACTICE_DURATION_MS } from '@/engine/core/practice';
+import { createPracticeState, practiceCommand, updatePractice, tickPractice, PRACTICE_DURATION_MS, PRACTICE_MAX_SAME_SIDE } from '@/engine/core/practice';
 import type { PracticeReadout, PracticeState } from '@/engine/core/practice';
-import type { PoseId } from '@/engine/core/trial';
+import { POSE_IDS, type PoseId } from '@/engine/core/trial';
 
 const still: PracticeReadout = { lane: 'CENTER', upKnee: null, isHandsOnHips: false, clapArmed: false };
-function start(pose: PoseId): PracticeState {
-  return practiceCommand(practiceCommand(createPracticeState(), { type: 'select', pose }), { type: 'start' });
+function start(pose: PoseId, seed?: number): PracticeState {
+  return practiceCommand(practiceCommand(createPracticeState(seed), { type: 'select', pose }), { type: 'start' });
 }
+/** Make the current pose the last of its round, so completing it leads to rest. */
+function closeRound(state: PracticeState): PracticeState {
+  return { ...state, order: [...state.order.filter(pose => pose !== state.pose), state.pose], step: state.order.length - 1 };
+}
+const opposite =(side: 'LEFT' | 'RIGHT') => side === 'LEFT' ? 'RIGHT' : 'LEFT';
 const frame: typeof updatePractice = (state, events = [], readout = still) => updatePractice(state, events, readout);
 
 describe('guided practice', () => {
-  it('defaults to guided lane practice with five repetitions and requires Start', () => {
+  it('defaults to a guided five-repetition session that opens with its shuffled first pose and requires Start', () => {
     const state = createPracticeState();
-    expect(state).toMatchObject({ mode: 'guided', pose: 'lateral', goal: 5, phase: 'idle', count: 0 });
-    expect(frame(state, [{ pose: 'lateral', lane: 'LEFT' }], still)).toBe(state);
+    expect(state).toMatchObject({ mode: 'guided', pose: state.order[0], step: 0, goal: 5, phase: 'idle', count: 0 });
+    expect([...state.order].sort()).toEqual([...POSE_IDS].sort());
+    expect(frame(state, [{ pose: state.pose }], still)).toBe(state);
   });
 
-  it('counts complete centre-side-centre lane repetitions and alternates sides', () => {
+  it('counts complete centre-side-centre lane repetitions towards the prompted side only', () => {
     let state = start('lateral');
-    expect(frame(state, [], { ...still, lane: 'LEFT' })).toBe(state);
+    expect(frame(state, [], { ...still, lane: state.nextSide })).toBe(state);
     state = frame(state, [], still);
-    expect(frame(state, [{ pose: 'lateral', lane: 'RIGHT' }], still)).toBe(state);
-    state = frame(state, [{ pose: 'lateral', lane: 'LEFT' }], { ...still, lane: 'LEFT' });
+    const side = state.nextSide;
+    expect(frame(state, [{ pose: 'lateral', lane: opposite(side) }], still)).toBe(state);
+    state = frame(state, [{ pose: 'lateral', lane: side }], { ...still, lane: side });
     expect(state).toMatchObject({ count: 0, laneStep: 'back' });
     state = frame(state, [{ pose: 'lateral', lane: 'CENTER' }], still);
-    expect(state).toMatchObject({ count: 1, nextSide: 'RIGHT', phase: 'ready' });
+    expect(state).toMatchObject({ count: 1, phase: 'ready', laneStep: 'out' });
+    const second = state.nextSide;
     state = frame(state, [], still);
-    state = frame(state, [{ pose: 'lateral', lane: 'RIGHT' }], { ...still, lane: 'RIGHT' });
+    state = frame(state, [{ pose: 'lateral', lane: second }], { ...still, lane: second });
     state = frame(state, [{ pose: 'lateral', lane: 'CENTER' }], still);
-    expect(state).toMatchObject({ count: 2, nextSide: 'LEFT' });
+    expect(state.count).toBe(2);
+  });
+
+  it('randomizes side steps without asking for one side more than the cap in a row', () => {
+    const sides = new Set<string>();
+    for (const seed of [1, 7, 42, 99, 12345]) {
+      let state = practiceCommand(practiceCommand(practiceCommand(createPracticeState(seed), { type: 'goal', goal: 10 }),
+        { type: 'select', pose: 'lateral' }), { type: 'start' });
+      let run = 0;
+      let previous: string | null = null;
+      while (state.phase !== 'complete') {
+        run = state.nextSide === previous ? run + 1 : 1;
+        previous = state.nextSide;
+        sides.add(state.nextSide);
+        expect(run).toBeLessThanOrEqual(PRACTICE_MAX_SAME_SIDE);
+        state = frame(state, [], still);
+        state = frame(state, [{ pose: 'lateral', lane: state.nextSide }], { ...still, lane: state.nextSide });
+        state = frame(state, [{ pose: 'lateral', lane: 'CENTER' }], still);
+      }
+    }
+    expect(sides).toEqual(new Set(['LEFT', 'RIGHT']));
+  });
+
+  it('shuffles every round, covers each pose once and never repeats a pose across the round boundary', () => {
+    const orders = new Set<string>();
+    let state = practiceCommand(createPracticeState(2024), { type: 'start' });
+    for (let round = 1; round <= 12; round++) {
+      const seen: PoseId[] = [];
+      for (let i = 0; i < POSE_IDS.length; i++) {
+        expect(state).toMatchObject({ round, step: i, pose: state.order[i] });
+        seen.push(state.pose);
+        state = practiceCommand(state, { type: 'skip' });
+      }
+      expect([...seen].sort()).toEqual([...POSE_IDS].sort());
+      orders.add(seen.join());
+      expect(state).toMatchObject({ phase: 'rest', step: -1 });
+      expect(state.order[0]).not.toBe(seen[seen.length - 1]);
+      state = practiceCommand(state, { type: 'continue' });
+    }
+    expect(orders.size).toBeGreaterThan(3);
+  });
+
+  it('reproduces a sequence from its seed and differs between seeds', () => {
+    expect(createPracticeState(5)).toEqual(createPracticeState(5));
+    const firsts = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(seed => createPracticeState(seed).order.join()));
+    expect(firsts.size).toBeGreaterThan(1);
+  });
+
+  it('moves a selected pose to the front of the round before the session starts', () => {
+    const state = practiceCommand(createPracticeState(3), { type: 'select', pose: 'hips' });
+    expect(state).toMatchObject({ pose: 'hips', step: 0 });
+    expect(state.order[0]).toBe('hips');
+    expect([...state.order].sort()).toEqual([...POSE_IDS].sort());
   });
 
   it('seeds a knee without counting then requires the prompted opposite side', () => {
@@ -70,8 +130,7 @@ describe('guided practice', () => {
 
   it.each([5, 10] as const)('completes exactly %i repetitions before an automatic transition', goal => {
     let state = practiceCommand(createPracticeState(), { type: 'goal', goal });
-    state = practiceCommand(state, { type: 'select', pose: 'clap' });
-    state = practiceCommand(state, { type: 'start' });
+    state = closeRound(practiceCommand(practiceCommand(state, { type: 'select', pose: 'clap' }), { type: 'start' }));
     for (let i = 0; i < goal; i++) state = frame(state, [{ pose: 'clap' }], { ...still, clapArmed: true });
     expect(state).toMatchObject({ count: goal, phase: 'complete', results: { clap: 'completed' } });
     expect(frame(state, [{ pose: 'clap' }], still)).toBe(state);
@@ -116,7 +175,7 @@ describe('guided practice', () => {
     expect(practiceCommand(state, { type: 'goal', goal: 10 })).toBe(state);
     state = practiceCommand(state, { type: 'restart' });
     state = practiceCommand(state, { type: 'goal', goal: 10 });
-    expect(state).toMatchObject({ goal: 10, count: 0, phase: 'idle', sessionStarted: false, pose: 'lateral' });
+    expect(state).toMatchObject({ goal: 10, count: 0, phase: 'idle', sessionStarted: false, step: 0, pose: state.order[0] });
   });
 
   it('preserves the checkpoint through free practice and requires explicit guided resume', () => {
@@ -137,17 +196,20 @@ describe('guided practice', () => {
 
   it('completes four poses, rests and repeats while accumulating totals', () => {
     let state = practiceCommand(createPracticeState(), { type: 'start' });
+    const firstRound = [...state.order];
     for (let i = 0; i < 4; i++) state = tickPractice(completePose(state), 3000);
     expect(state).toMatchObject({ phase: 'rest', round: 1, completedRounds: 1, remainingPhaseMs: 20000,
       totals: { lateral: 5, knees: 5, hips: 5, clap: 5 } });
     expect(frame(state, [{ pose: 'clap' }], still)).toBe(state);
     expect(tickPractice(state, 19999).phase).toBe('rest');
     state = tickPractice(state, 20000);
-    expect(state).toMatchObject({ phase: 'ready', pose: 'lateral', count: 0, round: 2, elapsedMs: 32000 });
+    expect(state).toMatchObject({ phase: 'ready', pose: state.order[0], step: 0, count: 0, round: 2, elapsedMs: 32000 });
+    expect(state.pose).not.toBe(firstRound[3]);
+    const opener = state.pose;
     state = completePose(state);
-    expect(state.totals.lateral).toBe(10);
+    expect(state.totals[opener]).toBe(10);
     for (let i = 0; i < 3; i++) state = completePose(tickPractice(state, 3000));
-    expect(state).toMatchObject({ phase: 'complete', pose: 'clap', completedRounds: 2 });
+    expect(state).toMatchObject({ phase: 'complete', pose: state.order[3], completedRounds: 2 });
     expect(practiceCommand(state, { type: 'finish' }).completedRounds).toBe(2);
   });
 
@@ -157,15 +219,15 @@ describe('guided practice', () => {
     expect(state).toMatchObject({ phase: 'rest', skips: 4, completedRounds: 0 });
     expect(practiceCommand(state, { type: 'skip' })).toBe(state);
     state = practiceCommand(state, { type: 'continue' });
-    expect(state).toMatchObject({ pose: 'lateral', phase: 'ready', round: 2 });
+    expect(state).toMatchObject({ pose: state.order[0], phase: 'ready', round: 2 });
     state = completePose(state);
     state = practiceCommand(state, { type: 'skip' });
-    expect(state).toMatchObject({ pose: 'knees', phase: 'ready', skips: 4, remainingPhaseMs: 0 });
-    expect(tickPractice(state, 4000).pose).toBe('knees');
+    expect(state).toMatchObject({ pose: state.order[1], step: 1, phase: 'ready', skips: 4, remainingPhaseMs: 0 });
+    expect(tickPractice(state, 4000).pose).toBe(state.order[1]);
   });
 
   it.each(['complete', 'rest'] as const)('preserves %s countdown through pause and resume', phase => {
-    let state = completePose(start('clap'));
+    let state = completePose(closeRound(start('clap')));
     if (phase === 'rest') state = tickPractice(state, 3000);
     state = tickPractice(state, 1000);
     const remaining = state.remainingPhaseMs, elapsed = state.elapsedMs;
@@ -184,7 +246,7 @@ describe('guided practice', () => {
   });
 
   it('expires during transition/rest without advancing or inventing unfinished poses', () => {
-    let state = completePose(start('clap'));
+    let state = completePose(closeRound(start('clap')));
     state = { ...state, elapsedMs: PRACTICE_DURATION_MS - 1 };
     expect(tickPractice(state, 3000)).toMatchObject({ phase: 'summary', pose: 'clap', round: 1, unfinishedPose: null });
     state = tickPractice({ ...state, elapsedMs: 0 }, 3000);
@@ -197,13 +259,14 @@ describe('guided practice', () => {
     state = practiceCommand(state, { type: 'finish' });
     expect(state).toMatchObject({ phase: 'summary', unfinishedPose: 'knees', finishReason: 'manual', elapsedMs: 500 });
     expect(practiceCommand(state, { type: 'finish' })).toBe(state);
-    state = practiceCommand(completePose(start('clap')), { type: 'restart' });
-    expect(state).toEqual(createPracticeState());
+    const finished = completePose(start('clap'));
+    state = practiceCommand(finished, { type: 'restart' });
+    expect(state).toEqual(createPracticeState(finished.seed));
     expect(tickPractice(state, 10000)).toBe(state);
   });
 
   it('carries elapsed time across a long transition/rest tick and ignores invalid deltas', () => {
-    const state = completePose(start('clap'));
+    const state = completePose(closeRound(start('clap')));
     expect(tickPractice(state, 24000)).toMatchObject({ phase: 'ready', round: 2, elapsedMs: 24000 });
     for (const delta of [0, -1, NaN, Infinity]) expect(tickPractice(state, delta)).toBe(state);
     expect(practiceCommand(createPracticeState(), { type: 'finish' }).phase).toBe('idle');

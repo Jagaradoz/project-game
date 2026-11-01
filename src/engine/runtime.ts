@@ -324,7 +324,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   /** Pose-frame time of each pose's first unrendered detection. */
   let pendingResponse: Partial<Record<PoseId, number>> = {};
   let trial = createTrialState();
-  let practice = createPracticeState();
+  let practice = createPracticeState(options.seed ?? 1);
   let lastPracticeClockMs = performance.now();
   const diagnostics = createDiagnosticLog();
   let lastPerformanceLogMs = performance.now();

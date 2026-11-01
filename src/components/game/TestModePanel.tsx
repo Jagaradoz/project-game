@@ -30,8 +30,7 @@ export function TestModePanel({ runtimeRefs: { container, gameCanvas, video, ove
   const p = snapshot.practice;
   const trackingCue = p.phase === 'summary' ? null : practiceTrackingCue(snapshot);
   const cue = trackingCue ?? practiceCue(p, snapshot.lateralLabel);
-  const index = MOVEMENTS.findIndex(m => m.id === p.pose);
-  const next = MOVEMENTS[(index + 1) % MOVEMENTS.length];
+  const nextPose = p.phase === 'rest' ? p.order[0] : p.order[p.step + 1];
   const action = actionFor(snapshot);
   const ready = snapshot.canPractice && snapshot.isSceneReady && !snapshot.trial.active;
   const free = p.mode === 'free';
@@ -53,7 +52,7 @@ export function TestModePanel({ runtimeRefs: { container, gameCanvas, video, ove
     if (ready && p.mode === 'guided' && p.phase === 'idle' && !p.sessionStarted) command({ type: 'start' });
   }, [ready, p.mode, p.phase, p.sessionStarted, command]);
   const readiness = trackingCue?.detail ?? (!snapshot.isSceneReady ? 'Loading your character…' : snapshot.trial.active ? 'Stop the developer test before starting.' : 'Starting your guide…');
-  const phaseText = free ? 'Move at your own pace' : p.phase === 'rest' ? `Rest · ${Math.ceil(p.remainingPhaseMs / 1000)}s` : p.phase === 'complete' ? `Pose complete · next in ${Math.ceil(p.remainingPhaseMs / 1000)}s` : isPaused ? 'Session paused' : ended ? 'Session finished' : p.sessionStarted ? `Pose ${index + 1} of 4` : 'Get ready';
+  const phaseText = free ? 'Move at your own pace' : p.phase === 'rest' ? `Rest · ${Math.ceil(p.remainingPhaseMs / 1000)}s` : p.phase === 'complete' ? `Pose complete · next in ${Math.ceil(p.remainingPhaseMs / 1000)}s` : isPaused ? 'Session paused' : ended ? 'Session finished' : p.sessionStarted ? `Pose ${p.step + 1} of ${p.order.length}` : 'Get ready';
   return <main className={styles.screen} aria-label="Guide Mode">
     <div className={styles.header}>
       <h1>Guide Mode</h1><span className={styles.sessionLabel}>{free ? 'Free practice' : '20-minute guided session'}</span>
@@ -84,7 +83,7 @@ export function TestModePanel({ runtimeRefs: { container, gameCanvas, video, ove
           <div className={styles.guideFooter}>
             {!free && <div className={styles.count}>{p.count} <small>/ {p.goal} reps</small></div>}
             {isPaused && !free && <Button size="sm" disabled={!ready} onClick={() => command({ type: 'resume' })}>Resume</Button>}
-            <div className={styles.next}><span>Next:</span><strong>{p.phase === 'rest' ? POSE_TITLES.lateral : index === MOVEMENTS.length - 1 ? '20-second rest' : POSE_TITLES[next.id]}</strong></div>
+            <div className={styles.next}><span>Next:</span><strong>{nextPose ? POSE_TITLES[nextPose] : '20-second rest'}</strong></div>
           </div>
         </div>
       </section>

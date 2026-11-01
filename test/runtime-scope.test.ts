@@ -249,6 +249,8 @@ it('requires a fresh knee starting side after Start and Resume', async () => {
 
 it('advances completed poses and rests on the runtime clock without logging each frame', async () => {
   await testMode();
+  // Each select moves its pose to the front, so this leaves clap closing the round.
+  for (const pose of ['clap', 'lateral', 'knees', 'hips'] as const) runtime.practiceCommand({ type: 'select', pose });
   runtime.practiceCommand({ type: 'start' });
   for (let i = 0; i < 3; i++) runtime.practiceCommand({ type: 'skip' });
   const clap = makePose({ arms: 'up' });
@@ -266,7 +268,9 @@ it('advances completed poses and rests on the runtime clock without logging each
   runtime.practiceCommand({ type: 'resume' });
   expect(runtime.getSnapshot().practice.remainingPhaseMs).toBe(paused.remainingPhaseMs);
   runtime.practiceCommand({ type: 'continue' }); frames(makePose(), 5);
-  expect(runtime.getSnapshot().practice).toMatchObject({ pose: 'lateral', round: 2, count: 0 });
+  const nextRound = runtime.getSnapshot().practice;
+  expect(nextRound).toMatchObject({ pose: nextRound.order[0], step: 0, round: 2, count: 0 });
+  expect(nextRound.pose).not.toBe('clap');
   const log = runtime.getDiagnosticReport('test').events;
   expect(log.some(e => e.event === 'rest-started')).toBe(true);
   expect(log.filter(e => e.category === 'practice').length).toBeLessThan(35);
@@ -274,7 +278,8 @@ it('advances completed poses and rests on the runtime clock without logging each
 });
 
 it('freezes session time across free practice, developer tests and finish', async () => {
-  await testMode(); runtime.practiceCommand({ type: 'start' }); frames(makePose(), 10);
+  await testMode(); runtime.practiceCommand({ type: 'select', pose: 'lateral' });
+  runtime.practiceCommand({ type: 'start' }); frames(makePose(), 10);
   expect(runtime.getSnapshot().practice.elapsedMs).toBeGreaterThan(0);
   runtime.practiceCommand({ type: 'mode', mode: 'free' });
   const checkpoint = runtime.getSnapshot().practice.elapsedMs;

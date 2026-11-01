@@ -3,6 +3,7 @@ import { createPracticeState, practiceCommand, updatePractice } from '@/engine/c
 import { practiceCue, practiceTrackingCue } from '@/lib/testing/practicePresentation';
 
 const still = { lane: 'CENTER' as const, upKnee: null, isHandsOnHips: false, clapArmed: false };
+const lateralStart = () => practiceCommand(practiceCommand(createPracticeState(), { type: 'select', pose: 'lateral' }), { type: 'start' });
 
 describe('body tracking guidance', () => {
   const tracked = { isCameraRunning: true, hasBody: true, kneesVisible: true, isCalibrated: true };
@@ -20,23 +21,24 @@ describe('body tracking guidance', () => {
   });
 
   it('replaces the current movement when tracking drops and restores it after recovery', () => {
-    const p = updatePractice(practiceCommand(createPracticeState(), { type: 'start' }), [], still);
+    const p = updatePractice(lateralStart(), [], still);
     const cue = (tracking: typeof tracked) => practiceTrackingCue(tracking) ?? practiceCue(p, 'CENTER');
-    expect(cue(tracked).title).toBe('Move Left');
+    const move = p.nextSide === 'LEFT' ? 'Move Left' : 'Move Right';
+    expect(cue(tracked).title).toBe(move);
     expect(cue({ ...tracked, hasBody: false }).title).toBe('Body Not Detected');
     expect(cue({ ...tracked, kneesVisible: false }).title).toBe('Show Your Head and Knees');
-    expect(cue(tracked).title).toBe('Move Left');
+    expect(cue(tracked).title).toBe(move);
   });
 });
 
 describe('one-action pose guidance', () => {
   it('follows the actual lateral target and explains the direction back to centre', () => {
-    let p = practiceCommand(createPracticeState(), { type: 'start' });
-    p = updatePractice(p, [], still);
+    // Sides are randomized per repetition, so pin them to check the cue wording.
+    let p = updatePractice({ ...lateralStart(), nextSide: 'LEFT' }, [], still);
     expect(practiceCue(p, 'CENTER')).toMatchObject({ title: 'Move Left', direction: 'left' });
     p = updatePractice(p, [{ pose: 'lateral', lane: 'LEFT' }], { ...still, lane: 'LEFT' });
     expect(practiceCue(p, 'LEFT')).toMatchObject({ title: 'Return to Centre', detail: 'Move right to the middle.', direction: 'right' });
-    p = updatePractice(p, [{ pose: 'lateral', lane: 'CENTER' }], still);
+    p = { ...updatePractice(p, [{ pose: 'lateral', lane: 'CENTER' }], still), nextSide: 'RIGHT' };
     expect(practiceCue(p, 'CENTER')).toMatchObject({ title: 'Move Right', direction: 'right' });
     p = updatePractice(p, [], still);
     p = updatePractice(p, [{ pose: 'lateral', lane: 'RIGHT' }], { ...still, lane: 'RIGHT' });
@@ -45,7 +47,7 @@ describe('one-action pose guidance', () => {
   it('asks for centre during setup and names the exact knee after seeding', () => {
     const initial = createPracticeState();
     expect(practiceCue(initial, 'CENTER').title).toBe('Stand in the Centre');
-    expect(practiceCue(practiceCommand(initial, { type: 'start' }), 'RIGHT').direction).toBe('left');
+    expect(practiceCue(lateralStart(), 'RIGHT').direction).toBe('left');
     let p = practiceCommand(practiceCommand(initial, { type: 'select', pose: 'knees' }), { type: 'start' });
     expect(practiceCue(p, 'CENTER').title).toBe('Lift Either Knee');
     p = updatePractice(p, [], { ...still, upKnee: 'LEFT' });
