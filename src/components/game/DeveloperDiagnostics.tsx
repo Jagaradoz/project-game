@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { CONFIG } from '@/engine/config';
 import { DIAGNOSTIC_CATEGORIES } from '@/engine/core/diagnostics';
 import type { ActiveTrial } from '@/engine/core/trial';
-import { MOVEMENTS, trialResult } from '@/lib/testing/evaluation';
+import { MOVEMENTS, trialResult, type MovementId } from '@/lib/testing/evaluation';
 import type { GameActions, HudSnapshot } from '@/hooks/useGameRuntime';
 import { diagnosticMessage, logTime, LOG_CATEGORIES } from '@/lib/testing/diagnosticPresentation';
 import { version } from '../../../package.json';
@@ -19,6 +19,37 @@ export function DeveloperDiagnostics({ snapshot, actions, view }: { snapshot: Hu
   const [filter, setFilter] = useState('all');
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const active = snapshot.trial.active;
+  // Hands-free run: the poses queued, and each one's result when the run began. A pose is
+  // done once its result has changed, so progress follows the runtime instead of local state.
+  const [run, setRun] = useState<{ poses: MovementId[]; baseline: HudSnapshot['trial']['results']; leadInEndsMs: number } | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const pending = run ? run.poses.filter(pose => snapshot.trial.results[pose] === run.baseline[pose]) : [];
+  const leadInLeft = run ? Math.max(0, run.leadInEndsMs - nowMs) : 0;
+  const { startTrial } = actions;
+  const leadInEndsMs = run?.leadInEndsMs ?? null;
+  useEffect(() => {
+    if (leadInEndsMs === null) return;
+    const id = setInterval(() => {
+      setNowMs(Date.now());
+      if (Date.now() >= leadInEndsMs) clearInterval(id);
+    }, 250);
+    return () => clearInterval(id);
+  }, [leadInEndsMs]);
+  const nextPose = pending[0] ?? null;
+  useEffect(() => {
+    // Each pose starts once the previous test ends and tracking is ready, so nobody has to reach the screen.
+    if (nextPose === null || active || leadInLeft > 0 || !snapshot.canPractice) return;
+    startTrial(nextPose);
+  }, [nextPose, active, leadInLeft, snapshot.canPractice, startTrial]);
+  function testAll() {
+    setRun({ poses: MOVEMENTS.map(m => m.id), baseline: snapshot.trial.results, leadInEndsMs: Date.now() + CONFIG.evaluation.leadInMs });
+    setNowMs(Date.now());
+  }
+  function stopAll() {
+    setRun(null);
+    if (active) actions.stopTrial();
+  }
+  const isRunningAll = pending.length > 0;
   const logs = view === 'logs' ? snapshot.diagnostics.events
     .filter(e => filter === 'all' || e.category === filter)
     .map(event => ({ event, message: diagnosticMessage(event) }))
@@ -49,7 +80,13 @@ export function DeveloperDiagnostics({ snapshot, actions, view }: { snapshot: Hu
       {view === 'evaluation' && <section aria-label="Timed evaluation">
 
         <p className="mb-3 mt-0 text-sm text-muted">These tests score prompted attempts. Guided practice counts successful repetitions separately. Starting a timed test pauses guided practice.</p>
-        {active && <p role="status" className="border-l-4 border-primary bg-primary-soft p-3 font-bold">{MOVEMENTS.find(m => m.id === active.pose)?.title} · Attempt {Math.min(CONFIG.trial.attempts, trialResult(active.tally).attempts + 1)} / {CONFIG.trial.attempts} · {trialPrompt(active)}</p>}
+        <div className="mb-3 flex flex-wrap gap-2">
+          {isRunningAll || active
+            ? <Button size="sm" variant="secondary" onClick={stopAll}>Stop testing</Button>
+            : <Button size="sm" disabled={!snapshot.canPractice} onClick={testAll}>Test all poses ×10</Button>}
+        </div>
+        {leadInLeft > 0 && <p role="status" className="border-l-4 border-primary bg-primary-soft p-3 text-3xl font-bold">Step back · starting in {Math.ceil(leadInLeft / 1000)}s</p>}
+        {active && <p role="status" className="border-l-4 border-primary bg-primary-soft p-3 font-bold"><span className="block text-sm">{MOVEMENTS.find(m => m.id === active.pose)?.title} · Attempt {Math.min(CONFIG.trial.attempts, trialResult(active.tally).attempts + 1)} / {CONFIG.trial.attempts}</span><span className="block text-3xl">{trialPrompt(active)}</span></p>}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead><tr className="text-xs text-muted"><th className="py-2 pr-3">Pose</th><th className="py-2 pr-3">Latency mean / P95</th><th className="py-2 pr-3">Timed trial errors</th><th className="py-2"><span className="sr-only">Evaluation controls</span></th></tr></thead>
@@ -57,7 +94,7 @@ export function DeveloperDiagnostics({ snapshot, actions, view }: { snapshot: Hu
               const latency = snapshot.metrics.latencyByPose[m.id];
               const tally = snapshot.trial.results[m.id];
               const result = tally ? trialResult(tally) : null;
-              return <tr key={m.id} className="border-t border-ink/20"><td className="py-2 pr-3">{m.title}</td><td className="whitespace-nowrap py-2 pr-3 font-bold tabular-nums">{latency.samples ? `${number(latency.meanMs)} / ${number(latency.p95Ms)} ms` : '—'}</td><td className="py-2 pr-3 tabular-nums">{result ? `${number(result.errorPercent, '%')} · ${result.attempts}/10${result.isComplete ? result.passes ? ' · pass' : ' · fail' : ''}` : '—'}</td><td className="py-2 text-right">{active?.pose === m.id ? <Button size="sm" variant="secondary" onClick={actions.stopTrial}>Stop test</Button> : <Button size="sm" disabled={!snapshot.canPractice || active !== null} onClick={() => actions.startTrial(m.id)}>Test ×10</Button>}</td></tr>;
+              return <tr key={m.id} className="border-t border-ink/20"><td className="py-2 pr-3">{m.title}</td><td className="whitespace-nowrap py-2 pr-3 font-bold tabular-nums">{latency.samples ? `${number(latency.meanMs)} / ${number(latency.p95Ms)} ms` : '—'}</td><td className="py-2 pr-3 tabular-nums">{result ? `${number(result.errorPercent, '%')} · ${result.attempts}/10${result.isComplete ? result.passes ? ' · pass' : ' · fail' : ''}` : '—'}</td><td className="py-2 text-right">{active?.pose === m.id ? <Button size="sm" variant="secondary" onClick={actions.stopTrial}>Stop test</Button> : <Button size="sm" disabled={!snapshot.canPractice || active !== null || isRunningAll} onClick={() => actions.startTrial(m.id)}>Test ×10</Button>}</td></tr>;
             })}</tbody>
           </table>
         </div>

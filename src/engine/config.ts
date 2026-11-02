@@ -180,6 +180,12 @@ export const CONFIG = {
     maxErrorPercent: 10,
   },
 
+  /** Guide Mode's hands-free run of every timed trial in a row. */
+  evaluation: {
+    /** Time to walk back from the screen before the first prompt. */
+    leadInMs: 10000,
+  },
+
   draw: {
     boneWidth: 4,
     jointRadius: 5,

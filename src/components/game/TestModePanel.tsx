@@ -12,7 +12,7 @@ import styles from './GuideMode.module.css';
 
 const SESSION_MS = 20 * 60 * 1000;
 const LANE_NAMES: Record<HudSnapshot['lateralLabel'], string> = { LEFT: 'Left lane', CENTER: 'Centre lane', RIGHT: 'Right lane' };
-type OverlayView = 'measurements' | 'logs' | 'summary' | null;
+type OverlayView = 'measurements' | 'evaluation' | 'logs' | 'summary' | null;
 function clock(ms: number) {
   const seconds = Math.ceil(Math.max(0, ms) / 1000);
   return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
@@ -37,7 +37,7 @@ export function TestModePanel({ runtimeRefs: { container, gameCanvas, video, ove
   const isPaused = p.phase === 'paused';
   const ended = p.phase === 'summary';
   const shownView = ended && !summaryDismissed ? 'summary' : view;
-  const titles = { measurements: 'Measurements', logs: 'Event log', summary: 'Session summary' };
+  const titles = { measurements: 'Measurements', evaluation: 'Pose evaluation', logs: 'Event log', summary: 'Session summary' };
   const command = actions.practiceCommand;
   function restart() {
     setSummaryDismissed(false);
@@ -89,10 +89,11 @@ export function TestModePanel({ runtimeRefs: { container, gameCanvas, video, ove
     </div>
     <div className={styles.dock} role="group" aria-label="Guide controls">
       <Button size="sm" variant="secondary" onClick={() => setView('measurements')}>Measurements</Button>
+      <Button size="sm" variant="secondary" onClick={() => setView('evaluation')}>Evaluation</Button>
       <Button size="sm" variant="secondary" onClick={() => setView('logs')}>Event log <span className="sr-only">{snapshot.diagnostics.events.length} events</span></Button>
     </div>
     {shownView && <GuideOverlay key={shownView} title={titles[shownView]} onClose={close}>
-      {(shownView === 'measurements' || shownView === 'logs') && <DeveloperDiagnostics view={shownView} snapshot={snapshot} actions={actions} />}
+      {(shownView === 'measurements' || shownView === 'evaluation' || shownView === 'logs') && <DeveloperDiagnostics view={shownView} snapshot={snapshot} actions={actions} />}
       {shownView === 'measurements' && <VersionTag />}
       {shownView === 'summary' && <div className={styles.options}>
         <p>{p.finishReason === 'time' ? 'Your 20-minute guided session is complete.' : 'You finished this guided session early.'}</p>
