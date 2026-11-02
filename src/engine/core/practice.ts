@@ -5,6 +5,10 @@ import type { UpKnee } from '@/engine/types';
 export const PRACTICE_DURATION_MS = 20 * 60 * 1000;
 export const PRACTICE_TRANSITION_MS = 3000;
 export const PRACTICE_REST_MS = 20000;
+/** Tracking must hold this long before a paused guided session resumes on its own. */
+export const PRACTICE_AUTO_RESUME_MS = 1000;
+/** Pauses the runtime raises itself; each one clears without the player touching anything. */
+export const PRACTICE_AUTO_PAUSE_REASONS = ['Tracking unavailable', 'Tab hidden', 'Camera stopped', 'Timed evaluation running', 'Free practice'] as const;
 /** Longest run of side steps prompted towards the same side. */
 export const PRACTICE_MAX_SAME_SIDE = 2;
 const LCG_MULTIPLIER = 1664525;

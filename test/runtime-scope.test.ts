@@ -157,7 +157,7 @@ async function testMode() {
   expect(runtime.getSnapshot().canPractice).toBe(true);
 }
 
-it('counts real detector events once and pauses practice on lost tracking until explicit resume', async () => {
+it('counts real detector events once and resumes practice by itself once tracking holds', async () => {
   await testMode();
   runtime.practiceCommand({ type: 'select', pose: 'hips' });
   runtime.practiceCommand({ type: 'start' }); frames(makePose(), 5);
@@ -167,9 +167,11 @@ it('counts real detector events once and pauses practice on lost tracking until 
   expect(runtime.getSnapshot().practice.count).toBe(1);
   frames(null, 1);
   expect(runtime.getSnapshot().practice).toMatchObject({ phase: 'paused', count: 1 });
-  frames(makePose(), 40);
+  // Under a second of tracking is a flicker, not a return.
+  frames(makePose(), 10);
   expect(runtime.getSnapshot().practice.phase).toBe('paused');
-  runtime.practiceCommand({ type: 'resume' }); frames(makePose(), 5);
+  frames(makePose(), 40);
+  expect(runtime.getSnapshot().practice).toMatchObject({ phase: 'active', count: 1, pauseReason: null });
   frames(makePose({ arms: 'hips' }), 20);
   expect(runtime.getSnapshot().practice.count).toBe(2);
   expect(runtime.getDiagnosticReport('test').events.filter(e => e.event === 'counted')).toHaveLength(2);
@@ -214,15 +216,15 @@ it('isolates timed evaluation and practice, logs outcomes and preserves camera o
   expect(mocks.camera).toHaveBeenCalledTimes(1);
 });
 
-it('freezes practice for hidden tabs and camera stop, and samples diagnostics at five seconds', async () => {
+it('freezes practice for hidden tabs and camera stop, resumes on return, and samples diagnostics at five seconds', async () => {
   await testMode();
   runtime.practiceCommand({ type: 'start' }); frames(makePose(), 3);
   Object.assign(document, { hidden: true }); document.dispatchEvent(new Event('visibilitychange'));
   expect(runtime.getSnapshot().practice.phase).toBe('paused');
   Object.assign(document, { hidden: false }); document.dispatchEvent(new Event('visibilitychange'));
   frames(makePose(), 150);
-  expect(runtime.getSnapshot().practice.phase).toBe('paused');
-  runtime.practiceCommand({ type: 'resume' }); frames(makePose(), 3);
+  expect(runtime.getSnapshot().practice.phase).not.toBe('paused');
+  expect(runtime.getDiagnosticReport('test').events.some(e => e.category === 'practice' && e.event === 'resume')).toBe(true);
   runtime.stopCamera();
   expect(runtime.getSnapshot().practice.phase).toBe('paused');
   const samples = runtime.getDiagnosticReport('test').events.filter(e => e.category === 'performance');
@@ -230,6 +232,14 @@ it('freezes practice for hidden tabs and camera stop, and samples diagnostics at
   expect(samples.length).toBeLessThanOrEqual(2);
   runtime.clearDiagnostics();
   expect(runtime.getSnapshot().diagnostics.events).toHaveLength(0);
+});
+
+it('keeps a pause the player asked for until they resume', async () => {
+  await testMode();
+  runtime.practiceCommand({ type: 'start' }); frames(makePose(), 3);
+  runtime.practiceCommand({ type: 'pause' });
+  frames(makePose(), 90);
+  expect(runtime.getSnapshot().practice).toMatchObject({ phase: 'paused', pauseReason: 'Taking a break' });
 });
 
 it('requires a fresh knee starting side after Start and Resume', async () => {
@@ -287,12 +297,13 @@ it('freezes session time across free practice, developer tests and finish', asyn
   expect(runtime.getSnapshot().practice.elapsedMs).toBe(checkpoint);
   runtime.practiceCommand({ type: 'mode', mode: 'guided' });
   frames(makePose(), 10);
-  expect(runtime.getSnapshot().practice.elapsedMs).toBe(checkpoint);
-  runtime.practiceCommand({ type: 'resume' }); frames(makePose(), 10);
+  expect(runtime.getSnapshot().practice.phase).not.toBe('paused');
+  expect(runtime.getSnapshot().practice.elapsedMs).toBeGreaterThan(checkpoint);
   runtime.startTrial('hips'); const trialTime = runtime.getSnapshot().practice.elapsedMs;
-  frames(makePose(), 90); runtime.stopTrial(); frames(makePose(), 10);
+  frames(makePose(), 90);
   expect(runtime.getSnapshot().practice).toMatchObject({ phase: 'paused', elapsedMs: trialTime });
-  runtime.practiceCommand({ type: 'resume' }); frames(makePose(), 10);
+  runtime.stopTrial(); frames(makePose(), 10);
+  expect(runtime.getSnapshot().practice.phase).not.toBe('paused');
   runtime.practiceCommand({ type: 'finish' }); const ended = runtime.getSnapshot().practice;
   frames(makePose(), 60);
   expect(runtime.getSnapshot().practice).toBe(ended);

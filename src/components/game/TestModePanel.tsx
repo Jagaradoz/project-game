@@ -52,7 +52,7 @@ export function TestModePanel({ runtimeRefs: { container, gameCanvas, video, ove
     if (ready && p.mode === 'guided' && p.phase === 'idle' && !p.sessionStarted) command({ type: 'start' });
   }, [ready, p.mode, p.phase, p.sessionStarted, command]);
   const readiness = trackingCue?.detail ?? (!snapshot.isSceneReady ? 'Loading your character…' : snapshot.trial.active ? 'Stop the developer test before starting.' : 'Starting your guide…');
-  const phaseText = free ? 'Move at your own pace' : p.phase === 'rest' ? `Rest · ${Math.ceil(p.remainingPhaseMs / 1000)}s` : p.phase === 'complete' ? `Pose complete · next in ${Math.ceil(p.remainingPhaseMs / 1000)}s` : isPaused ? 'Session paused' : ended ? 'Session finished' : p.sessionStarted ? `Pose ${p.step + 1} of ${p.order.length}` : 'Get ready';
+  const phaseText = free ? 'Move at your own pace' : p.phase === 'rest' ? `Rest · ${Math.ceil(p.remainingPhaseMs / 1000)}s` : p.phase === 'complete' ? `Pose complete · next in ${Math.ceil(p.remainingPhaseMs / 1000)}s` : isPaused ? 'Resumes automatically' : ended ? 'Session finished' : p.sessionStarted ? `Pose ${p.step + 1} of ${p.order.length}` : 'Get ready';
   return <main className={styles.screen} aria-label="Guide Mode">
     <div className={styles.header}>
       <h1>Guide Mode</h1><span className={styles.sessionLabel}>{free ? 'Free practice' : '20-minute guided session'}</span>
@@ -82,7 +82,6 @@ export function TestModePanel({ runtimeRefs: { container, gameCanvas, video, ove
           </div>
           <div className={styles.guideFooter}>
             {!free && <div className={styles.count}>{p.count} <small>/ {p.goal} reps</small></div>}
-            {isPaused && !free && <Button size="sm" disabled={!ready} onClick={() => command({ type: 'resume' })}>Resume</Button>}
             <div className={styles.next}><span>Next:</span><strong>{nextPose ? POSE_TITLES[nextPose] : '20-second rest'}</strong></div>
           </div>
         </div>

@@ -19,7 +19,7 @@ import { createGameState, restartGame, updateGame, difficultyAt } from '@/engine
 import { advanceDemo } from '@/engine/core/demo';
 import { createMetrics, type MetricsSnapshot } from '@/engine/core/metrics';
 import { createTrialState, startTrial, stopTrial, updateTrial } from '@/engine/core/trial';
-import { createPracticeState, practiceCommand, updatePractice, tickPractice } from '@/engine/core/practice';
+import { createPracticeState, practiceCommand, updatePractice, tickPractice, PRACTICE_AUTO_PAUSE_REASONS, PRACTICE_AUTO_RESUME_MS } from '@/engine/core/practice';
 import type { PracticeCommand, PracticeState } from '@/engine/core/practice';
 import { createDiagnosticLog } from '@/engine/core/diagnostics';
 import type { DiagnosticSnapshot, DiagnosticReport } from '@/engine/core/diagnostics';
@@ -329,6 +329,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   const diagnostics = createDiagnosticLog();
   let lastPerformanceLogMs = performance.now();
   let lastTrackingStatus = 'waiting';
+  /** When tracking last became ready, so a flicker does not resume the session. */
+  let trackingReadySinceMs: number | null = null;
   let lastRenderMs: number | null = null;
   let smoothedRenderFps: number | null = null;
   let smoothedProcessingMs: number | null = null;
@@ -550,7 +552,13 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
         diagnostics.append('tracking', tracking, { previous: lastTrackingStatus });
         lastTrackingStatus = tracking;
       }
-      if (tracking !== 'ready') pausePractice(tracking === 'hidden' ? 'Tab hidden' : tracking === 'camera' ? 'Camera stopped' : 'Tracking unavailable');
+      if (tracking !== 'ready') {
+        trackingReadySinceMs = null;
+        pausePractice(tracking === 'hidden' ? 'Tab hidden' : tracking === 'camera' ? 'Camera stopped' : 'Tracking unavailable');
+      } else {
+        trackingReadySinceMs ??= nowMs;
+        if (nowMs - trackingReadySinceMs >= PRACTICE_AUTO_RESUME_MS) autoResumePractice();
+      }
       advancePracticeClock(nowMs);
       if (nowMs - lastPerformanceLogMs >= 5000) {
         diagnostics.append('performance', 'sample', { poseFps: smoothedFps, renderFps: smoothedRenderFps, processingMs: smoothedProcessingMs, inferenceMs: smoothedInferenceMs, latency: metrics.snapshot().latencyByPose, model: poseModel, delegate });
@@ -681,6 +689,17 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
   function pausePractice(reason: string) {
     if (mode === 'test') setPractice(practiceCommand(practice, { type: 'pause', reason }), 'paused');
+  }
+
+  /** The player is too far from the screen to press Resume, so system pauses clear on their own. */
+  function autoResumePractice() {
+    if (practice.mode !== 'guided' || practice.phase !== 'paused' || trial.active || !testScene
+      || !(PRACTICE_AUTO_PAUSE_REASONS as readonly string[]).includes(practice.pauseReason ?? '')) return;
+    lastPracticeClockMs = performance.now();
+    const next = practiceCommand(practice, { type: 'resume' });
+    // Starting positions must be observed after resuming, as with an explicit Resume.
+    if (next.phase === 'ready') resetPracticeDetector(next);
+    setPractice(next, 'resume');
   }
 
   function pauseRun(reason: Exclude<PauseReason, null>) {

@@ -68,7 +68,9 @@ describe('one-action pose guidance', () => {
   it('replaces movement instructions when paused, resting, or finished', () => {
     let p = practiceCommand(createPracticeState(), { type: 'start' });
     p = practiceCommand(p, { type: 'pause' });
-    expect(practiceCue(p, 'LEFT')).toMatchObject({ title: 'Session Paused', direction: null });
+    expect(practiceCue({ ...p, pauseReason: 'Tracking unavailable' }, 'LEFT')).toMatchObject({ title: 'Step Back Into View', direction: 'centre' });
+    expect(practiceCue({ ...p, pauseReason: 'Timed evaluation running' }, 'LEFT')).toMatchObject({ title: 'Timed Test Running', direction: null });
+    expect(JSON.stringify(practiceCue(p, 'LEFT'))).not.toMatch(/Resume/);
     expect(practiceCue({ ...p, phase: 'rest', remainingPhaseMs: 11000 }, 'LEFT')).toMatchObject({ title: 'Rest', detail: 'Next round in 11s.', direction: null });
     expect(practiceCue({ ...p, phase: 'complete', remainingPhaseMs: 2000 }, 'LEFT')).toMatchObject({ title: 'Pose Complete', detail: 'Next pose in 2s.' });
     expect(practiceCue(practiceCommand(p, { type: 'finish' }), 'LEFT').title).toBe('Session Complete');

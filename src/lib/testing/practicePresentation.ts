@@ -25,7 +25,9 @@ export function practiceTrackingCue(s: PracticeTracking): PracticeCue | null {
 
 /** Present the detector's current target, rather than asking for an entire sequence. */
 export function practiceCue(p: PracticeState, lane: 'LEFT' | 'CENTER' | 'RIGHT'): PracticeCue {
-  if (p.phase === 'paused') return { title: 'Session Paused', detail: 'Get into position, then press Resume.', direction: null };
+  if (p.phase === 'paused') return p.pauseReason === 'Timed evaluation running'
+    ? { title: 'Timed Test Running', detail: 'Your guided session continues when the test ends.', direction: null }
+    : { title: 'Step Back Into View', detail: 'Your session continues automatically once you are tracked.', direction: 'centre' };
   if (p.phase === 'summary') return { title: 'Session Complete', detail: 'Your results are ready.', direction: null };
   if (p.phase === 'rest') return { title: 'Rest', detail: `Next round in ${Math.ceil(p.remainingPhaseMs / 1000)}s.`, direction: null };
   if (p.phase === 'complete') return { title: 'Pose Complete', detail: `Next pose in ${Math.ceil(p.remainingPhaseMs / 1000)}s.`, direction: null };
