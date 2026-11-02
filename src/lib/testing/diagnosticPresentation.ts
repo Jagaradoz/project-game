@@ -2,9 +2,11 @@ import type { DiagnosticEvent } from '@/engine/core/diagnostics';
 
 export const LOG_CATEGORIES = {
   lifecycle: 'System', tracking: 'Tracking', detection: 'Movement', practice: 'Guide',
-  trial: 'Evaluation', performance: 'Performance', error: 'Errors',
+  evaluation: 'Evaluation', trial: 'Timed trial', performance: 'Performance', error: 'Errors',
 };
 const POSES: Record<string, string> = { lateral: 'Side steps', knees: 'Knee lifts', hips: 'Hands on hips', clap: 'Overhead clap' };
+const OUTCOMES: Record<string, string> = { correct: 'correct', missed: 'missed', wrongLane: 'wrong lane', wrongKnee: 'wrong knee', otherMovement: 'other movement' };
+const VOID_REASONS: Record<string, string> = { tracking: 'tracking lost', paused: 'paused', cueChanged: 'cue changed' };
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const text = (value: unknown) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
 
@@ -48,11 +50,16 @@ export function diagnosticMessage(event: DiagnosticEvent): string | null {
       case 'prompt': return text(d.expected) || `Follow the guide: ${pose}`;
     }
   }
+  if (event.category === 'evaluation') {
+    if (event.event === 'voided') return `${pose}: not scored (${VOID_REASONS[text(d.reason)] ?? 'interrupted'})`;
+    const outcome = OUTCOMES[text(d.outcome)] ?? 'scored';
+    return finite(d.responseMs) ? `${pose}: ${outcome} · ${Math.round(d.responseMs)} ms` : `${pose}: ${outcome}`;
+  }
   if (event.category === 'trial') {
-    if (event.event === 'started') return `Evaluation started: ${pose}`;
-    if (event.event === 'stopped') return 'Evaluation stopped';
-    if (event.event === 'completed') return `Evaluation complete: ${pose}`;
-    return `Evaluation: ${pose} · ${d.phase === 'rest' ? 'Rest' : d.phase === 'ready' ? 'Get ready' : 'Follow the prompt'}`;
+    if (event.event === 'started') return `Timed trial started: ${pose}`;
+    if (event.event === 'stopped') return 'Timed trial stopped';
+    if (event.event === 'completed') return `Timed trial complete: ${pose}`;
+    return `Timed trial: ${pose} · ${d.phase === 'rest' ? 'Rest' : d.phase === 'ready' ? 'Get ready' : 'Follow the prompt'}`;
   }
   if (event.category === 'lifecycle') {
     if (event.event === 'status') return text(d.message) || 'Status updated';

@@ -1,8 +1,9 @@
+import type { EvaluationAttempt, EvaluationSummary } from './autoEvaluation';
 import type { MetricsSnapshot } from './metrics';
 import type { PracticeState } from './practice';
 import type { TrialState } from './trial';
 
-export const DIAGNOSTIC_CATEGORIES = ['lifecycle', 'tracking', 'detection', 'practice', 'trial', 'performance', 'error'] as const;
+export const DIAGNOSTIC_CATEGORIES = ['lifecycle', 'tracking', 'detection', 'practice', 'evaluation', 'trial', 'performance', 'error'] as const;
 export type DiagnosticCategory = typeof DIAGNOSTIC_CATEGORIES[number];
 export interface DiagnosticEvent {
   id: number;
@@ -17,13 +18,36 @@ export interface DiagnosticSnapshot {
   events: readonly DiagnosticEvent[];
   dropped: number;
 }
+/** Smoothed pipeline readings at export time. */
+export interface PerformanceReading {
+  poseFps: number | null;
+  renderFps: number | null;
+  processingMs: number | null;
+  inferenceMs: number | null;
+  model: string | null;
+  delegate: string | null;
+}
+/** Guide Mode's continuous evaluation: the summary plus every retained scored attempt. */
+export interface EvaluationReport {
+  summary: EvaluationSummary;
+  attempts: readonly EvaluationAttempt[];
+}
 export interface DiagnosticReport extends DiagnosticSnapshot {
-  schemaVersion: 2;
+  schemaVersion: 3;
   appVersion: string;
   exportedAt: string;
   practice: PracticeState;
   trial: TrialState;
   metrics: MetricsSnapshot;
+  performance: PerformanceReading;
+  evaluation: EvaluationReport;
+}
+export interface ReportInputs {
+  practice: PracticeState;
+  trial: TrialState;
+  metrics: MetricsSnapshot;
+  performance: PerformanceReading;
+  evaluation: EvaluationReport;
 }
 
 /** Immutable snapshots only change on events; storage is bounded for long visits. */
@@ -41,8 +65,8 @@ export function createDiagnosticLog(startedAtMs = Date.now(), startClockMs = per
     },
     snapshot: () => snapshot,
     clear() { snapshot = { ...snapshot, events: [], dropped: 0 }; },
-    report(appVersion: string, practice: PracticeState, trial: TrialState, metrics: MetricsSnapshot): DiagnosticReport {
-      return { ...snapshot, schemaVersion: 2, appVersion, exportedAt: new Date().toISOString(), practice, trial, metrics };
+    report(appVersion: string, inputs: ReportInputs): DiagnosticReport {
+      return { ...snapshot, schemaVersion: 3, appVersion, exportedAt: new Date().toISOString(), ...inputs };
     },
   };
 }

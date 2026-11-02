@@ -3,6 +3,7 @@ import { createDiagnosticLog } from '@/engine/core/diagnostics';
 import { createPracticeState } from '@/engine/core/practice';
 import { createTrialState } from '@/engine/core/trial';
 import { createMetrics } from '@/engine/core/metrics';
+import { createEvaluationState, summarizeEvaluation } from '@/engine/core/autoEvaluation';
 
 describe('Test Mode diagnostic log', () => {
   it('bounds history and keeps stable ordered snapshots with a drop count', () => {
@@ -32,8 +33,10 @@ describe('Test Mode diagnostic log', () => {
     const log = createDiagnosticLog(0, 0);
     log.append('practice', 'counted', { expected: 'clap', detected: 'clap', count: 1 }, 20);
     const practice = createPracticeState(), trial = createTrialState(), metrics = createMetrics().snapshot();
-    const report = JSON.parse(JSON.stringify(log.report('2.35.0-alpha.0', practice, trial, metrics)));
-    expect(report).toMatchObject({ schemaVersion: 2, appVersion: '2.35.0-alpha.0', practice, trial, metrics });
+    const performance = { poseFps: 30, renderFps: 60, processingMs: 2, inferenceMs: 18, model: 'lite', delegate: 'GPU' };
+    const evaluation = { summary: summarizeEvaluation(createEvaluationState()), attempts: [] };
+    const report = JSON.parse(JSON.stringify(log.report('2.35.0-alpha.0', { practice, trial, metrics, performance, evaluation })));
+    expect(report).toMatchObject({ schemaVersion: 3, appVersion: '2.35.0-alpha.0', practice, trial, metrics, performance, evaluation });
     expect(report.events[0]).toMatchObject({ elapsedMs: 20, category: 'practice' });
     expect(report.exportedAt).toBeTruthy();
     expect(report).not.toHaveProperty('landmarks');

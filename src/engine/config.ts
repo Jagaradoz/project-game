@@ -180,10 +180,10 @@ export const CONFIG = {
     maxErrorPercent: 10,
   },
 
-  /** Guide Mode's hands-free run of every timed trial in a row. */
+  /** Guide Mode's continuous evaluation: every guided cue is scored as one attempt. */
   evaluation: {
-    /** Time to walk back from the screen before the first prompt. */
-    leadInMs: 10000,
+    /** Most recent scored attempts kept for the summary and the exported report. */
+    maxAttempts: 2000,
   },
 
   draw: {

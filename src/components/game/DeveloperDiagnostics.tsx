@@ -1,55 +1,21 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { CONFIG } from '@/engine/config';
 import { DIAGNOSTIC_CATEGORIES } from '@/engine/core/diagnostics';
-import type { ActiveTrial } from '@/engine/core/trial';
-import { MOVEMENTS, trialResult, type MovementId } from '@/lib/testing/evaluation';
+import { MOVEMENTS } from '@/lib/testing/evaluation';
+import { evaluationCells, systemReadings } from '@/lib/testing/evaluationPresentation';
 import type { GameActions, HudSnapshot } from '@/hooks/useGameRuntime';
 import { diagnosticMessage, logTime, LOG_CATEGORIES } from '@/lib/testing/diagnosticPresentation';
 import { version } from '../../../package.json';
 
-const PROMPTS: Record<string, string> = { LEFT: 'Lean left', RIGHT: 'Lean right', CENTER: 'Back to centre', LEFT_KNEE: 'Lift your left knee', RIGHT_KNEE: 'Lift your right knee', hips: 'Hands on hips', clap: 'Clap overhead' };
-function trialPrompt(trial: ActiveTrial) {
-  return trial.phase === 'rest' ? 'Relax…' : trial.phase === 'ready' ? trial.pose === 'knees' ? 'Lift either knee to begin' : 'Lower your hands' : PROMPTS[trial.target ?? trial.pose];
-}
+const EVALUATION_COLUMNS = ['Attempts', 'Correct', 'Missed', 'Wrong lane', 'Wrong knee', 'Other movement', 'Error % (95% CI)', 'Response mean / P95', 'Detection-to-render mean / P95'];
 function number(value: number | null, suffix = '') { return value === null ? '—' : `${value.toFixed(0)}${suffix}`; }
 
 export function DeveloperDiagnostics({ snapshot, actions, view }: { snapshot: HudSnapshot; actions: GameActions; view: 'measurements' | 'logs' | 'evaluation' }) {
   const [filter, setFilter] = useState('all');
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const active = snapshot.trial.active;
-  // Hands-free run: the poses queued, and each one's result when the run began. A pose is
-  // done once its result has changed, so progress follows the runtime instead of local state.
-  const [run, setRun] = useState<{ poses: MovementId[]; baseline: HudSnapshot['trial']['results']; leadInEndsMs: number } | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  const pending = run ? run.poses.filter(pose => snapshot.trial.results[pose] === run.baseline[pose]) : [];
-  const leadInLeft = run ? Math.max(0, run.leadInEndsMs - nowMs) : 0;
-  const { startTrial } = actions;
-  const leadInEndsMs = run?.leadInEndsMs ?? null;
-  useEffect(() => {
-    if (leadInEndsMs === null) return;
-    const id = setInterval(() => {
-      setNowMs(Date.now());
-      if (Date.now() >= leadInEndsMs) clearInterval(id);
-    }, 250);
-    return () => clearInterval(id);
-  }, [leadInEndsMs]);
-  const nextPose = pending[0] ?? null;
-  useEffect(() => {
-    // Each pose starts once the previous test ends and tracking is ready, so nobody has to reach the screen.
-    if (nextPose === null || active || leadInLeft > 0 || !snapshot.canPractice) return;
-    startTrial(nextPose);
-  }, [nextPose, active, leadInLeft, snapshot.canPractice, startTrial]);
-  function testAll() {
-    setRun({ poses: MOVEMENTS.map(m => m.id), baseline: snapshot.trial.results, leadInEndsMs: Date.now() + CONFIG.evaluation.leadInMs });
-    setNowMs(Date.now());
-  }
-  function stopAll() {
-    setRun(null);
-    if (active) actions.stopTrial();
-  }
-  const isRunningAll = pending.length > 0;
+  const evaluation = snapshot.evaluation;
+  const voided = evaluation.voided.tracking + evaluation.voided.paused + evaluation.voided.cueChanged;
   const logs = view === 'logs' ? snapshot.diagnostics.events
     .filter(e => filter === 'all' || e.category === filter)
     .map(event => ({ event, message: diagnosticMessage(event) }))
@@ -77,27 +43,25 @@ export function DeveloperDiagnostics({ snapshot, actions, view }: { snapshot: Hu
         </dl>
         <p className="text-xs text-muted">Model {snapshot.poseModel ?? '—'} · Delegate {snapshot.delegate ?? '—'} · Camera {snapshot.cameraLabel ?? '—'}</p>
       </section>}
-      {view === 'evaluation' && <section aria-label="Timed evaluation">
-
-        <p className="mb-3 mt-0 text-sm text-muted">These tests score prompted attempts. Guided practice counts successful repetitions separately. Starting a timed test pauses guided practice.</p>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {isRunningAll || active
-            ? <Button size="sm" variant="secondary" onClick={stopAll}>Stop testing</Button>
-            : <Button size="sm" disabled={!snapshot.canPractice} onClick={testAll}>Test all poses ×10</Button>}
-        </div>
-        {leadInLeft > 0 && <p role="status" className="border-l-4 border-primary bg-primary-soft p-3 text-3xl font-bold">Step back · starting in {Math.ceil(leadInLeft / 1000)}s</p>}
-        {active && <p role="status" className="border-l-4 border-primary bg-primary-soft p-3 font-bold"><span className="block text-sm">{MOVEMENTS.find(m => m.id === active.pose)?.title} · Attempt {Math.min(CONFIG.trial.attempts, trialResult(active.tally).attempts + 1)} / {CONFIG.trial.attempts}</span><span className="block text-3xl">{trialPrompt(active)}</span></p>}
+      {view === 'evaluation' && <section aria-label="Continuous evaluation">
+        <p className="mb-3 mt-0 text-sm text-muted">Every guided cue is scored automatically as one attempt. Attempts cut off by a pause, lost tracking or a skipped pose are not scored.</p>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead><tr className="text-xs text-muted"><th className="py-2 pr-3">Pose</th><th className="py-2 pr-3">Latency mean / P95</th><th className="py-2 pr-3">Timed trial errors</th><th className="py-2"><span className="sr-only">Evaluation controls</span></th></tr></thead>
-            <tbody>{MOVEMENTS.map(m => {
-              const latency = snapshot.metrics.latencyByPose[m.id];
-              const tally = snapshot.trial.results[m.id];
-              const result = tally ? trialResult(tally) : null;
-              return <tr key={m.id} className="border-t border-ink/20"><td className="py-2 pr-3">{m.title}</td><td className="whitespace-nowrap py-2 pr-3 font-bold tabular-nums">{latency.samples ? `${number(latency.meanMs)} / ${number(latency.p95Ms)} ms` : '—'}</td><td className="py-2 pr-3 tabular-nums">{result ? `${number(result.errorPercent, '%')} · ${result.attempts}/10${result.isComplete ? result.passes ? ' · pass' : ' · fail' : ''}` : '—'}</td><td className="py-2 text-right">{active?.pose === m.id ? <Button size="sm" variant="secondary" onClick={actions.stopTrial}>Stop test</Button> : <Button size="sm" disabled={!snapshot.canPractice || active !== null || isRunningAll} onClick={() => actions.startTrial(m.id)}>Test ×10</Button>}</td></tr>;
-            })}</tbody>
+            <thead><tr className="text-xs text-muted"><th className="py-2 pr-3">Movement</th>{EVALUATION_COLUMNS.map(c => <th key={c} className="py-2 pr-3">{c}</th>)}</tr></thead>
+            <tbody>
+              {MOVEMENTS.map(m => <tr key={m.id} className="border-t border-ink/20"><td className="py-2 pr-3">{m.title}</td>{evaluationCells(m.id, evaluation.byPose[m.id], snapshot.metrics.latencyByPose[m.id]).map((cell, i) => <td key={EVALUATION_COLUMNS[i]} className="whitespace-nowrap py-2 pr-3 tabular-nums">{cell}</td>)}</tr>)}
+              <tr className="border-t-2 border-ink font-bold"><td className="py-2 pr-3">All movements</td>{evaluationCells('overall', evaluation.overall, { meanMs: snapshot.metrics.latencyMeanMs, p95Ms: snapshot.metrics.latencyP95Ms, minMs: snapshot.metrics.latencyMinMs, maxMs: snapshot.metrics.latencyMaxMs, samples: snapshot.metrics.latencySamples }).map((cell, i) => <td key={EVALUATION_COLUMNS[i]} className="whitespace-nowrap py-2 pr-3 tabular-nums">{cell}</td>)}</tr>
+            </tbody>
           </table>
         </div>
+        <dl aria-label="System" className="m-0 mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4 lg:grid-cols-7">
+          {systemReadings(snapshot, snapshot.metrics).map(([label, value]) => <div key={label} className="border border-ink/20 p-3"><dt className="text-xs text-muted">{label}</dt><dd className="m-0 mt-1 font-bold tabular-nums">{value}</dd></div>)}
+        </dl>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="m-0 text-xs text-muted">{voided} not scored{evaluation.dropped > 0 ? ` · ${evaluation.dropped} oldest attempts dropped` : ''}. Every attempt is in the JSON report.</p>
+          <Button size="sm" onClick={download}>Download JSON</Button>
+        </div>
+        {downloadError && <p role="alert">{downloadError}</p>}
       </section>}
       {view === 'logs' && <section aria-label="Developer event log">
         <div className="flex flex-wrap items-center justify-between gap-3">

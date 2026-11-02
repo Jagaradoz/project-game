@@ -22,6 +22,8 @@ import { createTrialState, startTrial, stopTrial, updateTrial } from '@/engine/c
 import { createPracticeState, practiceCommand, updatePractice, tickPractice, PRACTICE_AUTO_PAUSE_REASONS, PRACTICE_AUTO_RESUME_MS } from '@/engine/core/practice';
 import type { PracticeCommand, PracticeState } from '@/engine/core/practice';
 import { createDiagnosticLog } from '@/engine/core/diagnostics';
+import { createEvaluationState, summarizeEvaluation, updateEvaluation } from '@/engine/core/autoEvaluation';
+import type { EvaluationState, EvaluationSummary } from '@/engine/core/autoEvaluation';
 import type { DiagnosticSnapshot, DiagnosticReport } from '@/engine/core/diagnostics';
 import type { PoseEvent, PoseId, TrialState } from '@/engine/core/trial';
 import { createClapState, updateClap } from '@/engine/detectors/clap';
@@ -164,6 +166,8 @@ export interface HudSnapshot {
   /** Test Mode's guided error-rate trial. */
   trial: TrialState;
   practice: PracticeState;
+  /** Guide Mode's continuous evaluation: every guided cue scored as one attempt. */
+  evaluation: EvaluationSummary;
   diagnostics: DiagnosticSnapshot;
   canPractice: boolean;
   jumpCount: number;
@@ -252,7 +256,7 @@ export interface HudSnapshot {
  * an orb lands without publishing every frame.
  */
 const FORCE_EMIT_KEYS: (keyof HudSnapshot)[] = [
-  'hasStarted', 'pauseReason', 'canBegin', 'hasBody', 'goalReached', 'trial', 'practice', 'canPractice',
+  'hasStarted', 'pauseReason', 'canBegin', 'hasBody', 'goalReached', 'trial', 'practice', 'evaluation', 'canPractice',
   'score',
   'comboHits',
   'comboMultiplier',
@@ -326,6 +330,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let trial = createTrialState();
   let practice = createPracticeState(options.seed ?? 1);
   let lastPracticeClockMs = performance.now();
+  let evaluation: EvaluationState = createEvaluationState();
+  let evaluationSummary = summarizeEvaluation(evaluation);
   const diagnostics = createDiagnosticLog();
   let lastPerformanceLogMs = performance.now();
   let lastTrackingStatus = 'waiting';
@@ -434,6 +440,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       metrics: metrics.snapshot(),
       trial,
       practice,
+      evaluation: evaluationSummary,
       diagnostics: diagnostics.snapshot(),
       canPractice: hasPracticeTracking() && testScene !== null,
       score: game.score,
@@ -550,6 +557,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       const tracking = hasPracticeTracking() ? 'ready' : document.hidden ? 'hidden' : !isPoseRunning ? 'camera' : !lateral.hasBody || !kneesVisible ? 'body' : !lateral.isCalibrated ? 'calibrating' : 'stale';
       if (tracking !== lastTrackingStatus) {
         diagnostics.append('tracking', tracking, { previous: lastTrackingStatus });
+        if (tracking === 'body' && lastTrackingStatus === 'ready') metrics.bodyLoss();
         lastTrackingStatus = tracking;
       }
       if (tracking !== 'ready') {
@@ -819,8 +827,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
       for (const event of events) diagnostics.append('detection', 'movement', { ...event, expected: practice.mode === 'guided' ? practice.prompt : null, trialTarget: trial.active?.target ?? trial.active?.pose ?? null });
       const wasCounting = practice.phase === 'ready' || practice.phase === 'active';
       advancePracticeClock(nowMs);
-      if (hasPracticeTracking() && wasCounting) setPractice(updatePractice(practice, events, readout), 'prompt');
-      else if (!hasPracticeTracking()) pausePractice('Tracking unavailable');
+      // The cue as shown this frame, before its detections are applied.
+      const prompted = practice;
+      const isTracking = hasPracticeTracking();
+      if (isTracking && wasCounting) setPractice(updatePractice(practice, events, readout), 'prompt');
+      else if (!isTracking) pausePractice('Tracking unavailable');
+      scoreEvaluation(prompted, events, isTracking, nowMs);
       const previousTrial = trial;
       trial = updateTrial(trial, kneesVisible ? events : [], readout, nowMs);
       if (trial !== previousTrial) {
@@ -837,6 +849,20 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     }
     smoothedProcessingMs = ema(smoothedProcessingMs, performance.now() - nowMs, CONFIG.fps.smoothing);
     lastPoseReceivedMs = performance.now();
+  }
+
+  function scoreEvaluation(prompted: PracticeState, events: readonly PoseEvent[], isTracking: boolean, nowMs: number) {
+    const previous = evaluation;
+    evaluation = updateEvaluation(evaluation, prompted, practice, isTracking ? events : [], isTracking, nowMs);
+    if (evaluation === previous) return;
+    if (evaluation.attempts !== previous.attempts) {
+      const attempt = evaluation.attempts.at(-1);
+      if (attempt) diagnostics.append('evaluation', 'attempt', { ...attempt });
+    }
+    const voided = (Object.keys(evaluation.voided) as (keyof EvaluationState['voided'])[])
+      .find(reason => evaluation.voided[reason] !== previous.voided[reason]);
+    if (voided) diagnostics.append('evaluation', 'voided', { pose: previous.open?.pose ?? null, target: previous.open?.target ?? null, reason: voided });
+    if (evaluation.attempts !== previous.attempts || evaluation.voided !== previous.voided) evaluationSummary = summarizeEvaluation(evaluation);
   }
 
   /** This frame's detections, in a fixed order. */
@@ -1240,7 +1266,11 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     },
 
     clearDiagnostics() { diagnostics.clear(); lastEmitMs = -Infinity; publish(); },
-    getDiagnosticReport(appVersion: string) { return diagnostics.report(appVersion, practice, trial, metrics.snapshot()); },
+    getDiagnosticReport(appVersion: string) {
+      return diagnostics.report(appVersion, { practice, trial, metrics: metrics.snapshot(),
+        performance: { poseFps: smoothedFps, renderFps: smoothedRenderFps, processingMs: smoothedProcessingMs, inferenceMs: smoothedInferenceMs, model: poseModel, delegate },
+        evaluation: { summary: evaluationSummary, attempts: evaluation.attempts } });
+    },
 
     restart() {
       previewPaused = false;

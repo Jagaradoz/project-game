@@ -24,6 +24,7 @@ import { LATERAL } from '@/engine/detectors/lateral';
 import { EMPTY_LATENCY } from '@/engine/core/metrics';
 import { createTrialState } from '@/engine/core/trial';
 import { createPracticeState } from '@/engine/core/practice';
+import { createEvaluationState, summarizeEvaluation } from '@/engine/core/autoEvaluation';
 import type { PracticeCommand } from '@/engine/core/practice';
 import type { DiagnosticReport } from '@/engine/core/diagnostics';
 import type { PoseId } from '@/engine/core/trial';
@@ -38,6 +39,7 @@ const IDLE_SNAPSHOT: HudSnapshot = {
     fpsMean: null, firstMinuteFps: null, lastMinuteFps: null, fpsDeclinePercent: null, bodyLossIncidents: 0 },
   trial: createTrialState(),
   practice: createPracticeState(),
+  evaluation: summarizeEvaluation(createEvaluationState()),
   diagnostics: { startedAt: '', events: [], dropped: 0 }, canPractice: false,
   jumpCount: 0, armRaiseCount: 0, hipsHoldCount: 0, isHandsOnHips: false, isShielding: false,
   sporeDistance: null, isInSpore: false,
