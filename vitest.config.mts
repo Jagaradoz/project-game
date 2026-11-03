@@ -33,12 +33,16 @@ export default defineConfig({
         // The formatters and schemas are plain functions.
         'src/lib/validation/**',
         'src/lib/format.ts',
+        // Account service, storage and crypto run headless against :memory: SQLite.
+        'src/server/**',
       ],
       exclude: [
         'src/engine/render/**',
         'src/engine/pose/**',
         'src/engine/runtime.ts',
         'src/engine/types.ts',
+        // Next.js request/response glue, exercised by the route handlers.
+        'src/server/http.ts',
       ],
       thresholds: {
         lines: 80,
