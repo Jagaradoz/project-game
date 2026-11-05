@@ -26,8 +26,8 @@ export function CameraStage({ videoRef, overlayRef, isCameraRunning, isCameraSki
 
   return (
     <div
-      className={`absolute right-3 bottom-3 ${isSetup ? 'z-40' : 'z-[2]'} overflow-hidden border-2 border-white ${isCameraHidden && !isSetup ? 'bg-black' : 'bg-black/85'} shadow-[3px_3px_0_0_var(--color-primary)] transition-[width,height] duration-200 motion-reduce:transition-none ${isCameraSkipped ? 'invisible' : ''} ${
-        isSetup ? 'aspect-4/3 w-[140px] sm:w-[240px] lg:w-[320px]' : showFeed
+      className={`absolute right-3 bottom-3 ${isSetup ? `z-40 ${isCameraRunning ? '' : 'invisible'}` : 'z-[2]'} overflow-hidden border-2 border-white ${isCameraHidden && !isSetup ? 'bg-black' : 'bg-black/85'} shadow-[3px_3px_0_0_var(--color-primary)] transition-[width,height] duration-200 motion-reduce:transition-none ${isCameraSkipped ? 'invisible' : ''} ${
+        showFeed
           ? 'aspect-4/3 w-[120px] rounded-none border-white/20 sm:w-[180px]'
           : 'h-9 w-[116px] rounded-none border-white/15'
       }`}

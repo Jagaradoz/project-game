@@ -32,7 +32,7 @@ import { createDrowningPresentation, updateDrowningPresentation } from '@/engine
 import { TRAINING_STAGE_NUMBER, resolveTrainingRules } from '@/engine/core/stage';
 import { createInput } from '@/engine/core/input';
 import { createJogState, updateJog } from '@/engine/detectors/jog';
-import { createHandsOnHipsState, updateHandsOnHips } from '@/engine/detectors/handsOnHips';
+import { createHandsOnHipsState, revealHeldHips, updateHandsOnHips } from '@/engine/detectors/handsOnHips';
 import {
   LATERAL,
   createLateralState,
@@ -45,6 +45,8 @@ import { closePose, detect, getDelegate, initPose } from '@/engine/pose/pose';
 import type { PoseDelegate } from '@/engine/pose/pose';
 import { clearOverlay, drawLaneGuide, drawSkeleton, overlayCssScale, resizeOverlay } from '@/engine/pose/draw';
 import { createExposureSampler } from '@/engine/pose/exposure';
+import { createFakeBody, FAKE_POSE_INIT } from '@/engine/pose/fakeBody';
+import type { FakeBody } from '@/engine/pose/fakeBody';
 import { ema } from '@/engine/util/smooth';
 import { measureBody } from '@/engine/util/landmarks';
 import { createScene } from '@/engine/render/scene';
@@ -145,6 +147,8 @@ export interface RuntimeOptions {
   character?: string;
   graphicsQuality?: ShadowQuality;
   mode?: RuntimeMode;
+  /** Development only: a keyboard-driven body replaces the webcam and pose model. */
+  fakeBody?: boolean;
   onError?: (message: string) => void;
 }
 
@@ -320,6 +324,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let rehearsal = { left: false, right: false, knees: false, hips: false, clap: false };
   let runSteps = 0, runMovements = 0;
   let lastValidPoseMs: number | null = null;
+  /** Start of the current unbroken stretch of valid poses. */
+  let bodyReturnedMs: number | null = null;
   let lastPoseReceivedMs: number | null = null;
   /** Pose-frame time of each pose's first unrendered detection. */
   let pendingResponse: Partial<Record<PoseId, number>> = {};
@@ -347,6 +353,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   let renderedDrowningMs = -1;
   let needsRender = true;
   let stream: MediaStream | null = null;
+  let fakeBody: FakeBody | null = null;
   let connections: PoseConnection[] = [];
 
   let isDisposed = false;
@@ -569,8 +576,11 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
     // The run waits for pose tracking or the explicit dev bypass. The scene
     // still paints behind the dialog and remains available to tools/shot.mjs.
-    if (mode === 'game' && hasStarted && !isCameraSkipped && !game.isOver
-      && (lastValidPoseMs === null || nowMs - lastValidPoseMs > 1000)) pauseRun('body');
+    if (mode === 'game' && hasStarted && !isCameraSkipped && !game.isOver) {
+      if (!hasCurrentBody(nowMs)) pauseRun('body');
+      else if (pauseReason === 'body' && bodyReturnedMs !== null && lateral.isCalibrated
+        && nowMs - bodyReturnedMs >= CONFIG.pose.bodyReturnResumeMs) resumeRun();
+    }
     const isPlaying = mode === 'test' ? isPoseRunning : hasStarted && pauseReason === null && (isPoseRunning || isCameraSkipped);
     const hasTestTracking = isPoseRunning && lateral.hasBody && lateral.isCalibrated && kneesVisible
       && lastValidPoseMs !== null && nowMs - lastValidPoseMs <= 1000;
@@ -641,8 +651,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   function canBegin() {
     return isPoseRunning && lateral.hasBody && lateral.isCalibrated && kneesVisible
       && classifyDistance(shoulderWidth) === 'ok' && classifyLighting(luma) === 'ok'
-      && Object.values(rehearsal).every(Boolean) && lastValidPoseMs !== null
-      && performance.now() - lastValidPoseMs <= 1000 && !document.hidden;
+      && lastValidPoseMs !== null && performance.now() - lastValidPoseMs <= 1000
+      && bodyReturnedMs !== null && performance.now() - bodyReturnedMs >= CONFIG.pose.bodyReturnResumeMs && !document.hidden;
+  }
+
+  function hasCurrentBody(nowMs: number) {
+    return lastValidPoseMs !== null && nowMs - lastValidPoseMs <= CONFIG.pose.bodyLossPauseMs;
   }
 
   function hasPracticeTracking() {
@@ -689,6 +703,12 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     if (reason === 'body') metrics.bodyLoss();
     input.clearPose(); pendingResponse = {}; lastRenderMs = null;
     needsRender = true; publish();
+  }
+
+  function resumeRun() {
+    pauseReason = null; input.clearPose();
+    if (!isCameraSkipped) { input.setPose(lateral.label, jog.isJogging, handsOnHips.isActive, jog.cadenceSpm, jog.stepCount); input.read(); }
+    lastGameMs = performance.now(); lastRenderMs = null; needsRender = true; publish();
   }
 
   function sampleQuality(dtMs: number, suspended: boolean): void {
@@ -754,22 +774,23 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
   function processFrame(nowMs: number): void {
     resizeOverlay(els.overlay, els.video);
 
-    const { landmarks, inferenceMs } = detect(els.video, nowMs);
+    const { landmarks: rawLandmarks, inferenceMs } = fakeBody ? { landmarks: fakeBody.landmarks(nowMs), inferenceMs: 0 } : detect(els.video, nowMs);
     smoothedInferenceMs = ema(smoothedInferenceMs, inferenceMs, CONFIG.fps.smoothing);
 
     const previousSteps = jog.stepCount, previousClaps = clap.clapCount, previousHolds = handsOnHips.holdCount;
     const previousClapArmed = clap.armed;
     const previousLane = lateral.label;
+    handsOnHips = updateHandsOnHips(handsOnHips, rawLandmarks, nowMs);
+    const landmarks = revealHeldHips(handsOnHips, rawLandmarks);
     lateral = updateLateral(lateral, landmarks, nowMs);
     if (lateral.label !== previousLane) laneChangedMs = nowMs;
     jog = updateJog(jog, landmarks, nowMs);
     clap = updateClap(clap, landmarks, nowMs);
-    handsOnHips = updateHandsOnHips(handsOnHips, landmarks, nowMs);
 
     trackCalibrationReadouts(landmarks as PoseLandmarks | null, nowMs);
     trackMovement(nowMs);
-    if (lateral.hasBody && kneesVisible) lastValidPoseMs = nowMs;
-    else pauseRun('body');
+    if (lateral.hasBody && kneesVisible) { lastValidPoseMs = nowMs; bodyReturnedMs ??= nowMs; }
+    else bodyReturnedMs = null;
     if (!hasStarted) {
       const next = { left: rehearsal.left || lateral.isCalibrated && lateral.label === LATERAL.LEFT,
         right: rehearsal.right || lateral.isCalibrated && lateral.label === LATERAL.RIGHT,
@@ -1114,7 +1135,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
       try {
         setStatus('Requesting camera...');
-        const camera = await startCamera(els.video, undefined, abortController.signal);
+        if (options.fakeBody) fakeBody = createFakeBody();
+        const camera = await startCamera(els.video, undefined, abortController.signal, fakeBody?.stream);
         if (isDisposed || requestId !== cameraRequestId) {
           stopCamera(camera.stream);
           return false;
@@ -1130,7 +1152,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
 
         setStatus(`Loading pose model (${CONFIG.pose.model})...`);
         if (isDisposed || requestId !== cameraRequestId) return false;
-        const pose = await initPose();
+        const pose = fakeBody ? FAKE_POSE_INIT : await initPose();
         if (isDisposed || requestId !== cameraRequestId) {
           return false;
         }
@@ -1252,10 +1274,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     resume() {
       if (mode !== 'game' || !hasStarted || game.isOver || pauseReason === null || document.hidden) return false;
       if (!isCameraSkipped && (!isPoseRunning || !lateral.hasBody || !lateral.isCalibrated || !kneesVisible
-        || lastValidPoseMs === null || performance.now() - lastValidPoseMs > 1000)) return false;
-      pauseReason = null; input.clearPose();
-      if (!isCameraSkipped) { input.setPose(lateral.label, jog.isJogging, handsOnHips.isActive, jog.cadenceSpm, jog.stepCount); input.read(); }
-      lastGameMs = performance.now(); lastRenderMs = null; needsRender = true; publish(); return true;
+        || !hasCurrentBody(performance.now()))) return false;
+      resumeRun(); return true;
     },
 
     finish() {
@@ -1361,6 +1381,7 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     isCameraStarting = false;
     isPoseRunning = false;
     lastValidPoseMs = null;
+    bodyReturnedMs = null;
     lastPoseReceivedMs = null;
     if (mode === 'test') {
       game = { ...game, speed: 0, isFiring: false, isShielding: false, jumpStartedMs: null, jumpHeight: 0, bullets: [] };
@@ -1369,6 +1390,8 @@ export function createGameRuntime(els: RuntimeElements, options: RuntimeOptions 
     lateral = createLateralState(); jog = { ...createJogState(), stepCount: jog.stepCount };
     cancelPoseFrame();
     stopCamera(stream);
+    fakeBody?.dispose();
+    fakeBody = null;
     if (stream && els.video.srcObject === stream) {
       els.video.pause();
       els.video.srcObject = null;

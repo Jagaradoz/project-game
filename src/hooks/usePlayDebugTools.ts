@@ -11,6 +11,15 @@ export function usePlayDebugTools(): boolean {
   return useSyncExternalStore(subscribe, readDebugFlag, readServerFlag);
 }
 
+/** `?fakeBody=1` swaps the webcam for a keyboard-driven body. Never in production. */
+export function useFakeBody(): boolean {
+  return useSyncExternalStore(subscribe, readFakeBodyFlag, () => false);
+}
+
+function readFakeBodyFlag(): boolean {
+  return process.env.NODE_ENV !== 'production' && new URLSearchParams(window.location.search).get('fakeBody') === '1';
+}
+
 function readServerFlag(): boolean {
   return process.env.NODE_ENV !== 'production';
 }

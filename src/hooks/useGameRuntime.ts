@@ -91,6 +91,7 @@ export interface GameRuntimeRefs {
 }
 
 export interface UseGameRuntimeOptions {
+  fakeBody?: boolean;
   character?: string;
   graphicsQuality?: ShadowQuality;
   /** 'pose' skips the renderer and the reducer -- see RuntimeMode. */
@@ -120,7 +121,7 @@ export interface GameActions {
 }
 
 export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOptions = {}) {
-  const { character, graphicsQuality, mode = 'game' } = options;
+  const { character, graphicsQuality, mode = 'game', fakeBody = false } = options;
   const initialQuality = useRef(graphicsQuality);
 
   const runtimeRef = useRef<GameRuntime | null>(null);
@@ -144,7 +145,7 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
     // stops a character change from rebuilding the whole scene.
     const instance = createGameRuntime(
       { gameCanvas, video, overlay, container },
-      { seed, mode, graphicsQuality: initialQuality.current },
+      { seed, mode, fakeBody, graphicsQuality: initialQuality.current },
     );
 
     runtimeRef.current = instance;
@@ -168,7 +169,7 @@ export function useGameRuntime(refs: GameRuntimeRefs, options: UseGameRuntimeOpt
       snapshotRef.current = IDLE_SNAPSHOT;
       for (const listener of listeners) listener();
     };
-  }, [mode, refs.container, refs.gameCanvas, refs.overlay, refs.video]);
+  }, [mode, fakeBody, refs.container, refs.gameCanvas, refs.overlay, refs.video]);
 
   const subscribe = useCallback((onChange: () => void) => {
     const listeners = listenersRef.current;

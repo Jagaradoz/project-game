@@ -11,7 +11,7 @@ npm run dev
 
 Open http://localhost:3000. The public pages are Home (`/`), Calibration (`/calibrate`), Guide Mode (`/test`), Game Mode (`/play`), and Result (`/result`). There is no Profile page, history or saved data.
 
-Home leads directly to both modes. Game Mode requires camera permission, current body/centre calibration, suitable framing and light, and rehearsal of all four movements before every run. Stand with your head and knees visible, clear your space, and move at a comfortable pace.
+Home leads directly to both modes. Game Mode opens with one centred prompt that asks only for the camera. The run then starts by itself once current body/centre calibration, framing and light are good; rehearsing the movements is optional on Calibration, which also holds the character, starting difficulty and graphics choices. Stand with your head and knees visible, clear your space, and move at a comfortable pace.
 
 ## Controls and game goal
 
@@ -24,7 +24,7 @@ The character stops without coasting when the knee detector reports cessation. D
 
 Select one of the five existing characters and a starting difficulty in Game Mode setup. Difficulty increases every four gameplay minutes, up to level 5, by increasing enemy/fog challenge; it does not dictate exercise cadence or change scenes. Gameplay time and progress toward 20 minutes appear in the HUD. The goal is a milestone: play continues afterward until health runs out or you choose **Finish session**.
 
-Body loss, camera failure, and hiding the page pause the simulation and gameplay clock. Resume is explicit and requires valid tracking. Manual Pause is available too. Results show score, enemies defeated, gameplay duration, detected knee-lift time, knee steps, movement counts, distance, and technical measurements.
+Body loss, camera failure, and hiding the page pause the simulation and gameplay clock. After body loss, a short centred prompt stays up until the head-to-knee body is visible again, then the run continues automatically; other pauses need an explicit Resume with valid tracking. Manual Pause is available too. Results show score, enemies defeated, gameplay duration, detected knee-lift time, knee steps, movement counts, distance, and technical measurements.
 
 ## Guide Mode
 
@@ -83,6 +83,8 @@ node tools/check-long-play.mjs http://localhost:3000/play 1204
 The browser tools need a running development server and installed Chrome or Edge. They use an isolated software-rendered browser. The scope check covers five public routes, nine removed routes, two portrait panels, six Proposal measurement types, viewport fit without scrolling, removed controls, zero-valued empty measurements, automatic camera entry, preview retry after denial, synthetic camera acquisition/navigation cleanup, idle animation, developer pause/resume, finishing/results and an empty result after reload. The long-play probe simulates 1,204 seconds across repeated runs and checks GPU-resource bounds; it is not a 20-minute physical-webcam acceptance trial.
 
 For local development only, game setup includes **Development: skip camera**, plus the existing keyboard/headless harness. These controls and `window.__lane` are absent in production.
+
+To test the tracking flow without a webcam or moving, open `/play?fakeBody=1` in development and click Allow camera. A keyboard-driven body replaces the camera and pose model while detectors, pausing and gameplay run for real: `B` body in or out of frame, `N` hide knees, `Q`/`E` lean left or right while held, `G` jog on or off, `1`/`2`/`3` for 60/120/180 steps per minute, `H` hands on hips, `C` clap. This checks game logic, not pose accuracy.
 
 `npm run assets:catalog` opens the separate developer asset viewer at http://127.0.0.1:3101. It is served by a localhost-only tool; `/catalog.html` is absent from the public app.
 
