@@ -40,7 +40,7 @@ Measurements use actual runtime samples, with a dash for unavailable values. The
 
 Accounts are optional and use a username and password only (no OAuth, no email). Passwords are hashed with scrypt; the session is an HttpOnly, SameSite=Lax cookie. When a logged-in player finishes a Game Mode run, its score, distance, gameplay time and date are saved, and **My stats** shows the totals (runs, best score, best distance, total play time) and the 20 latest runs. Guests play exactly as before and nothing is saved for them.
 
-Storage is a SQLite file at `data/game.db` (git-ignored), created on first use by Node's built-in `node:sqlite`; set `DB_PATH` to move it. It needs a host with a persistent disk -- a serverless/static deploy will not keep it.
+Storage is Postgres. Production uses Neon through `DATABASE_URL`, which the Vercel integration sets. Without that variable, local runs use an on-disk PGlite database at `data/pglite` (git-ignored; set `DB_PATH` to move it), so no account is needed. Tables are created on first use.
 
 Everything else stays in visit-scoped memory: Guide Mode session state, bounded diagnostic events and the detailed last-run view. Guide Mode reloads start a fresh session; Result reloads clear the detailed view. Diagnostic JSON is downloaded only when requested. There is no online ranking and no browser storage.
 

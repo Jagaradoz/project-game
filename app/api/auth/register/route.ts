@@ -6,6 +6,6 @@ export function POST(request: NextRequest) {
   return handle('register', async () => {
     const parsed = await readJson(request);
     if (!parsed.ok) return parsed.response;
-    return respond(request, accountService().register(parsed.body, clientKey(request)));
+    return respond(request, await accountService().register(parsed.body, clientKey(request)));
   });
 }

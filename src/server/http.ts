@@ -7,17 +7,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { createAccountService, type AccountService, type ServiceResult } from '@/server/accounts';
 import { SERVER_CONFIG } from '@/server/config';
+import { openDatabase } from '@/server/database';
 import { openStore } from '@/server/db';
 
 /** Request bodies are tiny JSON objects; anything bigger is rejected. */
 const MAX_BODY_BYTES = 4 * 1024;
 const COOKIE = SERVER_CONFIG.session.cookieName;
 
-/** Survives dev hot reloads, so the SQLite handle and rate limits are not recreated per edit. */
+/** Survives dev hot reloads, so the database handle and rate limits are not recreated per edit. */
 const globalForAccounts = globalThis as unknown as { accountService?: AccountService };
 
 export function accountService(): AccountService {
-  globalForAccounts.accountService ??= createAccountService({ store: openStore(SERVER_CONFIG.dbPath) });
+  globalForAccounts.accountService ??= createAccountService({ store: openStore(openDatabase()) });
   return globalForAccounts.accountService;
 }
 

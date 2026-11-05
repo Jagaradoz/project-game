@@ -38,6 +38,7 @@ function getAllowedDevOrigins(): string[] {
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
+  serverExternalPackages: ['@electric-sql/pglite'],
   allowedDevOrigins: getAllowedDevOrigins(),
   async redirects() {
     return [{ source: '/how-to-play', destination: '/#how-to-play', permanent: true }];

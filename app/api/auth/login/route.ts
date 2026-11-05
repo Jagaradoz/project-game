@@ -6,6 +6,6 @@ export function POST(request: NextRequest) {
   return handle('login', async () => {
     const parsed = await readJson(request);
     if (!parsed.ok) return parsed.response;
-    return respond(request, accountService().login(parsed.body, clientKey(request)));
+    return respond(request, await accountService().login(parsed.body, clientKey(request)));
   });
 }

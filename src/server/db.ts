@@ -1,34 +1,36 @@
-/** SQLite storage for users, sessions and plays. Prepared statements only. */
-
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+/** Postgres storage for users, sessions and plays. Parameterised queries only. */
 
 import type { PlayInput, PlayRecord, PlaySummary } from '@/lib/validation/account';
 
-const SCHEMA = `
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY,
-    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+/** One statement per entry: Neon's HTTP driver runs a single statement per call. */
+const SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS users (
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    username TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     salt TEXT NOT NULL,
-    created_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS sessions (
+    created_at BIGINT NOT NULL
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS users_username_ci ON users (lower(username))',
+  `CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS plays (
-    id INTEGER PRIMARY KEY,
+    expires_at BIGINT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS plays (
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     score INTEGER NOT NULL,
     distance_m INTEGER NOT NULL,
-    duration_ms INTEGER NOT NULL,
-    played_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS plays_by_user ON plays(user_id, played_at DESC);
-`;
+    duration_ms BIGINT NOT NULL,
+    played_at BIGINT NOT NULL
+  )`,
+  'CREATE INDEX IF NOT EXISTS plays_by_user ON plays (user_id, played_at DESC)',
+];
+
+export interface Database {
+  query(text: string, params?: unknown[]): Promise<Record<string, unknown>[]>;
+}
 
 export interface UserRow {
   id: number;
@@ -44,77 +46,87 @@ export interface SessionUser {
 
 export interface Store {
   /** @returns The new user id, or null when the name is taken (case-insensitive). */
-  createUser(username: string, passwordHash: string, salt: string, nowMs: number): number | null;
-  findUser(username: string): UserRow | null;
-  createSession(token: string, userId: number, expiresAt: number, nowMs: number): void;
-  sessionUser(token: string, nowMs: number): SessionUser | null;
-  deleteSession(token: string): void;
-  addPlay(userId: number, play: PlayInput, nowMs: number): void;
-  recentPlays(userId: number, limit: number): PlayRecord[];
-  summary(userId: number): PlaySummary;
-  close(): void;
+  createUser(username: string, passwordHash: string, salt: string, nowMs: number): Promise<number | null>;
+  findUser(username: string): Promise<UserRow | null>;
+  createSession(token: string, userId: number, expiresAt: number, nowMs: number): Promise<void>;
+  sessionUser(token: string, nowMs: number): Promise<SessionUser | null>;
+  deleteSession(token: string): Promise<void>;
+  addPlay(userId: number, play: PlayInput, nowMs: number): Promise<void>;
+  recentPlays(userId: number, limit: number): Promise<PlayRecord[]>;
+  summary(userId: number): Promise<PlaySummary>;
 }
 
-export function openStore(dbPath: string): Store {
-  if (dbPath !== ':memory:') mkdirSync(path.dirname(dbPath), { recursive: true });
+/** BIGINT and SUM come back as strings, so numeric reads are cast to float8. */
+export function openStore(database: Database): Store {
+  let schemaReady: Promise<void> | null = null;
 
-  const db = new DatabaseSync(dbPath);
-  db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
-  db.exec(SCHEMA);
+  async function migrate(): Promise<void> {
+    for (const statement of SCHEMA) await database.query(statement);
+  }
 
-  const sql = {
-    insertUser: db.prepare('INSERT INTO users (username, password_hash, salt, created_at) VALUES (?, ?, ?, ?)'),
-    userByName: db.prepare(
-      'SELECT id, username, password_hash AS passwordHash, salt FROM users WHERE username = ?',
-    ),
-    insertSession: db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)'),
-    deleteExpiredSessions: db.prepare('DELETE FROM sessions WHERE expires_at <= ?'),
-    sessionUser: db.prepare(
-      `SELECT users.id, users.username FROM sessions
-       JOIN users ON users.id = sessions.user_id
-       WHERE sessions.token = ? AND sessions.expires_at > ?`,
-    ),
-    deleteSession: db.prepare('DELETE FROM sessions WHERE token = ?'),
-    insertPlay: db.prepare(
-      'INSERT INTO plays (user_id, score, distance_m, duration_ms, played_at) VALUES (?, ?, ?, ?, ?)',
-    ),
-    recentPlays: db.prepare(
-      `SELECT score, distance_m AS distanceM, duration_ms AS durationMs, played_at AS playedAt
-       FROM plays WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT ?`,
-    ),
-    summary: db.prepare(
-      `SELECT COUNT(*) AS runs,
-              COALESCE(MAX(score), 0) AS bestScore,
-              COALESCE(MAX(distance_m), 0) AS bestDistanceM,
-              COALESCE(SUM(duration_ms), 0) AS totalDurationMs
-       FROM plays WHERE user_id = ?`,
-    ),
-  };
+  async function run<T>(text: string, params: unknown[] = []): Promise<T[]> {
+    schemaReady ??= migrate().catch((error) => {
+      schemaReady = null;
+      throw error;
+    });
+    await schemaReady;
+    return (await database.query(text, params)) as T[];
+  }
 
   return {
-    createUser(username, passwordHash, salt, nowMs) {
-      try {
-        return Number(sql.insertUser.run(username, passwordHash, salt, nowMs).lastInsertRowid);
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('UNIQUE')) return null;
-        throw error;
-      }
+    async createUser(username, passwordHash, salt, nowMs) {
+      const [row] = await run<{ id: number }>(
+        `INSERT INTO users (username, password_hash, salt, created_at) VALUES ($1, $2, $3, $4)
+         ON CONFLICT DO NOTHING RETURNING id`,
+        [username, passwordHash, salt, nowMs],
+      );
+      return row?.id ?? null;
     },
-    findUser: (username) => (sql.userByName.get(username) as UserRow | undefined) ?? null,
-    createSession(token, userId, expiresAt, nowMs) {
-      sql.deleteExpiredSessions.run(nowMs);
-      sql.insertSession.run(token, userId, expiresAt);
+    async findUser(username) {
+      const [row] = await run<UserRow>(
+        `SELECT id, username, password_hash AS "passwordHash", salt FROM users
+         WHERE lower(username) = lower($1)`,
+        [username],
+      );
+      return row ?? null;
     },
-    sessionUser: (token, nowMs) => (sql.sessionUser.get(token, nowMs) as SessionUser | undefined) ?? null,
-    deleteSession: (token) => {
-      sql.deleteSession.run(token);
+    async createSession(token, userId, expiresAt, nowMs) {
+      await run('DELETE FROM sessions WHERE expires_at <= $1', [nowMs]);
+      await run('INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)', [token, userId, expiresAt]);
     },
-    addPlay: (userId, play, nowMs) => {
-      sql.insertPlay.run(userId, play.score, play.distanceM, play.durationMs, nowMs);
+    async sessionUser(token, nowMs) {
+      const [row] = await run<SessionUser>(
+        `SELECT users.id, users.username FROM sessions
+         JOIN users ON users.id = sessions.user_id
+         WHERE sessions.token = $1 AND sessions.expires_at > $2`,
+        [token, nowMs],
+      );
+      return row ?? null;
     },
-    recentPlays: (userId, limit) =>
-      (sql.recentPlays.all(userId, limit) as unknown as PlayRecord[]).map((row) => ({ ...row })),
-    summary: (userId) => ({ ...(sql.summary.get(userId) as unknown as PlaySummary) }),
-    close: () => db.close(),
+    async deleteSession(token) {
+      await run('DELETE FROM sessions WHERE token = $1', [token]);
+    },
+    async addPlay(userId, play, nowMs) {
+      await run(
+        'INSERT INTO plays (user_id, score, distance_m, duration_ms, played_at) VALUES ($1, $2, $3, $4, $5)',
+        [userId, play.score, play.distanceM, play.durationMs, nowMs],
+      );
+    },
+    recentPlays: (userId, limit) => run<PlayRecord>(
+      `SELECT score, distance_m AS "distanceM", duration_ms::float8 AS "durationMs", played_at::float8 AS "playedAt"
+       FROM plays WHERE user_id = $1 ORDER BY played_at DESC, id DESC LIMIT $2`,
+      [userId, limit],
+    ),
+    async summary(userId) {
+      const [row] = await run<PlaySummary>(
+        `SELECT COUNT(*)::int AS runs,
+                COALESCE(MAX(score), 0) AS "bestScore",
+                COALESCE(MAX(distance_m), 0) AS "bestDistanceM",
+                COALESCE(SUM(duration_ms), 0)::float8 AS "totalDurationMs"
+         FROM plays WHERE user_id = $1`,
+        [userId],
+      );
+      return { ...row! };
+    },
   };
 }

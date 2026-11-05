@@ -3,8 +3,8 @@
 import path from 'node:path';
 
 export const SERVER_CONFIG = {
-  /** Lives outside public/ and is git-ignored. Override with DB_PATH. */
-  dbPath: process.env.DB_PATH || path.join(process.cwd(), 'data', 'game.db'),
+  /** Local PGlite folder, used when DATABASE_URL is unset. Git-ignored; override with DB_PATH. */
+  localDbPath: process.env.DB_PATH || path.join(process.cwd(), 'data', 'pglite'),
 
   session: {
     cookieName: 'exergame_session',

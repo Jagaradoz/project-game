@@ -57,76 +57,76 @@ export function createAccountService({
   now = Date.now,
   limiter = createRateLimiter(SERVER_CONFIG.rateLimit.maxAttempts, SERVER_CONFIG.rateLimit.windowMs),
 }: Deps) {
-  function startSession(userId: number): NewSession {
+  async function startSession(userId: number): Promise<NewSession> {
     const token = newSessionToken();
     const maxAgeMs = SERVER_CONFIG.session.ttlMs;
-    store.createSession(token, userId, now() + maxAgeMs, now());
+    await store.createSession(token, userId, now() + maxAgeMs, now());
     return { token, maxAgeMs };
   }
 
-  function userFor(token: string | null | undefined): SessionUser | null {
+  async function userFor(token: string | null | undefined): Promise<SessionUser | null> {
     return token ? store.sessionUser(token, now()) : null;
   }
 
   return {
-    register(body: unknown, clientKey: string): ServiceResult<AccountData> {
+    async register(body: unknown, clientKey: string): Promise<ServiceResult<AccountData>> {
       if (!limiter.allow(clientKey, now())) return TOO_MANY;
       const parsed = credentialsSchema.safeParse(body);
       if (!parsed.success) return fail(400, firstIssue(parsed.error));
 
       const { username, password } = parsed.data;
       const { hash, salt } = hashPassword(password);
-      const userId = store.createUser(username, hash, salt, now());
+      const userId = await store.createUser(username, hash, salt, now());
       if (userId === null) return fail(409, 'That username is taken.');
 
-      return { ok: true, status: 201, data: { username }, session: startSession(userId) };
+      return { ok: true, status: 201, data: { username }, session: await startSession(userId) };
     },
 
-    login(body: unknown, clientKey: string): ServiceResult<AccountData> {
+    async login(body: unknown, clientKey: string): Promise<ServiceResult<AccountData>> {
       if (!limiter.allow(clientKey, now())) return TOO_MANY;
       const parsed = loginSchema.safeParse(body);
       if (!parsed.success) return fail(400, firstIssue(parsed.error));
 
-      const user = store.findUser(parsed.data.username);
+      const user = await store.findUser(parsed.data.username);
       const isValid = verifyPassword(
         parsed.data.password,
         user ? { hash: user.passwordHash, salt: user.salt } : DUMMY_HASH,
       );
       if (!user || !isValid) return fail(401, 'Invalid username or password.');
 
-      return { ok: true, status: 200, data: { username: user.username }, session: startSession(user.id) };
+      return { ok: true, status: 200, data: { username: user.username }, session: await startSession(user.id) };
     },
 
-    logout(token: string | null | undefined): ServiceResult<null> {
-      if (token) store.deleteSession(token);
+    async logout(token: string | null | undefined): Promise<ServiceResult<null>> {
+      if (token) await store.deleteSession(token);
       return { ok: true, status: 200, data: null, session: null };
     },
 
-    me(token: string | null | undefined): ServiceResult<MeData> {
-      const user = userFor(token);
+    async me(token: string | null | undefined): Promise<ServiceResult<MeData>> {
+      const user = await userFor(token);
       if (!user) return NOT_LOGGED_IN;
-      return { ok: true, status: 200, data: { username: user.username, summary: store.summary(user.id) } };
+      return { ok: true, status: 200, data: { username: user.username, summary: await store.summary(user.id) } };
     },
 
-    addPlay(token: string | null | undefined, body: unknown): ServiceResult<{ summary: PlaySummary }> {
-      const user = userFor(token);
+    async addPlay(token: string | null | undefined, body: unknown): Promise<ServiceResult<{ summary: PlaySummary }>> {
+      const user = await userFor(token);
       if (!user) return NOT_LOGGED_IN;
       const parsed = playSchema.safeParse(body);
       if (!parsed.success) return fail(400, firstIssue(parsed.error));
 
-      store.addPlay(user.id, parsed.data, now());
-      return { ok: true, status: 201, data: { summary: store.summary(user.id) } };
+      await store.addPlay(user.id, parsed.data, now());
+      return { ok: true, status: 201, data: { summary: await store.summary(user.id) } };
     },
 
-    plays(token: string | null | undefined): ServiceResult<PlaysData> {
-      const user = userFor(token);
+    async plays(token: string | null | undefined): Promise<ServiceResult<PlaysData>> {
+      const user = await userFor(token);
       if (!user) return NOT_LOGGED_IN;
       return {
         ok: true,
         status: 200,
         data: {
-          summary: store.summary(user.id),
-          recent: store.recentPlays(user.id, SERVER_CONFIG.recentPlaysLimit),
+          summary: await store.summary(user.id),
+          recent: await store.recentPlays(user.id, SERVER_CONFIG.recentPlaysLimit),
         },
       };
     },

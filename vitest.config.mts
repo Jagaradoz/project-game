@@ -43,6 +43,7 @@ export default defineConfig({
         'src/engine/types.ts',
         // Next.js request/response glue, exercised by the route handlers.
         'src/server/http.ts',
+        'src/server/database.ts',
       ],
       thresholds: {
         lines: 80,
