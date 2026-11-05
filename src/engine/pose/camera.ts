@@ -22,22 +22,10 @@ export async function startCamera(
   video: HTMLVideoElement,
   config: CameraConfig = CONFIG.camera,
   signal?: AbortSignal,
+  fakeStream?: MediaStream,
 ): Promise<CameraStartResult> {
   throwIfAborted(signal);
-  assertSecureContext();
-
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('This browser does not expose navigator.mediaDevices.getUserMedia.');
-  }
-
-  const stream = await withAbort(navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      facingMode: config.facingMode,
-      width: { ideal: config.idealWidth },
-      height: { ideal: config.idealHeight },
-    },
-  }), signal, stopCamera);
+  const stream = fakeStream ?? await requestStream(config, signal);
 
   try {
     throwIfAborted(signal);
@@ -69,6 +57,23 @@ export async function startCamera(
     }
     throw error;
   }
+}
+
+async function requestStream(config: CameraConfig, signal?: AbortSignal): Promise<MediaStream> {
+  assertSecureContext();
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('This browser does not expose navigator.mediaDevices.getUserMedia.');
+  }
+
+  return withAbort(navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: {
+      facingMode: config.facingMode,
+      width: { ideal: config.idealWidth },
+      height: { ideal: config.idealHeight },
+    },
+  }), signal, stopCamera);
 }
 
 export function stopCamera(stream: MediaStream | null | undefined): void {

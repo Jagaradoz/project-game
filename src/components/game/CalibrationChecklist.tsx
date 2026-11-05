@@ -14,9 +14,9 @@ export interface CalibrationCheck {
  * The gate on TOR 3 (ระบบปรับเทียบกล้อง): the run may not start until the system
  * has found the player in a workable position.
  *
- * A pure function of the snapshot plus the rehearsal progress, so the rule that
- * decides whether the run may start is one readable list rather than a
- * condition spread across the page.
+ * A pure function of the snapshot plus the rehearsal progress. /calibrate shows
+ * the whole list; Game Mode only waits on the framing checks, and rehearsal stays
+ * optional practice.
  */
 export function buildChecks(
   snapshot: HudSnapshot,

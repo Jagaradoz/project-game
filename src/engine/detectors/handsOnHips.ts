@@ -51,6 +51,21 @@ function readPose(pose: PoseLandmarks, hips: NonNullable<HandsOnHipsState['lastH
     sideOnHip(rw, re, hips.right, shoulderMid.x, torso, shoulderWidth, config);
 }
 
+/**
+ * While the pose is held, the hands themselves hide the hips. Restores them from
+ * the last good positions, so the body checks and the jog keep working under the
+ * shield. Any other low-confidence hips stay as they are.
+ */
+export function revealHeldHips(state: HandsOnHipsState, pose: PoseLandmarks | null): PoseLandmarks | null {
+  const hips = state.lastHips;
+  if (!pose || !hips || (!state.isActive && state.candidateMs === null)) return pose;
+  const held = { [LANDMARK.LEFT_HIP]: hips.left, [LANDMARK.RIGHT_HIP]: hips.right };
+  return pose.map((landmark, index) => {
+    const hip = held[index];
+    return hip && !isVisible(landmark) ? { ...landmark, ...hip, visibility: CONFIG.pose.minVisibility } : landmark;
+  });
+}
+
 export function updateHandsOnHips(state: HandsOnHipsState, pose: PoseLandmarks | null | undefined,
   nowMs: number, config: HandsOnHipsConfig = CONFIG.handsOnHips): HandsOnHipsState {
   const lastHips = pose ? resolveHips(state, pose, nowMs, config) : state.lastHips;

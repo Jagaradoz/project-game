@@ -57,6 +57,10 @@ export const CONFIG = {
     minTrackingConfidence: 0.5,
     /** Landmarks scoring below this are treated as missing rather than fed in as noise. */
     minVisibility: 0.5,
+    /** A run pauses once the full body has been missing this long, so one dropped frame cannot. */
+    bodyLossPauseMs: 500,
+    /** A run starts, or a body-loss pause ends, once the full body has been steady this long. */
+    bodyReturnResumeMs: 500,
   },
 
   lateral: {

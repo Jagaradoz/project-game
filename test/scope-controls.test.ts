@@ -52,6 +52,12 @@ describe('Proposal controls', () => {
     input.clearPose();
     expect(input.read().cadenceSpm).toBe(0);
   });
+  it('a knee step fires nothing while the shield is up or during a jump', () => {
+    const shielded = updateGame(createGameState(), { lane: 1, isFiring: true, isShielding: true, cadenceSpm: 90, stepEvents: 1 }, 33);
+    expect(shielded.justFired).toBe(false);
+    const jumping = updateGame(createGameState(), { lane: 1, isFiring: true, jump: true, cadenceSpm: 90, stepEvents: 1 }, 33);
+    expect(jumping.justFired).toBe(false);
+  });
   it('fires one identical projectile per step without a continuous-fire tail', () => {
     let state = createGameState();
     state = updateGame(state, { lane: 1, isFiring: true, cadenceSpm: 90, stepEvents: 2 }, 33);

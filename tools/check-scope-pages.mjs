@@ -108,7 +108,7 @@ try {
   writeFileSync(output+'/guide-camera.png',await page.screenshot());
   await page.goto(base + '/play');
   await page.waitFor(`location.pathname==='/play' && window.__lane?.ready`, { timeoutMs: 90000 });
-  assert.equal(await page.evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Start Game Mode').disabled`), true);
+  assert.equal(await page.evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Allow camera').disabled`), false);
   assert.equal(await page.evaluate('window.__cameraRequests'), 0, 'navigation does not request camera automatically');
   writeFileSync(output + '/game-setup.png', await page.screenshot());
   await page.evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Development: skip camera').click()`);

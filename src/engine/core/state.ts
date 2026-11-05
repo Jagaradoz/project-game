@@ -144,9 +144,8 @@ export function updateGame(
   const jumpHeight = jumpStartedMs === null ? 0 : Math.sin(Math.PI * jumpPhase) * config.jump.height;
   // Hands on hips is not a jog: the shield and the gun never run together. Nor
   // does a jump: arms up to jump must not spray bullets on the way over.
-  const isFiring = input.stepEvents === undefined
-    ? Boolean(input.isFiring) && !isShielding && jumpStartedMs === null
-    : input.stepEvents > 0;
+  const wantsFire = input.stepEvents === undefined ? Boolean(input.isFiring) : input.stepEvents > 0;
+  const isFiring = wantsFire && !isShielding && jumpStartedMs === null;
   const crossed = advanceHazards(state.obstacles, lane, speed * stepSec, state.elapsedMs, elapsedMs, lastTakeoffMs, config);
   // The boss is just a big enemy: it walks in, and contact costs one HP.
   const movedEnemies = state.enemies.map((enemy) => {
@@ -186,7 +185,7 @@ export function updateGame(
       config,
     );
 
-  const fired = input.stepEvents !== undefined ? fireSteps(shots.bullets.filter(bullet => bullet.z >= config.spawnZ), lane, input.stepEvents, config) : fireDue(
+  const fired = input.stepEvents !== undefined ? fireSteps(shots.bullets.filter(bullet => bullet.z >= config.spawnZ), lane, isFiring ? input.stepEvents : 0, config) : fireDue(
     { bullets: shots.bullets.filter((bullet) => bullet.z >= config.spawnZ), cooldownMs: state.fireCooldownMs },
     { lane, isFiring, stepMs },
     config,

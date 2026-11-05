@@ -56,9 +56,9 @@ beforeEach(async () => {
   mocks.detect.mockImplementation(() => ({ landmarks: mocks.pose, inferenceMs: 2 }));
   await mount('game');
 });
-async function mount(mode: 'game' | 'test') {
+async function mount(mode: 'game' | 'test', fakeBody = false) {
   const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
-  runtime = createGameRuntime({ gameCanvas: canvas, overlay: canvas, video: video as unknown as HTMLVideoElement, container: {} as HTMLElement }, { mode });
+  runtime = createGameRuntime({ gameCanvas: canvas, overlay: canvas, video: video as unknown as HTMLVideoElement, container: {} as HTMLElement }, { mode, fakeBody });
   runtime.start(); await vi.waitFor(() => expect(runtime.getSnapshot().isSceneReady).toBe(true));
 }
 afterEach(() => { runtime.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -76,7 +76,28 @@ it('camera entry reports failure on rejection and success only after pose startu
   errors.mockRestore();
 });
 
-it('requires current calibration and all four controls; setup movements do not enter run totals', async () => {
+it('can begin from framing and centre alone, without rehearsing the movements', async () => {
+  expect(runtime.getSnapshot().canBegin).toBe(false);
+  await runtime.startCamera();
+  frames(makePose({ visibility: .1 }), 40);
+  expect(runtime.getSnapshot().canBegin).toBe(false);
+  frames(makePose(), 40);
+  expect(runtime.getSnapshot().rehearsal.clap).toBe(false);
+  expect(runtime.getSnapshot().canBegin).toBe(true);
+  expect(runtime.beginRun()).toBe(true);
+});
+it('a momentary full-body frame does not begin the run', async () => {
+  await runtime.startCamera();
+  const kneesHidden = makePose();
+  kneesHidden[LANDMARK.LEFT_KNEE]!.visibility = 0; kneesHidden[LANDMARK.RIGHT_KNEE]!.visibility = 0;
+  frames(kneesHidden, 40);
+  expect(runtime.getSnapshot().isCalibrated).toBe(true);
+  frames(makePose(), 3);
+  expect(runtime.getSnapshot().canBegin).toBe(false);
+  frames(makePose(), 20);
+  expect(runtime.getSnapshot().canBegin).toBe(true);
+});
+it('requires current calibration; setup movements do not enter run totals', async () => {
   expect(runtime.beginRun()).toBe(false);
   await calibrate();
   expect(runtime.getSnapshot().canBegin).toBe(true);
@@ -95,23 +116,98 @@ it('requires current calibration and all four controls; setup movements do not e
   expect(runtime.getSnapshot().hasStarted).toBe(false);
   expect(runtime.beginRun()).toBe(false);
 });
-it('body loss freezes simulation and time, counts one incident, and never resumes automatically', async () => {
+it('body loss freezes simulation and time, counts one incident, and resumes once the full body returns', async () => {
   await calibrate(); runtime.beginRun(); frames(makePose(), 15);
-  frames(null, 1);
+  frames(null, 20);
   expect(runtime.getSnapshot().pauseReason).toBe('body');
   const summary = runtime.getRunSummary();
   frames(null, 40);
   expect(runtime.getRunSummary()).toEqual(summary);
   expect(runtime.getSnapshot().metrics.bodyLossIncidents).toBe(1);
   expect(runtime.resume()).toBe(false);
-  frames(makePose(), 40);
-  expect(runtime.getSnapshot().pauseReason).toBe('body');
-  expect(runtime.resume()).toBe(true);
+  frames(makePose(), 30);
+  expect(runtime.getSnapshot().pauseReason).toBeNull();
   frames(makePose(), 15);
   expect(runtime.getRunSummary().durationMs).toBeGreaterThan(summary.durationMs);
+  expect(runtime.getSnapshot().metrics.bodyLossIncidents).toBe(1);
   runtime.finish();
   expect(runtime.getSnapshot().isOver).toBe(true);
   expect(runtime.getSnapshot().deathReason).toBeNull();
+});
+it('a brief tracking dropout neither pauses the run nor counts as body loss', async () => {
+  await calibrate(); runtime.beginRun(); frames(makePose(), 15);
+  frames(null, 3);
+  frames(makePose({ visibility: .1 }), 3);
+  frames(makePose(), 15);
+  expect(runtime.getSnapshot().pauseReason).toBeNull();
+  expect(runtime.getSnapshot().metrics.bodyLossIncidents).toBe(0);
+});
+it('pauses when only the knees leave frame, and a partial return does not resume', async () => {
+  await calibrate(); runtime.beginRun(); frames(makePose(), 15);
+  const kneesHidden = () => {
+    const pose = makePose();
+    pose[LANDMARK.LEFT_KNEE]!.visibility = 0; pose[LANDMARK.RIGHT_KNEE]!.visibility = 0;
+    return pose;
+  };
+  frames(kneesHidden(), 20);
+  expect(runtime.getSnapshot().pauseReason).toBe('body');
+  frames(kneesHidden(), 30);
+  expect(runtime.getSnapshot().pauseReason).toBe('body');
+  frames(makePose(), 5);
+  expect(runtime.getSnapshot().pauseReason).toBe('body');
+  frames(makePose(), 25);
+  expect(runtime.getSnapshot().pauseReason).toBeNull();
+});
+it('jogging with the shield up keeps running while the hands hide the hips, and leaving frame still pauses', async () => {
+  await calibrate(); runtime.beginRun(); frames(makePose(), 15);
+  const jogStep = (i: number, hipVisibility: number) => frames(makePose({ arms: 'hips', hipVisibility,
+    leftKneeLift: i % 2 ? 0 : .3, rightKneeLift: i % 2 ? .3 : 0 }), 8);
+  for (let i = 0; i < 2; i++) jogStep(i, 1);
+  for (let i = 0; i < 12; i++) jogStep(i, .4);
+  expect(runtime.getSnapshot().pauseReason).toBeNull();
+  expect(runtime.getSnapshot().isShielding).toBe(true);
+  expect(runtime.getSnapshot().speed).toBeGreaterThan(0);
+  expect(runtime.getSnapshot().metrics.bodyLossIncidents).toBe(0);
+  frames(null, 20);
+  expect(runtime.getSnapshot().pauseReason).toBe('body');
+});
+it('hidden hips without the shield pose still count as body loss', async () => {
+  await calibrate(); runtime.beginRun(); frames(makePose(), 15);
+  frames(makePose({ hipVisibility: .4 }), 20);
+  expect(runtime.getSnapshot().pauseReason).toBe('body');
+});
+it('a manual pause stays paused while the full body is visible', async () => {
+  await calibrate(); runtime.beginRun(); frames(makePose(), 15);
+  runtime.pause();
+  frames(makePose(), 40);
+  expect(runtime.getSnapshot().pauseReason).toBe('manual');
+  expect(runtime.resume()).toBe(true);
+});
+it('a fake body plays the real flow from the keyboard, without the pose model', async () => {
+  runtime.dispose(); callbacks.clear();
+  const stop = vi.fn();
+  const fakeCanvas = { width: 0, height: 0, getContext: () => ({ fillRect: vi.fn(), fillStyle: '' }), captureStream: () => ({ getTracks: () => [{ stop }] }) };
+  Object.assign(document, { createElement: () => fakeCanvas });
+  vi.stubGlobal('HTMLElement', class {});
+  await mount('game', true);
+  const press = (key: string) => window.dispatchEvent(Object.assign(new Event('keydown'), { key }));
+
+  await runtime.startCamera();
+  frames(null, 40);
+  expect(mocks.detect).not.toHaveBeenCalled();
+  expect(runtime.getSnapshot().canBegin).toBe(true);
+  expect(runtime.beginRun()).toBe(true);
+  press('b'); frames(null, 20);
+  expect(runtime.getSnapshot().pauseReason).toBe('body');
+  press('b'); frames(null, 30);
+  expect(runtime.getSnapshot().pauseReason).toBeNull();
+  press('3'); press('g'); frames(null, 90);
+  expect(runtime.getSnapshot().speed).toBeCloseTo(11, 0);
+  press('g'); press('h'); frames(null, 60);
+  expect(runtime.getSnapshot().speed).toBe(0);
+  expect(runtime.getSnapshot().isShielding).toBe(true);
+  runtime.stopCamera();
+  expect(stop).toHaveBeenCalled();
 });
 it('camera stop and hidden tabs require valid tracking and explicit resume', async () => {
   await calibrate(); runtime.beginRun(); frames(makePose(), 15);
