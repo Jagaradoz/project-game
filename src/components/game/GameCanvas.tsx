@@ -1,6 +1,6 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useGameRuntime } from '@/hooks/useGameRuntime';
 import type { RuntimeMode } from '@/engine/runtime';
 import { useFakeBody, usePlayDebugTools } from '@/hooks/usePlayDebugTools';
@@ -29,7 +29,7 @@ export default function GameCanvas({ mode = 'game' }: { mode?: RuntimeMode }) {
   const fakeBody = useFakeBody();
   const { snapshot, actions } = useGameRuntime(refs, { mode, character, graphicsQuality, fakeBody });
   const showDebugTools = usePlayDebugTools();
-  const setLastRun = useRunStore(s => s.setLastRun);
+  const setLastRun = useRunStore(s => s.setLastRun), saveRun = useRunStore(s => s.saveRun);
   const handedOff = useRef(false);
   useEffect(() => {
     if (mode !== 'test') return;
@@ -44,18 +44,26 @@ export default function GameCanvas({ mode = 'game' }: { mode?: RuntimeMode }) {
   useEffect(() => {
     if (mode === 'game' && !snapshot.hasStarted && snapshot.canBegin && snapshot.isSceneReady) actions.beginRun(startingDifficulty);
   }, [mode, snapshot.hasStarted, snapshot.canBegin, snapshot.isSceneReady, actions, startingDifficulty]);
-  /** Hands the finished run to /result. Held in memory for this page view only. */
-  const seeResult = () => {
+  /**
+   * Hands the finished run to /result, and saves it to the player's stats the
+   * first time only -- game over and "See result" can both land on one run.
+   */
+  const handOff = useCallback(() => {
     const summary = actions.getRunSummary();
-    if (summary) setLastRun(summary);
+    if (!summary) return;
+    setLastRun(summary);
+    if (handedOff.current) return;
+    handedOff.current = true;
+    void saveRun(summary);
+  }, [actions, setLastRun, saveRun]);
+  const seeResult = () => {
+    handOff();
     router.push('/result');
   };
   useEffect(() => {
     if (mode !== 'game' || !snapshot.isOver || handedOff.current) return;
-    handedOff.current = true;
-    const summary = actions.getRunSummary();
-    if (summary) setLastRun(summary);
-  }, [mode, snapshot.isOver, actions, setLastRun]);
+    handOff();
+  }, [mode, snapshot.isOver, handOff]);
   const restart = () => { handedOff.current = false; actions.restart(); };
 
   if (mode === 'test') return <TestModePanel runtimeRefs={refs} snapshot={snapshot} actions={actions} />;

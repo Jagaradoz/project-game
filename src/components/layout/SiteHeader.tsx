@@ -6,6 +6,7 @@ import { Menu, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { SHELL_GUTTER, SHELL_WIDTH } from '@/components/layout/container';
 import { Wordmark } from '@/components/layout/Wordmark';
+import { AccountNav } from '@/components/layout/AccountNav';
 import { NAV_LINKS, type NavLink } from '@/components/layout/nav';
 
 export function SiteHeader() {
@@ -53,6 +54,7 @@ export function SiteHeader() {
         <nav aria-label="Main" className="ml-auto hidden h-full items-stretch gap-7 lg:flex">
           {NAV_LINKS.map((link) => <NavItem key={link.href} link={link} pathname={pathname} />)}
         </nav>
+        <div className="ml-6 hidden lg:flex"><AccountNav /></div>
         <button ref={triggerRef} type="button"
           onClick={() => setOpenedAtPath((current) => current === pathname ? null : pathname)}
           aria-expanded={isMenuOpen} aria-controls="mobile-nav"
@@ -65,6 +67,7 @@ export function SiteHeader() {
         <div id="mobile-nav" ref={panelRef} className="border-t-2 border-ink bg-surface lg:hidden">
           <nav aria-label="Main" className={`mx-auto flex ${SHELL_WIDTH.wide} flex-col p-3 sm:px-6`}>
             {NAV_LINKS.map((link) => <NavItem key={link.href} link={link} pathname={pathname} isStacked />)}
+            <AccountNav isStacked />
           </nav>
         </div>
       )}

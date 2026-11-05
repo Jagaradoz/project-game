@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. The public pages are Home (`/`), Calibration (`/calibrate`), Guide Mode (`/test`), Game Mode (`/play`), and Result (`/result`). There is no Profile page, history or saved data.
+Open http://localhost:3000. The public pages are Home (`/`), Calibration (`/calibrate`), Guide Mode (`/test`), Game Mode (`/play`), Result (`/result`), plus Log in (`/login`), Register (`/register`) and My stats (`/stats`).
 
 Home leads directly to both modes. Game Mode opens with one centred prompt that asks only for the camera. The run then starts by itself once current body/centre calibration, framing and light are good; rehearsing the movements is optional on Calibration, which also holds the character, starting difficulty and graphics choices. Stand with your head and knees visible, clear your space, and move at a comfortable pace.
 
@@ -36,9 +36,13 @@ The twenty-minute clock includes movements, transitions and rests. Manual pauses
 
 Measurements use actual runtime samples, with a dash for unavailable values. The centered event-log overlay shows short messages and elapsed timestamps, hides empty performance samples, and retains at most 500 raw events, supports category filters and clearing, and exports schema-version-2 JSON including guided session state, measurements and trial results. The diagnostic engine retains timed evaluation support and pauses guided practice if a developer trial is started. The two-button guide interface does not expose timed-test controls. These are technical observations; pose accuracy still requires observer ground truth.
 
-## No stored data and privacy
+## Accounts, stored data and privacy
 
-The application keeps session state, bounded diagnostic events and the last run only in visit-scoped memory. Guide Mode reloads start a fresh session; Result reloads clear the last run. Diagnostic JSON is downloaded only when requested. There is no history, profile, personal high score, account, backend write, browser storage or online ranking.
+Accounts are optional and use a username and password only (no OAuth, no email). Passwords are hashed with scrypt; the session is an HttpOnly, SameSite=Lax cookie. When a logged-in player finishes a Game Mode run, its score, distance, gameplay time and date are saved, and **My stats** shows the totals (runs, best score, best distance, total play time) and the 20 latest runs. Guests play exactly as before and nothing is saved for them.
+
+Storage is a SQLite file at `data/game.db` (git-ignored), created on first use by Node's built-in `node:sqlite`; set `DB_PATH` to move it. It needs a host with a persistent disk -- a serverless/static deploy will not keep it.
+
+Everything else stays in visit-scoped memory: Guide Mode session state, bounded diagnostic events and the detailed last-run view. Guide Mode reloads start a fresh session; Result reloads clear the detailed view. Diagnostic JSON is downloaded only when requested. There is no online ranking and no browser storage.
 
 Camera frames are processed locally using MediaPipe and are never uploaded or recorded. The initial pose model and WASM files are downloaded from the pinned CDN. The developer asset catalog uses existing assets and requires network access for its Three.js import map.
 

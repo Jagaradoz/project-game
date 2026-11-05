@@ -4,6 +4,9 @@ node_modules/
 tsconfig.tsbuildinfo
 coverage/
 
+# Local account/stats database (server/node:sqlite).
+data/
+
 # Local environment. .env.example is the committed template and stays tracked.
 .env
 .env.local
