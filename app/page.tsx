@@ -74,7 +74,7 @@ export default function HomePage() {
             here in your browser — no controller needed.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <LinkButton href="/play" variant="primary" size="lg" icon={<Play size={20} />}>
+            <LinkButton href="/characters" variant="primary" size="lg" icon={<Play size={20} />}>
               Game Mode
             </LinkButton>
             <LinkButton href="/test" variant="secondary" size="lg">

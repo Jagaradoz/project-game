@@ -4,6 +4,7 @@ export interface NavLink { href: string; label: string; }
 export const NAV_LINKS: readonly NavLink[] = [
   { href: '/', label: 'Home' },
   { href: '/test', label: 'Guide Mode' },
+  { href: '/characters', label: 'Magicians' },
   { href: '/play', label: 'Game Mode' },
   { href: '/calibrate', label: 'Calibration' },
 ];

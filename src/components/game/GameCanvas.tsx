@@ -1,8 +1,9 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { useGameRuntime } from '@/hooks/useGameRuntime';
-import type { RuntimeMode } from '@/engine/runtime';
+import { createCharacterPreviewRuntime, type RuntimeMode } from '@/engine/runtime';
+import type { CharacterPreviewStatus } from '@/engine/render/characterPreview';
 import { useFakeBody, usePlayDebugTools } from '@/hooks/usePlayDebugTools';
 import { useRunStore } from '@/lib/store/run';
 import { useSettings } from '@/lib/store/settings';
@@ -107,4 +108,20 @@ export default function GameCanvas({ mode = 'game' }: { mode?: RuntimeMode }) {
       {fakeBody && <p className="pointer-events-none absolute inset-x-3 top-16 z-40 m-0 bg-ink/85 px-2 py-1 text-center font-mono text-[10px] text-white">Fake body: B body · N knees · Q/E lean · G jog · 1/2/3 speed · H hips · C clap</p>}
     </div>
   </main>;
+}
+
+/** The magician selection page shares this sole React/engine boundary: one canvas, five previews. */
+export function MagicianPreviewCanvas({ containerRef, onStatus }: {
+  containerRef: RefObject<HTMLDivElement | null>;
+  onStatus: (id: string, status: CharacterPreviewStatus) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current, container = containerRef.current;
+    if (!canvas || !container) return;
+    const runtime = createCharacterPreviewRuntime(canvas, container, onStatus);
+    void runtime.start();
+    return () => runtime.dispose();
+  }, [containerRef, onStatus]);
+  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[1] h-dvh w-screen" />;
 }
