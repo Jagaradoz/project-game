@@ -19,11 +19,32 @@ export function openDatabase(): Database {
   }
   if (process.env.VERCEL) throw new Error('DATABASE_URL is not set for this deployment.');
 
-  mkdirSync(SERVER_CONFIG.localDbPath, { recursive: true });
-  const local = import('@electric-sql/pglite').then(({ PGlite }) => PGlite.create(SERVER_CONFIG.localDbPath));
+  return openLocal(SERVER_CONFIG.localDbPath);
+}
+
+/**
+ * Opens PGlite lazily. A failed open (folder locked by another dev server, bad
+ * data dir) is not cached, so the next request retries instead of failing forever.
+ */
+function openLocal(dbPath: string): Database {
+  type Local = import('@electric-sql/pglite').PGlite;
+  let local: Promise<Local> | null = null;
+
+  function connect(): Promise<Local> {
+    local ??= (async () => {
+      mkdirSync(dbPath, { recursive: true });
+      const { PGlite } = await import('@electric-sql/pglite');
+      return PGlite.create(dbPath);
+    })().catch((error) => {
+      local = null;
+      throw error;
+    });
+    return local;
+  }
+
   return {
     async query(text, params) {
-      const { rows } = await (await local).query<Record<string, unknown>>(text, params);
+      const { rows } = await (await connect()).query<Record<string, unknown>>(text, params);
       return rows;
     },
   };
