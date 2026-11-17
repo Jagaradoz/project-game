@@ -18,3 +18,10 @@ public/assets/**/*.blend*
 docs/
 /test/
 tools/
+
+# Local database and design renders: never needed at runtime, and the local
+# PGlite store holds account data that must not leave this machine.
+data/
+render/
+renders/
+tmp/
